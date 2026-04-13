@@ -20,17 +20,17 @@ function fix_variables_from_solution!(benchmark_model, reduced_model, var_symbol
     val_to_fix = JuMP.value(reduced_model.variables[var_symbol].container)
 
     for (var, val) in zip(var_to_fix, val_to_fix)
-        JuMP.fix(var, val; force = true)
+        JuMP.fix(var, val; force=true)
     end
 end
 
 function plot_mu_vs_rp(
     results_df::DataFrame,
     case_studies_df::DataFrame;
-    savepath = "value_at_risk_threshold_mu.png",
+    savepath="value_at_risk_threshold_mu.png",
 )
     results_with_options =
-        outerjoin(case_studies_df, results_df; on = "base_name", makeunique = true)
+        outerjoin(case_studies_df, results_df; on="base_name", makeunique=true)
 
     results_with_options =
         filter(row -> !ismissing(row.value_at_risk_threshold_mu), results_with_options)
@@ -43,26 +43,22 @@ function plot_mu_vs_rp(
     rp_index = Dict(rp => i for (i, rp) in enumerate(rp_vals))
 
     p = plot(;
-        xlabel = "Number of representative_periods",
-        ylabel = "Optimal value_at_risk_threshold_mu",
-        title = "",
-        legend = :topright,
-        size = (800, 500),
-        xticks = (1:length(rp_vals), rp_labels),
+        xlabel="Number of representative_periods",
+        ylabel="Optimal value_at_risk_threshold_mu",
+        title="",
+        legend=:topright,
+        size=(800, 500),
+        xticks=(1:length(rp_vals), rp_labels),
     )
 
     for g in groupby(nonbenchmark_df, :base_name)
         g_sorted = sort(g, :rp)
 
         stochastic_method = g.stochastic_method[1]
-        mk = get(MARKER_MAP, stochastic_method) do
-            return error("Unknown stochastic_method: $stochastic_method")
-        end
+        mk = get(MARKER_MAP, stochastic_method, :circle)
 
         weight_type = g.weight_type[1]
-        mcol = get(COLOR_MAP_weight, weight_type) do
-            return error("Unknown weight_type: $weight_type")
-        end
+        mcol = get(COLOR_MAP_weight, weight_type, :black)
 
         xidx = [rp_index[rp] for rp in g_sorted.rp]
 
@@ -70,19 +66,19 @@ function plot_mu_vs_rp(
             p,
             xidx,
             g_sorted.value_at_risk_threshold_mu;
-            markershape = mk,
-            markersize = 8,
-            markercolor = mcol,
-            label = "",
+            markershape=mk,
+            markersize=8,
+            markercolor=mcol,
+            label="",
         )
 
         plot!(
             p,
             xidx,
             g_sorted.value_at_risk_threshold_mu;
-            color = mcol,
-            linewidth = 1.5,
-            label = "",
+            color=mcol,
+            linewidth=1.5,
+            label="",
         )
     end
 
@@ -93,10 +89,10 @@ function plot_mu_vs_rp(
         hline!(
             p,
             [mu_benchmark];
-            color = :black,
-            linestyle = :dash,
-            linewidth = 2,
-            label = "Hourly benchmark",
+            color=:black,
+            linestyle=:dash,
+            linewidth=2,
+            label="Hourly benchmark",
         )
     end
 
@@ -107,10 +103,10 @@ function plot_mu_vs_rp(
             p,
             [NaN],
             [NaN];
-            markershape = marker,
-            markersize = 8,
-            markercolor = :gray30,
-            label = short_label,
+            markershape=marker,
+            markersize=8,
+            markercolor=:gray30,
+            label=short_label,
         )
     end
 
@@ -120,10 +116,10 @@ function plot_mu_vs_rp(
             p,
             [NaN],
             [NaN];
-            markershape = :rect,
-            markersize = 8,
-            markercolor = color,
-            label = get(LEGEND_METHOD_MAP, label) do
+            markershape=:rect,
+            markersize=8,
+            markercolor=color,
+            label=get(LEGEND_METHOD_MAP, label) do
                 return error("Unknown method: $label")
             end,
         )
@@ -137,10 +133,10 @@ function plot_values_stocmethod_weight( #considering different options: stochast
     results_df::DataFrame,
     case_studies_df::DataFrame,
     values::String;
-    savepath = "relative_regret.png",
+    savepath="relative_regret.png",
 )
     results_with_options =
-        outerjoin(case_studies_df, results_df; on = "base_name", makeunique = true)
+        outerjoin(case_studies_df, results_df; on="base_name", makeunique=true)
     results_with_options = filter(row -> row.base_name != "0_HourlyBenchmark", results_with_options)
 
     rp_vals = sort(unique(results_with_options.rp))
@@ -148,14 +144,14 @@ function plot_values_stocmethod_weight( #considering different options: stochast
     rp_index = Dict(rp => i for (i, rp) in enumerate(rp_vals))
 
     p = plot(;
-        xlabel = "Number of representative_periods",
-        ylabel = get(VALUE_MAP, values) do
+        xlabel="Number of representative_periods",
+        ylabel=get(VALUE_MAP, values) do
             return error("Unknown values: $values")
         end,
-        title = "",
-        legend = :topright,
-        size = (800, 500),
-        xticks = (1:length(rp_vals), rp_labels),
+        title="",
+        legend=:topright,
+        size=(800, 500),
+        xticks=(1:length(rp_vals), rp_labels),
     )
     for g in groupby(results_with_options, :base_name)
         name = g.base_name[1]
@@ -181,10 +177,10 @@ function plot_values_stocmethod_weight( #considering different options: stochast
             p,
             xidx,
             g_sorted[!, column];
-            markershape = mk,
-            markersize = 8,
-            markercolor = mcol,
-            label = "",
+            markershape=mk,
+            markersize=8,
+            markercolor=mcol,
+            label="",
         )
     end
 
@@ -195,10 +191,10 @@ function plot_values_stocmethod_weight( #considering different options: stochast
             p,
             [NaN],
             [NaN];
-            markershape = marker,
-            markersize = 8,
-            markercolor = :gray30,
-            label = short_label,
+            markershape=marker,
+            markersize=8,
+            markercolor=:gray30,
+            label=short_label,
         )
     end
 
@@ -208,10 +204,10 @@ function plot_values_stocmethod_weight( #considering different options: stochast
             p,
             [NaN],
             [NaN];
-            markershape = :rect,
-            markersize = 8,
-            markercolor = color,
-            label = get(LEGEND_METHOD_MAP, label) do
+            markershape=:rect,
+            markersize=8,
+            markercolor=color,
+            label=get(LEGEND_METHOD_MAP, label) do
                 return error("Unknown method: $label")
             end,
         )
@@ -225,13 +221,13 @@ function plot_values_stocmethod_method( # considering options: method, stochasti
     results_df::DataFrame,
     case_studies_df::DataFrame,
     values::String;
-    savepath = "relative_regret.png",
-    include_dirac = false,
-    from_rp = 0,
-    chosen_method = nothing,
+    savepath="relative_regret.png",
+    include_dirac=false,
+    from_rp=0,
+    chosen_method=nothing,
 )
     results_with_options =
-        outerjoin(case_studies_df, results_df; on = "base_name", makeunique = true)
+        outerjoin(case_studies_df, results_df; on="base_name", makeunique=true)
     results_with_options = filter(row -> row.base_name != "0_HourlyBenchmark", results_with_options)
 
     rp_vals = sort(unique(results_with_options.rp))
@@ -239,14 +235,14 @@ function plot_values_stocmethod_method( # considering options: method, stochasti
     rp_index = Dict(rp => i for (i, rp) in enumerate(rp_vals))
 
     p = plot(;
-        xlabel = "Number of representative periods",
-        ylabel = get(VALUE_MAP, values) do
+        xlabel="Number of representative periods",
+        ylabel=get(VALUE_MAP, values) do
             return error("Unknown values: $values")
         end,
-        title = "",
-        legend = :topright,
-        size = (800, 500),
-        xticks = (1:length(rp_vals), rp_labels),
+        title="",
+        legend=:topright,
+        size=(800, 500),
+        xticks=(1:length(rp_vals), rp_labels),
     )
     if !include_dirac
         results_with_options = filter(row -> row.weight_type != "dirac", results_with_options)
@@ -290,11 +286,11 @@ function plot_values_stocmethod_method( # considering options: method, stochasti
             p,
             xidx,
             g_sorted[!, column];
-            markershape = mk,
-            markersize = 8,
-            markercolor = mcolin,
-            markerstrokecolor = mcolout,
-            label = "",
+            markershape=mk,
+            markersize=8,
+            markercolor=mcolin,
+            markerstrokecolor=mcolout,
+            label="",
         )
     end
 
@@ -305,10 +301,10 @@ function plot_values_stocmethod_method( # considering options: method, stochasti
             p,
             [NaN],
             [NaN];
-            markershape = marker,
-            markersize = 8,
-            markercolor = :gray30,
-            label = short_label,
+            markershape=marker,
+            markersize=8,
+            markercolor=:gray30,
+            label=short_label,
         )
     end
 
@@ -318,10 +314,10 @@ function plot_values_stocmethod_method( # considering options: method, stochasti
             p,
             [NaN],
             [NaN];
-            markershape = :rect,
-            markersize = 8,
-            markercolor = color,
-            label = get(LEGEND_METHOD_MAP, label) do
+            markershape=:rect,
+            markersize=8,
+            markercolor=color,
+            label=get(LEGEND_METHOD_MAP, label) do
                 return error("Unknown method: $label")
             end,
         )
@@ -332,10 +328,10 @@ function plot_values_stocmethod_method( # considering options: method, stochasti
             p,
             [NaN],
             [NaN];
-            markershape = :rect,
-            markersize = 8,
-            markercolor = :white,
-            label = "dirac weights",
+            markershape=:rect,
+            markersize=8,
+            markercolor=:white,
+            label="dirac weights",
         )
     end
 
@@ -347,21 +343,21 @@ function parse_rep_period_name(name::String) # the vars were created as storage_
     inside = name[findfirst('[', name)+1:end-1] # inside []
     parts = split(inside, ",")
     return (
-        asset = parts[1],
-        year = parse(Int, parts[2]),
-        rep_period = parse(Int, parts[3]),
-        time_block_start = parse(Int, split(parts[4], ":")[1]),
+        asset=parts[1],
+        year=parse(Int, parts[2]),
+        rep_period=parse(Int, parts[3]),
+        time_block_start=parse(Int, split(parts[4], ":")[1]),
     )
 end
 
-function parse_over_clustered_name(name::String) # storage_level_over_clustered_year[$(row.asset),$(row.year),$(row.scenario),$(row.period_block_start):$(row.period_block_end)]
+function parse_over_clustered_name(name::String) # storage_level_inter_period[$(row.asset),$(row.year),$(row.scenario),$(row.period_block_start):$(row.period_block_end)]
     inside = name[findfirst('[', name)+1:end-1]
     parts = split(inside, ",")
     return (
-        asset = parts[1],
-        year = parse(Int, parts[2]),
-        scenario = parse(Int, parts[3]),
-        period_block_start = parse(Int, split(parts[4], ":")[1]),
+        asset=parts[1],
+        year=parse(Int, parts[2]),
+        scenario=parse(Int, parts[3]),
+        period_block_start=parse(Int, split(parts[4], ":")[1]),
     )
 end
 
@@ -373,7 +369,7 @@ function fix_storage_levels!(
     storage_asset,
 )
     bench_vars = benchmark_model.variables[:storage_level_rep_period].container
-    red_vars = reduced_model.variables[:storage_level_over_clustered_year].container
+    red_vars = reduced_model.variables[:storage_level_inter_period].container
 
     bench_pairs = [
         (bench_vars[i], parse_rep_period_name(JuMP.name(bench_vars[i]))) for
@@ -408,7 +404,7 @@ function fix_storage_levels!(
         key = (row.asset, row.year, scenario, period)
 
         if haskey(val_to_fix, key)
-            JuMP.fix(v, val_to_fix[key]; force = true)
+            JuMP.fix(v, val_to_fix[key]; force=true)
         else
             error("No reduced_model value found for key $key")
         end
@@ -424,11 +420,11 @@ function plot_storage_behavior(
     storage_asset::String,
     representative_periods::Vector{Int64},
     scenario::Int64;
-    tables_path = "outputs",
-    savepath = "storage.png",
+    tables_path="outputs",
+    savepath="storage.png",
 )
     results_with_options =
-        outerjoin(case_studies_df, results_df; on = "base_name", makeunique = true)
+        outerjoin(case_studies_df, results_df; on="base_name", makeunique=true)
 
     asset_to_filter = storage_asset
     hourly_filtered_asset = filter(row -> row.asset == asset_to_filter, storage_levels_hourly)
@@ -439,7 +435,7 @@ function plot_storage_behavior(
     ncols = min(n, 3)
     nrows = ceil(Int, n / ncols)
 
-    p = plot(; layout = grid(nrows, ncols), link = :x, size = (1500, 350 * nrows), legend = false)
+    p = plot(; layout=grid(nrows, ncols), link=:x, size=(1500, 350 * nrows), legend=false)
 
     for (i, rp) in enumerate(representative_periods)
         # plotting the results for the hourly benchmark
@@ -447,15 +443,15 @@ function plot_storage_behavior(
             p,
             hourly_filtered_asset.time_block_end,
             hourly_filtered_asset.solution;
-            subplot = i,
-            label = "hourly",
-            color = :red,
-            title = "Storage level — $asset_to_filter (rp = $rp)",
-            xlabel = "Hour",
-            ylabel = "[GWh]",
-            xlims = (1, 8760),
-            legend = false,
-            dpi = 600,
+            subplot=i,
+            label="hourly",
+            color=:red,
+            title="Storage level — $asset_to_filter (rp = $rp)",
+            xlabel="Hour",
+            ylabel="[GWh]",
+            xlims=(1, 8760),
+            legend=false,
+            dpi=600,
         )
 
         # add storage levels for each base_name, but using the rp-specific folder
@@ -498,10 +494,10 @@ function plot_storage_behavior(
                 p,
                 reduced_filtered_asset.time_block_end,
                 reduced_filtered_asset.solution;
-                subplot = i,
-                label = "$stochastic_method selection",
-                color = mcol,
-                linestyle = mk,
+                subplot=i,
+                label="$stochastic_method selection",
+                color=mcol,
+                linestyle=mk,
             )
         end
     end

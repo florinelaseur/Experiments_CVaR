@@ -9,6 +9,8 @@ representative_periods = [30,60]
 solvers = ["Gurobi"]
 #["HiGHS", "Gurobi"]
 fix_level_storage = true
+risk_aversion_weight_lambda = 0.1
+risk_aversion_confidence_level = 0.95
 
 [clustering]
 use_ratio = false

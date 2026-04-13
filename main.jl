@@ -6,7 +6,6 @@
 cd(@__DIR__)
 using Pkg: Pkg
 Pkg.activate(".")
-Pkg.update()
 Pkg.instantiate()
 
 # Load the required packages
@@ -21,12 +20,14 @@ using CSV: CSV
 using Statistics: Statistics
 using JuMP: JuMP
 using TOML: TOML
+using Plots
 
 using DataFrames
 
 # helper functions
 @info "Including helper functions"
 include("utils/functions.jl")
+include("utils/constants.jl")
 
 distance_map = Dict(
     :Euclidean => Distances.Euclidean(),
@@ -44,11 +45,13 @@ heuristic_distance = config["clustering"]["heuristic_distance"]
 fix_level_storage = config["simulation"]["fix_level_storage"]
 representative_periods = config["simulation"]["representative_periods"]
 solvers = [Symbol(el) for el in config["simulation"]["solvers"]]
+lambda = config["simulation"]["risk_aversion_weight_lambda"]
+alpha = config["simulation"]["risk_aversion_confidence_level"]
 
 case_studies_info = CSV.read(
     "case-studies-info.csv",
     DataFrame;
-    types = Dict(
+    types=Dict(
         :base_name => String,
         :period_duration => Int,
         :method => Symbol,
@@ -57,48 +60,32 @@ case_studies_info = CSV.read(
         :niters => Int,
         :learning_rate => Float64,
         :stochastic_method => Symbol,
-        :risk_aversion_weight_lambda => Float64,
-        :risk_aversion_confidence_level => Float64,
         :run_case => Bool,
     ),
 )
 
-model_parameters = CSV.read(
-    "base-input-data/example-tulipa-single-year/model-parameters.csv",
-    DataFrame;
-    types = Dict(
-        :risk_aversion_weight_lambda => Float64,
-        :risk_aversion_confidence_level_alpha => Float64,
-    ),
-)
-
-for row in eachrow(model_parameters)
-    global risk_aversion_weight_lambda = row[:risk_aversion_weight_lambda]
-    global risk_aversion_confidence_level_alpha = row[:risk_aversion_confidence_level_alpha]
-end
-
 enable_names = true
 direct_model = false
 results_df = DataFrame(;
-    base_name = String[],
-    rp = Int[],
-    solver = Symbol[],
-    time_to_cluster = Float64[],
-    time_to_read = Float64[],
-    time_to_create = Float64[],
-    time_to_solve = Float64[],
-    time_to_save = Float64[],
-    objective_value = Float64[],
-    termination_status = String[],
-    num_constraints = Int[],
-    num_variables = Int[],
-    time_to_resolve_benchmark = Float64[],
-    objective_value_resolve_benchmark = Float64[],
-    termination_status_resolve_benchmark = String[],
-    num_loss_of_load_e_demand = Int[],
-    num_loss_of_load_h2_demand = Int[],
-    water_borrowed = Float64[],
-    value_at_risk_threshold_mu = Float64[],
+    base_name=String[],
+    rp=Int[],
+    solver=Symbol[],
+    time_to_cluster=Float64[],
+    time_to_read=Float64[],
+    time_to_create=Float64[],
+    time_to_solve=Float64[],
+    time_to_save=Float64[],
+    objective_value=Float64[],
+    termination_status=String[],
+    num_constraints=Int[],
+    num_variables=Int[],
+    time_to_resolve_benchmark=Float64[],
+    objective_value_resolve_benchmark=Float64[],
+    termination_status_resolve_benchmark=String[],
+    num_loss_of_load_e_demand=Int[],
+    num_loss_of_load_h2_demand=Int[],
+    water_borrowed=Float64[],
+    value_at_risk_threshold_mu=Float64[],
 )
 
 function main()
@@ -109,13 +96,14 @@ function main()
     # set up the connection and read the data
     connection_benchmark = DuckDB.DBInterface.connect(DuckDB.DB)
     TIO.read_csv_folder(connection_benchmark, input_data_path)
+    # update the CSV input data for Tulipa from the config file info
     DuckDB.query(
         connection_benchmark,
         "
         UPDATE model_parameters -- tables are with underscore in DuckDB world
         SET
-            risk_aversion_weight_lambda = $(risk_aversion_weight_lambda) ,
-            risk_aversion_confidence_level_alpha = $(risk_aversion_confidence_level_alpha);
+            risk_aversion_weight_lambda = $(lambda) ,
+            risk_aversion_confidence_level_alpha = $(alpha);
         ",
     )
     # transform the profiles data from wide to long
@@ -123,7 +111,7 @@ function main()
         connection_benchmark,
         "profiles_wide",
         "profiles";
-        exclude_columns = ["scenario", "milestone_year", "timestep"],
+        exclude_columns=["scenario", "milestone_year", "timestep"],
     )
 
     # To make number of rps comparable with per and cross scenario
@@ -133,10 +121,10 @@ function main()
     representative_periods .= n_scenarios .* round.(Int, representative_periods ./ n_scenarios)
 
     layout = TC.ProfilesTableLayout(;
-        year = :milestone_year,
-        cols_to_groupby = [:milestone_year, :scenario],
+        year=:milestone_year,
+        cols_to_groupby=[:milestone_year, :scenario],
     )
-    time_to_cluster = @elapsed TC.dummy_cluster!(connection_benchmark; layout = layout)
+    time_to_cluster = @elapsed TC.dummy_cluster!(connection_benchmark; layout=layout)
     TEM.populate_with_defaults!(connection_benchmark)
     DuckDB.query(connection_benchmark, "UPDATE asset SET is_seasonal = false")
 
@@ -148,11 +136,11 @@ function main()
         @info "Creating the model for the base case study (0_HourlyBenchmark) with $solver"
         time_to_create = @elapsed TEM.create_model!(
             energy_problem_benchmark;
-            optimizer = optimizer,
-            optimizer_parameters = parameters,
-            model_file_name = "",
-            enable_names = enable_names,
-            direct_model = direct_model,
+            optimizer=optimizer,
+            optimizer_parameters=parameters,
+            model_file_name="",
+            enable_names=enable_names,
+            direct_model=direct_model,
         )
 
         output_folder = joinpath(@__DIR__, "outputs", base_name, string(solver))
@@ -184,28 +172,28 @@ function main()
         amount_water_borrowed_b = sum(water_borrowed.solution)
 
         new_results_row = (
-            base_name = base_name,
-            rp = 1,
-            solver = solver,
-            time_to_cluster = 0.0,
-            time_to_read = time_to_read,
-            time_to_create = time_to_create,
-            time_to_solve = time_to_solve,
-            time_to_save = time_to_save,
-            objective_value = energy_problem_benchmark.objective_value,
-            termination_status = string(energy_problem_benchmark.termination_status),
-            num_constraints = JuMP.num_constraints(
+            base_name=base_name,
+            rp=1,
+            solver=solver,
+            time_to_cluster=0.0,
+            time_to_read=time_to_read,
+            time_to_create=time_to_create,
+            time_to_solve=time_to_solve,
+            time_to_save=time_to_save,
+            objective_value=energy_problem_benchmark.objective_value,
+            termination_status=string(energy_problem_benchmark.termination_status),
+            num_constraints=JuMP.num_constraints(
                 energy_problem_benchmark.model;
-                count_variable_in_set_constraints = false,
+                count_variable_in_set_constraints=false,
             ),
-            num_variables = JuMP.num_variables(energy_problem_benchmark.model),
-            time_to_resolve_benchmark = 0.0,
-            objective_value_resolve_benchmark = 0.0,
-            termination_status_resolve_benchmark = "",
-            num_loss_of_load_e_demand = n_lol_ens,
-            num_loss_of_load_h2_demand = n_lol_smr_cca,
-            water_borrowed = amount_water_borrowed_b,
-            value_at_risk_threshold_mu = mu_value,
+            num_variables=JuMP.num_variables(energy_problem_benchmark.model),
+            time_to_resolve_benchmark=0.0,
+            objective_value_resolve_benchmark=0.0,
+            termination_status_resolve_benchmark="",
+            num_loss_of_load_e_demand=n_lol_ens,
+            num_loss_of_load_h2_demand=n_lol_smr_cca,
+            water_borrowed=amount_water_borrowed_b,
+            value_at_risk_threshold_mu=mu_value,
         )
         push!(results_df, new_results_row)
     end
@@ -220,8 +208,6 @@ function main()
         niters = row[:niters]
         learning_rate = row[:learning_rate]
         stochastic_method = row[:stochastic_method]
-        risk_aversion_weight_lambda = row[:risk_aversion_weight_lambda]
-        risk_aversion_confidence_level_alpha = row[:risk_aversion_confidence_level]
         run_case = row[:run_case]
 
         weight_fitting_kwargs = Dict(:learning_rate => learning_rate, :niters => niters)
@@ -244,8 +230,8 @@ function main()
                 "
                 UPDATE model_parameters -- tables are with underscore in DuckDB world
                 SET
-                    risk_aversion_weight_lambda = $(risk_aversion_weight_lambda) ,
-                    risk_aversion_confidence_level_alpha = $(risk_aversion_confidence_level_alpha);
+                    risk_aversion_weight_lambda = $(lambda) ,
+                    risk_aversion_confidence_level_alpha = $(alpha);
                 ",
             )
             # to use the ratio availability/demand
@@ -268,22 +254,22 @@ function main()
                 connection,
                 "profiles_wide",
                 "profiles";
-                exclude_columns = ["scenario", "milestone_year", "timestep"],
+                exclude_columns=["scenario", "milestone_year", "timestep"],
             )
 
             if stochastic_method == :per_scenario
                 layout = TC.ProfilesTableLayout(;
-                    year = :milestone_year,
-                    cols_to_groupby = [:milestone_year, :scenario],
+                    year=:milestone_year,
+                    cols_to_groupby=[:milestone_year, :scenario],
                 )
                 time_to_cluster = @elapsed TC.cluster!(
                     connection,
                     period_duration,
                     round(Int, rp / n_scenarios);
-                    method = method,
-                    distance = distance,
-                    weight_type = weight_type,
-                    layout = layout,
+                    method=method,
+                    distance=distance,
+                    weight_type=weight_type,
+                    layout=layout,
                     clustering_kwargs,
                     weight_fitting_kwargs,
                 )
@@ -308,18 +294,18 @@ function main()
 
             elseif stochastic_method == :cross_scenario
                 layout = TC.ProfilesTableLayout(;
-                    year = :milestone_year,
-                    cols_to_groupby = [:milestone_year],
-                    cols_to_crossby = [:scenario],
+                    year=:milestone_year,
+                    cols_to_groupby=[:milestone_year],
+                    cols_to_crossby=[:scenario],
                 )
                 time_to_cluster = @elapsed TC.cluster!(
                     connection,
                     period_duration,
                     rp;
-                    method = method,
-                    distance = distance,
-                    weight_type = weight_type,
-                    layout = layout,
+                    method=method,
+                    distance=distance,
+                    weight_type=weight_type,
+                    layout=layout,
                     clustering_kwargs,
                     weight_fitting_kwargs,
                 )
@@ -370,10 +356,10 @@ function main()
                 @info "Creating the model for the case study: $case_name"
                 time_to_create = @elapsed TEM.create_model!(
                     energy_problem;
-                    optimizer = optimizer,
-                    optimizer_parameters = parameters,
-                    model_file_name = "",
-                    enable_names = enable_names,
+                    optimizer=optimizer,
+                    optimizer_parameters=parameters,
+                    model_file_name="",
+                    enable_names=enable_names,
                 )
 
                 output_folder = joinpath(@__DIR__, "outputs", case_name, string(solver))
@@ -460,47 +446,46 @@ function main()
                 # count how much water_borrowed
                 amount_water_borrowed = sum(water_borrowed.solution)
 
+                # get mu solution
+                mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
+                mu_value = only(mu_value_df.solution)
+
                 output_folder = joinpath(@__DIR__, "outputs", "fixed", case_name, string(solver))
                 mkpath(output_folder)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
 
                 new_results_row = (
-                    base_name = base_name,
-                    rp = rp,
-                    solver = solver,
-                    time_to_cluster = time_to_cluster,
-                    time_to_read = time_to_read,
-                    time_to_create = time_to_create,
-                    time_to_solve = time_to_solve,
-                    time_to_save = time_to_save,
-                    objective_value = energy_problem.objective_value,
-                    termination_status = string(energy_problem.termination_status),
-                    num_constraints = JuMP.num_constraints(
+                    base_name=base_name,
+                    rp=rp,
+                    solver=solver,
+                    time_to_cluster=time_to_cluster,
+                    time_to_read=time_to_read,
+                    time_to_create=time_to_create,
+                    time_to_solve=time_to_solve,
+                    time_to_save=time_to_save,
+                    objective_value=energy_problem.objective_value,
+                    termination_status=string(energy_problem.termination_status),
+                    num_constraints=JuMP.num_constraints(
                         energy_problem.model;
-                        count_variable_in_set_constraints = false,
+                        count_variable_in_set_constraints=false,
                     ),
-                    num_variables = JuMP.num_variables(energy_problem.model),
-                    time_to_resolve_benchmark = time_to_resolve_benchmark,
-                    objective_value_resolve_benchmark = energy_problem_benchmark.objective_value,
-                    termination_status_resolve_benchmark = string(
+                    num_variables=JuMP.num_variables(energy_problem.model),
+                    time_to_resolve_benchmark=time_to_resolve_benchmark,
+                    objective_value_resolve_benchmark=energy_problem_benchmark.objective_value,
+                    termination_status_resolve_benchmark=string(
                         energy_problem_benchmark.termination_status,
                     ),
-                    num_loss_of_load_e_demand = n_lol_ens,
-                    num_loss_of_load_h2_demand = n_lol_smr_cca,
-                    water_borrowed = amount_water_borrowed,
+                    num_loss_of_load_e_demand=n_lol_ens,
+                    num_loss_of_load_h2_demand=n_lol_smr_cca,
+                    water_borrowed=amount_water_borrowed,
+                    value_at_risk_threshold_mu=mu_value,
                 )
                 push!(results_df, new_results_row)
             end
         end
     end
 
-    results_df |> CSV.write("outputs/results.csv"; writeheader = true)
-
-    plot_mu_vs_rp(
-        results_df,
-        case_studies_info;
-        savepath = "outputs/value_at_risk_threshold_mu.png",
-    )
+    results_df |> CSV.write("outputs/results.csv"; writeheader=true)
 
     return nothing
 end
