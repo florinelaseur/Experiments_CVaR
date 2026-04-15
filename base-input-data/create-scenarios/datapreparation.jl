@@ -40,5 +40,7 @@ for (i, year) in enumerate([2028, 2030, 2033, 2035])
     profiles_list_full[start_index:stop_index] = profiles_list
 end
 profiles_df = vcat(profiles_list_full...)
+profiles_df[!, :milestone_year] .= 2030
+profiles_df[!, :scenario] .= repeat(1:144, inner=n_timesteps)
 
 CSV.write(joinpath(input_data_file, "profiles-wide.csv"), profiles_df; writeheader=true)
