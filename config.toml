@@ -1,14 +1,13 @@
 # to give information about the simulations that we are running
 
 [simulation]
+
+input_data = "base-input-data/RIDM-case-study" 
 number_of_scenarios = 50
-input_data = "base-input-data/case-study-cvar/" #/example-tulipa-single-year/" # /case-study-cvar/" # feasibility-study-cvar/"
-# possibilities: "base-input-data/example-tulipa-single-year/", "base-input-data/simple-case-2-scenarios/equal/", "base-input-data/simple-case-2-scenarios/modified/", "base-input-data/simple-case-2-scenarios/modified_3scen/", "base-input-data/simple-case-2-scenarios/1995equal/"
-#representative_periods = [30,60,90,120,180,240,360,365]
 representative_periods = [30,60]
-#with cross you have possibilities: [9,15,30,60,90,120,180,240,360,365] or [8760] etc
+#representative_periods = [30,60,90,120,180,240,360,365]
 solvers = ["Gurobi"]
-#["HiGHS", "Gurobi"]
+#solvers = ["HiGHS", "Gurobi"]
 fix_level_storage = true
 risk_aversion_weight_lambda = 0.1
 risk_aversion_confidence_level = 0.95

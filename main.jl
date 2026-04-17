@@ -47,6 +47,20 @@ representative_periods = config["simulation"]["representative_periods"]
 solvers = [Symbol(el) for el in config["simulation"]["solvers"]]
 lambda = config["simulation"]["risk_aversion_weight_lambda"]
 alpha = config["simulation"]["risk_aversion_confidence_level"]
+number_of_scenarios = config["simulation"]["number_of_scenarios"] #no more than 144
+
+all_profiles_df = CSV.read("C:/Users/fjlaseur/Tulipa/Experiments_CVaR/base-input-data/create-scenarios/profiles-wide-all-scenarios.csv", DataFrame)
+profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
+selected_scenarios = sort(unique(profiles_df.scenario))
+mapping = Dict(old => new for (new, old) in enumerate(selected_scenarios))
+profiles_df[!, :scenario] = [mapping[s] for s in profiles_df.scenario]
+CSV.write(joinpath(input_data_path, "profiles-wide.csv"), profiles_df; writeheader=true)
+
+df_stochastic_scenario = DataFrame(;
+    scenario=sort(unique(profiles_df.scenario)),
+    probability=fill(1.0 / number_of_scenarios, number_of_scenarios),
+)
+CSV.write(joinpath(input_data_path, "stochastic-scenario.csv"), df_stochastic_scenario; writeheader=true)
 
 case_studies_info = CSV.read(
     "case-studies-info.csv",
