@@ -4,7 +4,7 @@ Experiments to test two-stage stochastic formulation with representative periods
 
 ## Tulipa Setup
 
-Follow the Tutorial Setup to get to work [Tutorial Setup](https://tulipaenergy.github.io/TulipaEnergyModel.jl/stable/10-tutorials/11-setting-up/)
+Follow the [Tutorial Setup](https://tulipaenergy.github.io/TulipaEnergyModel.jl/stable/10-tutorials/11-setting-up/) and clone the current repo to get to work
 
 ## Units of measurement
 
