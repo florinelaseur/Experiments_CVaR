@@ -506,4 +506,10 @@ function plot_storage_behavior(
     @info "Plot saved in: $savepath"
 end
 
-using DataFrames
+
+function get_scenario_set(input_df::DataFrame, cardinality::Int)
+    scenarios = unique(input_df.scenario)
+    @assert cardinality ≤ length(scenarios) "Requested more scenarios than available."
+    selected = sort(shuffle(scenarios)[1:cardinality])
+    return filter(row -> row.scenario in selected, input_df)
+end

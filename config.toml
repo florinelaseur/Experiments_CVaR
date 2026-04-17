@@ -1,6 +1,7 @@
 # to give information about the simulations that we are running
 
 [simulation]
+number_of_scenarios = 50
 input_data = "base-input-data/case-study-cvar/" #/example-tulipa-single-year/" # /case-study-cvar/" # feasibility-study-cvar/"
 # possibilities: "base-input-data/example-tulipa-single-year/", "base-input-data/simple-case-2-scenarios/equal/", "base-input-data/simple-case-2-scenarios/modified/", "base-input-data/simple-case-2-scenarios/modified_3scen/", "base-input-data/simple-case-2-scenarios/1995equal/"
 #representative_periods = [30,60,90,120,180,240,360,365]

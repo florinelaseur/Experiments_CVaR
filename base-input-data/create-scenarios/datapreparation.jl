@@ -1,5 +1,7 @@
 using DataFrames
 using CSV
+using Random
+include("C:/Users/fjlaseur/Tulipa/Experiments_CVaR/utils/functions.jl")
 
 input_data_file = "C:/Users/fjlaseur/Tulipa/Experiments_CVaR/base-input-data/create-scenarios/"
 profiles_list_full = Vector{DataFrame}(undef, 144)
@@ -39,8 +41,13 @@ for (i, year) in enumerate([2028, 2030, 2033, 2035])
     stop_index = i * 36
     profiles_list_full[start_index:stop_index] = profiles_list
 end
-profiles_df = vcat(profiles_list_full...)
-profiles_df[!, :milestone_year] .= 2030
-profiles_df[!, :scenario] .= repeat(1:144, inner=n_timesteps)
+all_profiles_df = vcat(profiles_list_full...)
+all_profiles_df[!, :milestone_year] .= 2030
+all_profiles_df[!, :scenario] .= repeat(1:144, inner=n_timesteps)
 
+CSV.write(joinpath(input_data_file, "profiles-wide-all-scenarios.csv"), all_profiles_df; writeheader=true)
+
+config = TOML.parsefile("C:/Users/fjlaseur/Tulipa/Experiments_CVaR/config.toml")
+number_of_scenarios = config["simulation"]["number_of_scenarios"] #no more than 144
+profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
 CSV.write(joinpath(input_data_file, "profiles-wide.csv"), profiles_df; writeheader=true)
