@@ -521,4 +521,14 @@ function export_operational_cost_per_scenario(energy_problem, output_folder)
     costs = JuMP.value.(costs_per_scenario.expressions[:cost])
     df[!, :operational_cost] = costs
     CSV.write(joinpath(output_folder, "operational_cost_per_scenario.csv"), df)
+    return df
+end
+
+function plot_operational_cost_per_scenario(input_df::DataFrame, output_folder)
+    p = plot(input_df.scenario, input_df.operational_cost; xlabel="Scenario", ylabel="Operational Cost", title="Operational Cost per Scenario", marker=:circle)
+    sorted_scenario_costs = input_df.operational_cost |> sort
+    h = histogram(sorted_scenario_costs; bins=100, normalize=true, label="Operational Cost Distribution")
+    savefig(p, joinpath(output_folder, "operational_cost_per_scenario.png"))
+    savefig(h, joinpath(output_folder, "operational_cost_distribution.png"))
+    @info "Plots saved in: $(joinpath(output_folder, "operational_cost_per_scenario.png")) and $(joinpath(output_folder, "operational_cost_distribution.png"))"
 end
