@@ -513,3 +513,12 @@ function get_scenario_set(input_df::DataFrame, cardinality::Int)
     selected = sort(shuffle(scenarios)[1:cardinality])
     return filter(row -> row.scenario in selected, input_df)
 end
+
+
+function export_operational_cost_per_scenario(energy_problem, output_folder)
+    costs_per_scenario = energy_problem.expressions[:flows_operational_cost_per_scenario]
+    df = costs_per_scenario.indices |> DataFrame
+    costs = JuMP.value.(costs_per_scenario.expressions[:cost])
+    df[!, :operational_cost] = costs
+    CSV.write(joinpath(output_folder, "operational_cost_per_scenario.csv"), df)
+end

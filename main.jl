@@ -392,6 +392,7 @@ function main()
                 time_to_solve = @elapsed TEM.solve_model!(energy_problem)
                 time_to_save = @elapsed TEM.save_solution!(energy_problem)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem)
+                export_operational_cost_per_scenario(energy_problem, output_folder)
 
                 var_flow_df = TIO.get_table(connection, "var_flow")
                 water_borrowed = filter(
