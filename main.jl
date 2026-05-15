@@ -53,7 +53,8 @@ alpha = config["simulation"]["risk_aversion_confidence_level"]
 number_of_scenarios = config["simulation"]["number_of_scenarios"]
 run_benchmark = config["simulation"]["run_benchmark"]
 
-all_profiles_df = CSV.read("C:/Users/fjlaseur/Tulipa/Experiments_CVaR/create-scenarios/profiles-wide-all-scenarios.csv", DataFrame)
+profiles_path = joinpath(@__DIR__, "create-scenarios", "profiles-wide-all-scenarios.csv")
+all_profiles_df = CSV.read(profiles_path, DataFrame)
 profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
 selected_scenarios = sort(unique(profiles_df.scenario))
 mapping = Dict(old => new for (new, old) in enumerate(selected_scenarios))
@@ -174,6 +175,11 @@ function main()
             #            JuMP.value(energy_problem_benchmark.variables[:value_at_risk_threshold_mu].container)
             time_to_save = @elapsed TEM.save_solution!(energy_problem_benchmark)
             TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
+
+
+            df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem, output_folder)
+            plot_operational_cost_per_scenario(df_cost_per_scenario, output_folder)
+
 
             mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
             mu_value = only(mu_value_df.solution)
