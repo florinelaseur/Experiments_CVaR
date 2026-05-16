@@ -5,7 +5,8 @@
 input_data = "base-input-data/RIDM-case-study" 
 number_of_scenarios = 10
 run_benchmark = true
-representative_periods = [30,60,90]
+representative_periods = []
+#representative_periods = [30,60,90]
 #representative_periods = [30,60,90,120,180,240,360,365]
 solvers = ["Gurobi"]
 #solvers = ["HiGHS", "Gurobi"]
