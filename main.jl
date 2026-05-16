@@ -177,7 +177,7 @@ function main()
             TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
 
 
-            df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem, output_folder)
+            df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem_benchmark, output_folder)
             plot_operational_cost_per_scenario(df_cost_per_scenario, output_folder)
 
 
