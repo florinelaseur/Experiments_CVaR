@@ -7,6 +7,7 @@ cd(@__DIR__)
 using Pkg: Pkg
 Pkg.activate(".")
 Pkg.instantiate()
+Pkg.add(url="https://github.com/TulipaEnergy/TulipaEnergyModel.jl", rev="227a80f7907e2c7178edb0697874cfb6666ad644")
 
 # Load the required packages
 import TulipaEnergyModel as TEM
