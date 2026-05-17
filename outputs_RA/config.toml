@@ -1,0 +1,20 @@
+# to give information about the simulations that we are running
+
+[simulation]
+
+input_data = "base-input-data/RIDM-case-study" 
+number_of_scenarios = 5
+run_benchmark = true
+#representative_periods = []
+representative_periods = [30,60,90]
+#representative_periods = [30,60,90,120,180,240,360,365]
+solvers = ["Gurobi"]
+#solvers = ["HiGHS", "Gurobi"]
+fix_level_storage = true
+risk_aversion_weight_lambda = 0.3
+risk_aversion_confidence_level = 0.60
+
+[clustering]
+use_ratio = false
+heuristic_distance = false
+
