@@ -98,7 +98,7 @@ df_stochastic_scenario_reduced = DataFrame(
     ],
 )
 
-
+CSV.write(joinpath(input_data_path, "stochastic-scenario.csv"), df_stochastic_scenario_reduced; writeheader=true)
 
 case_studies_info = CSV.read(
     "case-studies-info.csv",
