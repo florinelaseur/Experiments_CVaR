@@ -174,7 +174,7 @@ function main()
                 direct_model=direct_model,
             )
 
-            output_folder = joinpath(@__DIR__, "outputs", base_name, string(solver))
+            output_folder = joinpath(@__DIR__, "outputsBM", base_name, string(solver))
             mkpath(output_folder)
 
             @info "Solving the model and saving the solution for the base case study (0_HourlyBenchmark) with $solver"
@@ -186,6 +186,29 @@ function main()
 
 
             df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem_benchmark, output_folder)
+            #put this into a function later
+            worst_case_row = df_cost_per_scenario[
+                argmax(df_cost_per_scenario.operational_cost),
+                :
+            ]
+
+            df_worst_case_tail_cost = DataFrame(
+                scenario=[worst_case_row.scenario],
+                operational_cost=[worst_case_row.operational_cost],
+            )
+
+            CSV.write(joinpath(output_folder, "worst-case-tail-cost.csv"), df_worst_case_tail_cost; writeheader=true)
+            #put this into a function later
+            df_sorted = sort(df_cost_per_scenario, :operational_cost)
+            middle_idx = ceil(Int, nrow(df_sorted) / 2)
+            average_case_row = df_sorted[middle_idx, :]
+            df_average_case_cost = DataFrame(
+                scenario=[average_case_row.scenario],
+                operational_cost=[average_case_row.operational_cost],
+            )
+
+            CSV.write(joinpath(output_folder, "average-case-cost.csv"), df_average_case_cost; writeheader=true,)
+
             plot_operational_cost_per_scenario(df_cost_per_scenario, output_folder)
 
 
@@ -403,7 +426,7 @@ function main()
                     enable_names=enable_names,
                 )
 
-                output_folder = joinpath(@__DIR__, "outputs", case_name, string(solver))
+                output_folder = joinpath(@__DIR__, "outputsBM", case_name, string(solver))
                 mkpath(output_folder)
 
                 @info "Solving the model and saving the solution for the case study: $case_name with $solver"
@@ -411,6 +434,29 @@ function main()
                 time_to_save = @elapsed TEM.save_solution!(energy_problem)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem)
                 df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem, output_folder)
+
+                #put this into a function later
+                worst_case_row = df_cost_per_scenario[
+                    argmax(df_cost_per_scenario.operational_cost),
+                    :
+                ]
+
+                df_worst_case_tail_cost = DataFrame(
+                    scenario=[worst_case_row.scenario],
+                    operational_cost=[worst_case_row.operational_cost],
+                )
+
+                CSV.write(joinpath(output_folder, "worst-case-tail-cost.csv"), df_worst_case_tail_cost; writeheader=true)
+                #put this into a function later
+                df_sorted = sort(df_cost_per_scenario, :operational_cost)
+                middle_idx = ceil(Int, nrow(df_sorted) / 2)
+                average_case_row = df_sorted[middle_idx, :]
+                df_average_case_cost = DataFrame(
+                    scenario=[average_case_row.scenario],
+                    operational_cost=[average_case_row.operational_cost],
+                )
+
+                CSV.write(joinpath(output_folder, "average-case-cost.csv"), df_average_case_cost; writeheader=true,)
 
                 plot_operational_cost_per_scenario(df_cost_per_scenario, output_folder)
 
