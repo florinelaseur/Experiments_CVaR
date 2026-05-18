@@ -190,7 +190,11 @@ function main()
 
 
             mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
-            mu_value = only(mu_value_df.solution)
+            mu_value = if nrow(mu_value_df) == 0
+                NaN
+            else
+                only(mu_value_df.solution)
+            end
             var_flow_df = TIO.get_table(connection_benchmark, "var_flow")
             flow_ens = filter(row -> row.from_asset == "ens" && row.to_asset == "e_demand", var_flow_df)
             flow_smr_ccs =
@@ -421,7 +425,11 @@ function main()
                     error("Borrowed water has been used: $amount_water_borrowed")
                 end
                 mu_value_df = TIO.get_table(connection, "var_value_at_risk_threshold_mu")
-                mu_value = only(mu_value_df.solution)
+                mu_value = if nrow(mu_value_df) == 0
+                    NaN
+                else
+                    only(mu_value_df.solution)
+                end
 
                 if run_benchmark
                     @info "Fixing variables in the benchmark case study: $case_name with $solver"
@@ -491,7 +499,11 @@ function main()
 
                     # get mu solution
                     mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
-                    mu_value = only(mu_value_df.solution)
+                    mu_value = if nrow(mu_value_df) == 0
+                        NaN
+                    else
+                        only(mu_value_df.solution)
+                    end
 
                     output_folder = joinpath(@__DIR__, "outputs", "fixed", case_name, string(solver))
                     mkpath(output_folder)
