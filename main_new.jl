@@ -580,6 +580,8 @@ function main()
             end
         end
     end
+
+
     for solver in solvers
         optimizer, parameters = get_solver_parameters(solver)
         profiles_df = CSV.read(
