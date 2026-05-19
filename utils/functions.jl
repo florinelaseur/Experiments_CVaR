@@ -564,7 +564,7 @@ function export_total_cost_per_scenario(energy_problem, output_folder)
     return df
 end
 
-function plot_operational_cost_per_scenario(input_df::DataFrame, output_folder)
+function plot_cost_per_scenario(input_df::DataFrame, output_folder)
     p = plot(input_df.scenario, input_df.operational_cost; xlabel="Scenario", ylabel="Operational Cost", title="Operational Cost per Scenario", marker=:circle)
     sorted_scenario_costs = input_df.operational_cost |> sort
     h = histogram(sorted_scenario_costs; bins=100, normalize=true, label="Operational Cost Distribution")
