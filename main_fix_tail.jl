@@ -115,507 +115,202 @@ results_df = DataFrame(;
     value_at_risk_threshold_mu=Float64[],
 )
 
-function main()
-    # optimize for the base case study (0_HourlyBenchmark)
-    # set up the connection and read the data
-    connection_benchmark = DuckDB.DBInterface.connect(DuckDB.DB)
-    TIO.read_csv_folder(connection_benchmark, input_data_path)
-    profiles_wide = TIO.get_table(connection_benchmark, "profiles_wide")
-    n_scenarios = length(unique(profiles_wide.scenario))
-    # To make number of rps comparable with per and cross scenario
-    # we consider the case that n_rps is not divisible by the number of scenarios
-    #representative_periods .= n_scenarios .* round.(Int, representative_periods ./ n_scenarios)
+# function main()
+# optimize for the base case study (0_HourlyBenchmark)
+# set up the connection and read the data
+connection_benchmark = DuckDB.DBInterface.connect(DuckDB.DB)
+TIO.read_csv_folder(connection_benchmark, input_data_path)
+profiles_wide = TIO.get_table(connection_benchmark, "profiles_wide")
+n_scenarios = length(unique(profiles_wide.scenario))
+# To make number of rps comparable with per and cross scenario
+# we consider the case that n_rps is not divisible by the number of scenarios
+#representative_periods .= n_scenarios .* round.(Int, representative_periods ./ n_scenarios)
 
-    if run_benchmark
-        @info "Running the base case study (0_HourlyBenchmark)"
-        base_name = "0_HourlyBenchmark"
+#    if run_benchmark
+@info "Running the base case study (0_HourlyBenchmark)"
+base_name = "0_HourlyBenchmark"
 
-        # set up the connection and read the data
-        connection_benchmark = DuckDB.DBInterface.connect(DuckDB.DB)
-        TIO.read_csv_folder(connection_benchmark, input_data_path)
-        # update the CSV input data for Tulipa from the config file info
-        DuckDB.query(
-            connection_benchmark,
-            "
-            UPDATE model_parameters -- tables are with underscore in DuckDB world
-            SET
-                risk_aversion_weight_lambda = $(lambda) ,
-                risk_aversion_confidence_level_alpha = $(alpha);
-            ",
-        )
-        # transform the profiles data from wide to long
-        TC.transform_wide_to_long!(
-            connection_benchmark,
-            "profiles_wide",
-            "profiles";
-            exclude_columns=["scenario", "milestone_year", "timestep"],
-        )
+# set up the connection and read the data
+connection_benchmark = DuckDB.DBInterface.connect(DuckDB.DB)
+TIO.read_csv_folder(connection_benchmark, input_data_path)
+# update the CSV input data for Tulipa from the config file info
+DuckDB.query(
+    connection_benchmark,
+    "
+    UPDATE model_parameters -- tables are with underscore in DuckDB world
+    SET
+        risk_aversion_weight_lambda = $(lambda) ,
+        risk_aversion_confidence_level_alpha = $(alpha);
+    ",
+)
+# transform the profiles data from wide to long
+TC.transform_wide_to_long!(
+    connection_benchmark,
+    "profiles_wide",
+    "profiles";
+    exclude_columns=["scenario", "milestone_year", "timestep"],
+)
 
-        layout = TC.ProfilesTableLayout(;
-            year=:milestone_year,
-            cols_to_groupby=[:milestone_year, :scenario],
-        )
-        time_to_cluster = @elapsed TC.dummy_cluster!(connection_benchmark; layout=layout)
-        TEM.populate_with_defaults!(connection_benchmark)
-        DuckDB.query(connection_benchmark, "UPDATE asset SET is_seasonal = false")
+layout = TC.ProfilesTableLayout(;
+    year=:milestone_year,
+    cols_to_groupby=[:milestone_year, :scenario],
+)
+time_to_cluster = @elapsed TC.dummy_cluster!(connection_benchmark; layout=layout)
+TEM.populate_with_defaults!(connection_benchmark)
+DuckDB.query(connection_benchmark, "UPDATE asset SET is_seasonal = false")
 
-        time_to_read = @elapsed energy_problem_benchmark = TEM.EnergyProblem(connection_benchmark)
+time_to_read = @elapsed energy_problem_benchmark = TEM.EnergyProblem(connection_benchmark)
 
-        for solver in solvers
-            optimizer, parameters = get_solver_parameters(solver)
+#       for solver in solvers
+solver = :Gurobi
+optimizer, parameters = get_solver_parameters(solver)
 
-            @info "Creating the model for the base case study (0_HourlyBenchmark) with $solver"
-            time_to_create = @elapsed TEM.create_model!(
-                energy_problem_benchmark;
-                optimizer=optimizer,
-                optimizer_parameters=parameters,
-                model_file_name="",
-                enable_names=enable_names,
-                direct_model=direct_model,
-            )
+@info "Creating the model for the base case study (0_HourlyBenchmark) with $solver"
+time_to_create = @elapsed TEM.create_model!(
+    energy_problem_benchmark;
+    optimizer=optimizer,
+    optimizer_parameters=parameters,
+    model_file_name="",
+    enable_names=enable_names,
+    direct_model=direct_model,
+)
 
-            output_folder = joinpath(@__DIR__, "outputs", base_name, string(solver))
-            mkpath(output_folder)
+output_folder = joinpath(@__DIR__, "outputs-tailfix", base_name, string(solver))
+mkpath(output_folder)
 
-            @info "Solving the model and saving the solution for the base case study (0_HourlyBenchmark) with $solver"
-            time_to_solve = @elapsed TEM.solve_model!(energy_problem_benchmark)
-            #        mu_value =
-            #            JuMP.value(energy_problem_benchmark.variables[:value_at_risk_threshold_mu].container)
-            time_to_save = @elapsed TEM.save_solution!(energy_problem_benchmark)
-            TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
+@info "Solving the model and saving the solution for the base case study (0_HourlyBenchmark) with $solver"
+time_to_solve = @elapsed TEM.solve_model!(energy_problem_benchmark)
+#        mu_value =
+#            JuMP.value(energy_problem_benchmark.variables[:value_at_risk_threshold_mu].container)
+time_to_save = @elapsed TEM.save_solution!(energy_problem_benchmark)
+TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
 
+df_base_cost = export_base_cost(energy_problem_benchmark, output_folder)
+#kan geen expressions optellen, check hoe operational cost in worst case tail cost wordt gepakt 
+df_operational_cost_per_scenario = export_operational_cost_per_scenario(energy_problem_benchmark, output_folder)
+df_total_cost_per_scenario = export_total_cost_per_scenario(energy_problem_benchmark, output_folder)
 
-            df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem_benchmark, output_folder)
-            #put this into a function later
-            worst_case_row = df_cost_per_scenario[
-                argmax(df_cost_per_scenario.operational_cost),
-                :
-            ]
-
-            df_worst_case_tail_cost = DataFrame(
-                scenario=[worst_case_row.scenario],
-                operational_cost=[worst_case_row.operational_cost],
-            )
-
-            CSV.write(joinpath(output_folder, "worst-case-tail-cost.csv"), df_worst_case_tail_cost; writeheader=true)
-            #put this into a function later
-            df_sorted = sort(df_cost_per_scenario, :operational_cost)
-            middle_idx = ceil(Int, nrow(df_sorted) / 2)
-            average_case_row = df_sorted[middle_idx, :]
-            df_average_case_cost = DataFrame(
-                scenario=[average_case_row.scenario],
-                operational_cost=[average_case_row.operational_cost],
-            )
-
-            CSV.write(joinpath(output_folder, "average-case-cost.csv"), df_average_case_cost; writeheader=true,)
-
-            plot_operational_cost_per_scenario(df_cost_per_scenario, output_folder)
-
-
-            mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
-            mu_value = if nrow(mu_value_df) == 0
-                NaN
-            else
-                only(mu_value_df.solution)
-            end
-            var_flow_df = TIO.get_table(connection_benchmark, "var_flow")
-            flow_ens = filter(row -> row.from_asset == "ens" && row.to_asset == "e_demand", var_flow_df)
-            flow_smr_ccs =
-                filter(row -> row.from_asset == "smr_ccs" && row.to_asset == "h2_demand", var_flow_df)
-            water_borrowed = filter(
-                row -> row.from_asset == "water_borrower" && row.to_asset == "hydro_reservoir",
-                var_flow_df,
-            )
-
-            # count steps with loss of load
-            n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
-            n_lol_smr_cca = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
-
-            # count how much water_borrowed
-            amount_water_borrowed_b = sum(water_borrowed.solution)
-
-            new_results_row = (
-                base_name=base_name,
-                rp=1,
-                solver=solver,
-                time_to_cluster=0.0,
-                time_to_read=time_to_read,
-                time_to_create=time_to_create,
-                time_to_solve=time_to_solve,
-                time_to_save=time_to_save,
-                objective_value=energy_problem_benchmark.objective_value,
-                termination_status=string(energy_problem_benchmark.termination_status),
-                num_constraints=JuMP.num_constraints(
-                    energy_problem_benchmark.model;
-                    count_variable_in_set_constraints=false,
-                ),
-                num_variables=JuMP.num_variables(energy_problem_benchmark.model),
-                time_to_resolve_benchmark=0.0,
-                objective_value_resolve_benchmark=0.0,
-                termination_status_resolve_benchmark="",
-                num_loss_of_load_e_demand=n_lol_ens,
-                num_loss_of_load_h2_demand=n_lol_smr_cca,
-                water_borrowed=amount_water_borrowed_b,
-                value_at_risk_threshold_mu=mu_value,
-            )
-            push!(results_df, new_results_row)
-        end
-    end
-
-    # optimize the energy system for each case study
-    for row in eachrow(case_studies_info)
-        base_name = row[:base_name]
-        period_duration = row[:period_duration]
-        method = row[:method]
-        distance = distance_map[row[:distance]]
-        weight_type = row[:weight_type]
-        niters = row[:niters]
-        learning_rate = row[:learning_rate]
-        stochastic_method = row[:stochastic_method]
-        run_case = row[:run_case]
-
-        weight_fitting_kwargs = Dict(:learning_rate => learning_rate, :niters => niters)
-        clustering_kwargs = Dict(:learning_rate => learning_rate, :niters => niters)
-
-        if !run_case
-            continue
-        end
-
-        for rp in representative_periods
-            case_name = base_name * "_rp_" * "$rp"
-
-            @info "Processing case study: $case_name"
-
-            connection = DuckDB.DBInterface.connect(DuckDB.DB)
-            TIO.read_csv_folder(connection, input_data_path)
-
-            DuckDB.query(
-                connection,
-                "
-                UPDATE model_parameters -- tables are with underscore in DuckDB world
-                SET
-                    risk_aversion_weight_lambda = $(lambda) ,
-                    risk_aversion_confidence_level_alpha = $(alpha);
-                ",
-            )
-            # to use the ratio availability/demand
-            if use_ratio == true # be careful: this works now that we have only one demand location, so we divide each availability and inflow by that only demand
-                DuckDB.query(
-                    connection,
-                    "
-                    UPDATE profiles_wide
-                    SET
-                        solar = solar / demand,
-                        wind_offshore = wind_offshore / demand,
-                        wind_onshore = wind_onshore / demand,
-                        hydro_inflow = hydro_inflow / demand;
-                    ",
-                )
-            end
-
-            # transform the profiles data from wide to long
-            TC.transform_wide_to_long!(
-                connection,
-                "profiles_wide",
-                "profiles";
-                exclude_columns=["scenario", "milestone_year", "timestep"],
-            )
-
-            if stochastic_method == :per_scenario
-                layout = TC.ProfilesTableLayout(;
-                    year=:milestone_year,
-                    cols_to_groupby=[:milestone_year, :scenario],
-                )
-                time_to_cluster = @elapsed TC.cluster!(
-                    connection,
-                    period_duration,
-                    rp; #round(Int, rp / n_scenarios);
-                    method=method,
-                    distance=distance,
-                    weight_type=weight_type,
-                    layout=layout,
-                    clustering_kwargs,
-                    weight_fitting_kwargs,
-                )
-                if use_ratio == true
-                    DuckDB.query(
-                        connection,
-                        "UPDATE profiles_rep_periods AS x
-                            SET value =
-                                CASE
-                                    WHEN x.profile_name = 'demand' THEN x.value
-                                    ELSE x.value * d.value
-                                END
-                            FROM profiles_rep_periods AS d
-                            WHERE d.timestep   = x.timestep
-                            AND d.rep_period       = x.rep_period
-                            AND d.milestone_year       = x.milestone_year
-                            AND d.scenario   = x.scenario
-                            AND d.profile_name = 'demand';
-                                ",
-                    )
-                end
-
-            elseif stochastic_method == :cross_scenario
-                layout = TC.ProfilesTableLayout(;
-                    year=:milestone_year,
-                    cols_to_groupby=[:milestone_year],
-                    cols_to_crossby=[:scenario],
-                )
-                time_to_cluster = @elapsed TC.cluster!(
-                    connection,
-                    period_duration,
-                    rp;
-                    method=method,
-                    distance=distance,
-                    weight_type=weight_type,
-                    layout=layout,
-                    clustering_kwargs,
-                    weight_fitting_kwargs,
-                )
-                if use_ratio == true
-                    DuckDB.query(
-                        connection,
-                        "UPDATE profiles_rep_periods AS x
-                            SET value =
-                                CASE
-                                    WHEN x.profile_name = 'demand' THEN x.value
-                                    ELSE x.value * d.value
-                                END
-                            FROM profiles_rep_periods AS d
-                            WHERE d.timestep   = x.timestep
-                            AND d.rep_period       = x.rep_period
-                            AND d.milestone_year       = x.milestone_year
-                            AND d.profile_name = 'demand';
-                                ",
-                    )
-                end
-            else
-                error("Unknown stochastic method: $stochastic_method")
-            end
-            if use_ratio == true
-                DuckDB.query(
-                    connection,
-                    "UPDATE profiles AS x
-                        SET value =
-                            CASE
-                                WHEN x.profile_name = 'demand' THEN x.value
-                                ELSE x.value * d.value
-                            END
-                        FROM profiles AS d
-                        WHERE d.timestep   = x.timestep
-                        AND d.milestone_year       = x.milestone_year
-                        AND d.scenario   = x.scenario
-                        AND d.profile_name = 'demand';
-                            ",
-                )
-            end
-            TEM.populate_with_defaults!(connection)
-
-            time_to_read = @elapsed energy_problem = TEM.EnergyProblem(connection)
-
-            for solver in solvers
-                optimizer, parameters = get_solver_parameters(solver)
-
-                @info "Creating the model for the case study: $case_name"
-                time_to_create = @elapsed TEM.create_model!(
-                    energy_problem;
-                    optimizer=optimizer,
-                    optimizer_parameters=parameters,
-                    model_file_name="",
-                    enable_names=enable_names,
-                )
-
-                output_folder = joinpath(@__DIR__, "outputs", case_name, string(solver))
-                mkpath(output_folder)
-
-                @info "Solving the model and saving the solution for the case study: $case_name with $solver"
-                time_to_solve = @elapsed TEM.solve_model!(energy_problem)
-                time_to_save = @elapsed TEM.save_solution!(energy_problem)
-                TEM.export_solution_to_csv_files(output_folder, energy_problem)
-                df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem, output_folder)
-
-                #put this into a function later
-                worst_case_row = df_cost_per_scenario[
-                    argmax(df_cost_per_scenario.operational_cost),
-                    :
-                ]
-
-                df_worst_case_tail_cost = DataFrame(
-                    scenario=[worst_case_row.scenario],
-                    operational_cost=[worst_case_row.operational_cost],
-                )
-
-                CSV.write(joinpath(output_folder, "worst-case-tail-cost.csv"), df_worst_case_tail_cost; writeheader=true)
-                #put this into a function later
-                df_sorted = sort(df_cost_per_scenario, :operational_cost)
-                middle_idx = ceil(Int, nrow(df_sorted) / 2)
-                average_case_row = df_sorted[middle_idx, :]
-                df_average_case_cost = DataFrame(
-                    scenario=[average_case_row.scenario],
-                    operational_cost=[average_case_row.operational_cost],
-                )
-
-                CSV.write(joinpath(output_folder, "average-case-cost.csv"), df_average_case_cost; writeheader=true,)
-
-                plot_operational_cost_per_scenario(df_cost_per_scenario, output_folder)
-
-                var_flow_df = TIO.get_table(connection, "var_flow")
-                water_borrowed = filter(
-                    row ->
-                        row.from_asset == "water_borrower" && row.to_asset == "hydro_reservoir",
-                    var_flow_df,
-                )
-                amount_water_borrowed_err = sum(water_borrowed.solution)
-                if amount_water_borrowed_err > 0.0
-                    error("Borrowed water has been used: $amount_water_borrowed")
-                end
-                mu_value_df = TIO.get_table(connection, "var_value_at_risk_threshold_mu")
-                mu_value = if nrow(mu_value_df) == 0
-                    NaN
-                else
-                    only(mu_value_df.solution)
-                end
-
-                if run_benchmark
-                    @info "Fixing variables in the benchmark case study: $case_name with $solver"
-                    fix_variables_from_solution!(
-                        energy_problem_benchmark,
-                        energy_problem,
-                        :assets_investment,
-                    )
-                    fix_variables_from_solution!(
-                        energy_problem_benchmark,
-                        energy_problem,
-                        :assets_investment_energy,
-                    )
-
-                    # to fix also level of the seasonal storage
-                    if fix_level_storage
-                        df_profiles = TIO.get_table(connection, "profiles")
-                        scenarios = unique(df_profiles.scenario)
-                        scenario_to_rep_period_map = Dict(i => val for (i, val) in enumerate(scenarios))
-                        fix_storage_levels!(
-                            energy_problem_benchmark,
-                            energy_problem,
-                            scenario_to_rep_period_map,
-                            period_duration,
-                            "hydro_reservoir",
-                        )
-                        fix_storage_levels!(
-                            energy_problem_benchmark,
-                            energy_problem,
-                            scenario_to_rep_period_map,
-                            period_duration,
-                            "h2_storage",
-                        )
-                    end
-
-                    @info "Resolving the benchmark case study: $case_name with $solver"
-                    time_to_resolve_benchmark = @elapsed TEM.solve_model!(energy_problem_benchmark)
-
-                    if energy_problem_benchmark.termination_status == JuMP.INFEASIBLE
-                        JuMP.compute_conflict!(energy_problem_benchmark.model)
-                        iis_model, reference_map = JuMP.copy_conflict(energy_problem_benchmark.model)
-                        print(iis_model)
-                    end
-
-                    TEM.save_solution!(energy_problem_benchmark)
-                    var_flow_df = TIO.get_table(connection_benchmark, "var_flow")
-                    flow_ens = filter(
-                        row -> row.from_asset == "ens" && row.to_asset == "e_demand",
-                        var_flow_df,
-                    )
-                    flow_smr_ccs = filter(
-                        row -> row.from_asset == "smr_ccs" && row.to_asset == "h2_demand",
-                        var_flow_df,
-                    )
-                    water_borrowed = filter(
-                        row ->
-                            row.from_asset == "water_borrower" && row.to_asset == "hydro_reservoir",
-                        var_flow_df,
-                    )
-
-                    # count steps with loss of load
-                    n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
-                    n_lol_smr_cca = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
-
-                    # count how much water_borrowed
-                    amount_water_borrowed = sum(water_borrowed.solution)
-
-                    # get mu solution
-                    mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
-                    mu_value = if nrow(mu_value_df) == 0
-                        NaN
-                    else
-                        only(mu_value_df.solution)
-                    end
-
-                    output_folder = joinpath(@__DIR__, "outputs", "fixed", case_name, string(solver))
-                    mkpath(output_folder)
-                    TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
-
-                    new_results_row = (
-                        base_name=base_name,
-                        rp=rp,
-                        solver=solver,
-                        time_to_cluster=time_to_cluster,
-                        time_to_read=time_to_read,
-                        time_to_create=time_to_create,
-                        time_to_solve=time_to_solve,
-                        time_to_save=time_to_save,
-                        objective_value=energy_problem.objective_value,
-                        termination_status=string(energy_problem.termination_status),
-                        num_constraints=JuMP.num_constraints(
-                            energy_problem.model;
-                            count_variable_in_set_constraints=false,
-                        ),
-                        num_variables=JuMP.num_variables(energy_problem.model),
-                        time_to_resolve_benchmark=time_to_resolve_benchmark,
-                        objective_value_resolve_benchmark=energy_problem_benchmark.objective_value,
-                        termination_status_resolve_benchmark=string(
-                            energy_problem_benchmark.termination_status,
-                        ),
-                        num_loss_of_load_e_demand=n_lol_ens,
-                        num_loss_of_load_h2_demand=n_lol_smr_cca,
-                        water_borrowed=amount_water_borrowed,
-                        value_at_risk_threshold_mu=mu_value,
-                    )
-                    push!(results_df, new_results_row)
-                else
-                    new_results_row = (
-                        base_name=base_name,
-                        rp=rp,
-                        solver=solver,
-                        time_to_cluster=time_to_cluster,
-                        time_to_read=time_to_read,
-                        time_to_create=time_to_create,
-                        time_to_solve=time_to_solve,
-                        time_to_save=time_to_save,
-                        objective_value=energy_problem.objective_value,
-                        termination_status=string(energy_problem.termination_status),
-                        num_constraints=JuMP.num_constraints(
-                            energy_problem.model;
-                            count_variable_in_set_constraints=false,
-                        ),
-                        num_variables=JuMP.num_variables(energy_problem.model),
-                        time_to_resolve_benchmark=0.0,
-                        objective_value_resolve_benchmark=0.0,
-                        termination_status_resolve_benchmark="",
-                        num_loss_of_load_e_demand=0.0,
-                        num_loss_of_load_h2_demand=0.0,
-                        water_borrowed=0.0,
-                        value_at_risk_threshold_mu=mu_value,
-                    )
-                    push!(results_df, new_results_row)
-                end
-            end
-        end
-    end
-
-    results_df |> CSV.write("outputs/results.csv"; writeheader=true)
-
-    return nothing
+mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
+mu_value = if nrow(mu_value_df) == 0
+    NaN
+else
+    only(mu_value_df.solution)
 end
 
-main()
+tol = 1e-5
+
+df_tail_scenarios = copy(df_total_cost_per_scenario)
+
+df_tail_scenarios[!, :solution] =
+    max.(0.0, df_tail_scenarios.total_cost .- mu_value)
+
+df_tail_scenarios = filter(
+    row -> row.total_cost >= mu_value - tol,
+    df_tail_scenarios,
+)
+
+df_tail_scenarios = df_tail_scenarios[:, [:id, :scenario, :probability, :solution]]
+
+CSV.write(
+    joinpath(output_folder, "tail_scenarios.csv"),
+    df_tail_scenarios;
+    writeheader=true,
+)
+#put this into a function later
+worst_case_row = df_operational_cost_per_scenario[
+    argmax(df_operational_cost_per_scenario.operational_cost),
+    :
+]
+
+df_worst_case_tail_cost = DataFrame(
+    scenario=[worst_case_row.scenario],
+    operational_cost=[worst_case_row.operational_cost],
+)
+
+CSV.write(joinpath(output_folder, "worst-case-tail-cost.csv"), df_worst_case_tail_cost; writeheader=true)
+#put this into a function later
+df_sorted = sort(df_operational_cost_per_scenario, :operational_cost)
+middle_idx = ceil(Int, nrow(df_sorted) / 2)
+average_case_row = df_sorted[middle_idx, :]
+df_average_case_cost = DataFrame(
+    scenario=[average_case_row.scenario],
+    operational_cost=[average_case_row.operational_cost],
+)
+
+CSV.write(joinpath(output_folder, "average-case-cost.csv"), df_average_case_cost; writeheader=true,)
+
+plot_operational_cost_per_scenario(df_operational_cost_per_scenario, output_folder)
+
+
+var_flow_df = TIO.get_table(connection_benchmark, "var_flow")
+flow_ens = filter(row -> row.from_asset == "ens" && row.to_asset == "e_demand", var_flow_df)
+flow_smr_ccs =
+    filter(row -> row.from_asset == "smr_ccs" && row.to_asset == "h2_demand", var_flow_df)
+water_borrowed = filter(
+    row -> row.from_asset == "water_borrower" && row.to_asset == "hydro_reservoir",
+    var_flow_df,
+)
+
+# count steps with loss of load
+n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
+n_lol_smr_cca = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
+
+# count how much water_borrowed
+amount_water_borrowed_b = sum(water_borrowed.solution)
+
+new_results_row = (
+    base_name=base_name,
+    rp=1,
+    solver=solver,
+    time_to_cluster=0.0,
+    time_to_read=time_to_read,
+    time_to_create=time_to_create,
+    time_to_solve=time_to_solve,
+    time_to_save=time_to_save,
+    objective_value=energy_problem_benchmark.objective_value,
+    termination_status=string(energy_problem_benchmark.termination_status),
+    num_constraints=JuMP.num_constraints(
+        energy_problem_benchmark.model;
+        count_variable_in_set_constraints=false,
+    ),
+    num_variables=JuMP.num_variables(energy_problem_benchmark.model),
+    time_to_resolve_benchmark=0.0,
+    objective_value_resolve_benchmark=0.0,
+    termination_status_resolve_benchmark="",
+    num_loss_of_load_e_demand=n_lol_ens,
+    num_loss_of_load_h2_demand=n_lol_smr_cca,
+    water_borrowed=amount_water_borrowed_b,
+    value_at_risk_threshold_mu=mu_value,
+)
+push!(results_df, new_results_row)
+CSV.write(joinpath(output_folder, "results.csv"), results_df; writeheader=true)
+#     end
+# end
+
+# tol = 1e-6
+
+# tail_scenarios_path = joinpath(@__DIR__, "outputs-tailfix", "0_hourlyBenchmark", "Gurobi", "var_tail_excess_slack_xi.csv")
+# tail_scenarios_df = CSV.read(tail_scenarios_path, DataFrame)
+
+
+# df_check = leftjoin(
+#     df_operational_cost_per_scenario,
+#     tail_scenarios_df;
+#     on=:scenario,
+#     makeunique=true,
+# )
+
+# rename!(df_check, :solution => :xi)
+
+# df_check[!, :mu] .= mu_value
+# df_check[!, :cost_minus_mu] = df_check.operational_cost .- df_check.mu
+# df_check[!, :xi_should_be_at_least] = max.(0.0, df_check.cost_minus_mu)
+# df_check[!, :violation] = df_check.xi .+ tol .< df_check.xi_should_be_at_least
+
+# sort!(df_check, :operational_cost, rev=true)
+
+# CSV.write(joinpath(output_folder, "debug_cvar_constraints.csv"), df_check)
+# df_check[:, [:scenario, :operational_cost, :mu, :xi, :cost_minus_mu, :xi_should_be_at_least, :violation]]
+
+# obj_breakdown = TIO.get_table(connection_benchmark, "obj_breakdown")
+# display(obj_breakdown)

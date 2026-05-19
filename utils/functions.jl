@@ -514,13 +514,53 @@ function get_scenario_set(input_df::DataFrame, cardinality::Int)
     return filter(row -> row.scenario in selected, input_df)
 end
 
+function export_base_cost(energy_problem, output_folder)
+    base_cost = JuMP.AffExpr(0.0)
+
+    for objective_name in (
+        :assets_investment_cost,
+        :assets_fixed_cost_compact_method,
+        :assets_fixed_cost_simple_method,
+        :storage_assets_energy_investment_cost,
+        :storage_assets_energy_fixed_cost,
+        :flows_investment_cost,
+        :flows_fixed_cost,
+    )
+        if haskey(energy_problem.model, objective_name)
+            JuMP.add_to_expression!(base_cost, energy_problem.model[objective_name])
+        end
+    end
+
+    df = DataFrame(base_cost=[JuMP.value(base_cost)])
+
+    CSV.write(joinpath(output_folder, "base_cost.csv"), df)
+
+    return df
+end
 
 function export_operational_cost_per_scenario(energy_problem, output_folder)
-    costs_per_scenario = energy_problem.expressions[:flows_operational_cost_per_scenario]
+    costs_per_scenario = energy_problem.expressions[:flows_operational_cost_per_scenario] +
+                         energy_problem.expressions[:vintage_flows_operational_cost_per_scenario] +
+                         energy_problem.expressions[:units_on_operational_cost_per_scenario]
     df = costs_per_scenario.indices |> DataFrame
     costs = JuMP.value.(costs_per_scenario.expressions[:cost])
     df[!, :operational_cost] = costs
     CSV.write(joinpath(output_folder, "operational_cost_per_scenario.csv"), df)
+    return df
+end
+
+function export_total_cost_per_scenario(energy_problem, output_folder)
+    expr = energy_problem.expressions[:scenario_tail_excess]
+    df = expr.indices |> DataFrame
+    total_costs = JuMP.value.(
+        expr.expressions[:total_cost_per_scenario]
+    )
+    df[!, :total_cost] = total_costs
+    CSV.write(
+        joinpath(output_folder, "total_cost_per_scenario.csv"),
+        df;
+        writeheader=true,
+    )
     return df
 end
 
