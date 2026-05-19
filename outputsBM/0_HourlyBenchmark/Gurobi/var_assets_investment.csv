@@ -1,8 +1,0 @@
-id,asset,milestone_year,investment_integer,capacity,investment_limit,solution
-1,ccgt,2030,false,0.8,,55291.29485104052
-2,wind,2030,false,0.4,,94538.12178126957
-3,solar,2030,false,0.5,,5987.957193234421
-4,ocgt,2030,false,0.1,,63466.102976457994
-5,electrolizer,2030,false,0.1,,1.0511754357908214
-6,wind_offshore,2030,false,0.4,,0.0
-7,battery,2030,false,0.05,,190392.61613815714

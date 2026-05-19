@@ -56,24 +56,24 @@ run_benchmark = config["simulation"]["run_benchmark"]
 
 ## for new scenarios
 
-# profiles_path = joinpath(@__DIR__, "create-scenarios", "profiles-wide-all-scenarios.csv")
-# all_profiles_df = CSV.read(profiles_path, DataFrame)
-# profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
-# selected_scenarios = sort(unique(profiles_df.scenario))
-# mapping = Dict(old => new for (new, old) in enumerate(selected_scenarios))
-# profiles_df[!, :scenario] = [mapping[s] for s in profiles_df.scenario]
-# CSV.write(joinpath(input_data_path, "profiles-wide.csv"), profiles_df; writeheader=true)
+profiles_path = joinpath(@__DIR__, "create-scenarios", "profiles-wide-all-scenarios.csv")
+all_profiles_df = CSV.read(profiles_path, DataFrame)
+profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
+selected_scenarios = sort(unique(profiles_df.scenario))
+mapping = Dict(old => new for (new, old) in enumerate(selected_scenarios))
+profiles_df[!, :scenario] = [mapping[s] for s in profiles_df.scenario]
+CSV.write(joinpath(input_data_path, "profiles-wide.csv"), profiles_df; writeheader=true)
 
-# df_stochastic_scenario = DataFrame(;
-#     scenario=sort(unique(profiles_df.scenario)),
-#     probability=fill(1.0 / number_of_scenarios, number_of_scenarios),
-# )
-# CSV.write(joinpath(input_data_path, "stochastic-scenario.csv"), df_stochastic_scenario; writeheader=true)
+df_stochastic_scenario = DataFrame(;
+    scenario=sort(unique(profiles_df.scenario)),
+    probability=fill(1.0 / number_of_scenarios, number_of_scenarios),
+)
+CSV.write(joinpath(input_data_path, "stochastic-scenario.csv"), df_stochastic_scenario; writeheader=true)
 
 ## to keep scenarios
 
-profiles_df = CSV.read(joinpath(input_data_path, "profiles-wide.csv"), DataFrame)
-df_stochastic_scenario = CSV.read(joinpath(input_data_path, "stochastic-scenario.csv"), DataFrame)
+# profiles_df = CSV.read(joinpath(input_data_path, "profiles-wide.csv"), DataFrame)
+# df_stochastic_scenario = CSV.read(joinpath(input_data_path, "stochastic-scenario.csv"), DataFrame)
 
 case_studies_info = CSV.read(
     "case-studies-info.csv",
