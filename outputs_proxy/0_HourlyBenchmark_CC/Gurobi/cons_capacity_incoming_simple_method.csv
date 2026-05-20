@@ -220,7 +220,7 @@ id,asset,milestone_year,rep_period,time_block_start,time_block_end,dual_max_inpu
 219,battery,2030,1,219,219,0.0
 220,battery,2030,1,220,220,0.0
 221,battery,2030,1,221,221,0.0
-222,battery,2030,1,222,222,0.0
+222,battery,2030,1,222,222,-0.0036889999999999996
 223,battery,2030,1,223,223,0.0
 224,battery,2030,1,224,224,0.0
 225,battery,2030,1,225,225,0.0
@@ -244,7 +244,7 @@ id,asset,milestone_year,rep_period,time_block_start,time_block_end,dual_max_inpu
 243,battery,2030,1,243,243,0.0
 244,battery,2030,1,244,244,0.0
 245,battery,2030,1,245,245,0.0
-246,battery,2030,1,246,246,0.0
+246,battery,2030,1,246,246,-0.0036889999999999996
 247,battery,2030,1,247,247,0.0
 248,battery,2030,1,248,248,0.0
 249,battery,2030,1,249,249,0.0
@@ -923,7 +923,7 @@ id,asset,milestone_year,rep_period,time_block_start,time_block_end,dual_max_inpu
 922,battery,2030,1,922,922,0.0
 923,battery,2030,1,923,923,0.0
 924,battery,2030,1,924,924,0.0
-925,battery,2030,1,925,925,0.0
+925,battery,2030,1,925,925,-0.0036889999999999996
 926,battery,2030,1,926,926,0.0
 927,battery,2030,1,927,927,0.0
 928,battery,2030,1,928,928,0.0
@@ -8156,7 +8156,7 @@ id,asset,milestone_year,rep_period,time_block_start,time_block_end,dual_max_inpu
 8155,battery,2030,1,8155,8155,0.0
 8156,battery,2030,1,8156,8156,0.0
 8157,battery,2030,1,8157,8157,0.0
-8158,battery,2030,1,8158,8158,0.0
+8158,battery,2030,1,8158,8158,-0.0036889999999999996
 8159,battery,2030,1,8159,8159,0.0
 8160,battery,2030,1,8160,8160,0.0
 8161,battery,2030,1,8161,8161,0.0
@@ -13820,7 +13820,7 @@ id,asset,milestone_year,rep_period,time_block_start,time_block_end,dual_max_inpu
 13819,battery,2030,2,5059,5059,0.0
 13820,battery,2030,2,5060,5060,0.0
 13821,battery,2030,2,5061,5061,0.0
-13822,battery,2030,2,5062,5062,0.0
+13822,battery,2030,2,5062,5062,-0.015449193482866677
 13823,battery,2030,2,5063,5063,0.0
 13824,battery,2030,2,5064,5064,0.0
 13825,battery,2030,2,5065,5065,0.0
@@ -14284,7 +14284,7 @@ id,asset,milestone_year,rep_period,time_block_start,time_block_end,dual_max_inpu
 14283,battery,2030,2,5523,5523,0.0
 14284,battery,2030,2,5524,5524,0.0
 14285,battery,2030,2,5525,5525,0.0
-14286,battery,2030,2,5526,5526,0.0
+14286,battery,2030,2,5526,5526,-0.03105000000000001
 14287,battery,2030,2,5527,5527,0.0
 14288,battery,2030,2,5528,5528,0.0
 14289,battery,2030,2,5529,5529,0.0
