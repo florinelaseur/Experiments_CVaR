@@ -41,8 +41,9 @@ distance_map = Dict(
 )
 
 # Read and transform user input files to Tulipa input files
-config = TOML.parsefile("config.toml")
-input_data_path = config["simulation"]["input_data"]
+project_root = @__DIR__
+config = TOML.parsefile(joinpath(project_root, "config.toml"))
+input_data_path = joinpath(project_root, config["simulation"]["input_data"])
 use_ratio = config["clustering"]["use_ratio"]
 heuristic_distance = config["clustering"]["heuristic_distance"]
 fix_level_storage = config["simulation"]["fix_level_storage"]
@@ -53,7 +54,7 @@ alpha = config["simulation"]["risk_aversion_confidence_level"]
 number_of_scenarios = config["simulation"]["number_of_scenarios"]
 run_benchmark = config["simulation"]["run_benchmark"]
 
-all_profiles_df = CSV.read("C:/Users/fjlaseur/Tulipa/Experiments_CVaR/create-scenarios/profiles-wide-all-scenarios.csv", DataFrame)
+all_profiles_df = CSV.read(joinpath(project_root, "create-scenarios", "profiles-wide-all-scenarios.csv"), DataFrame)
 profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
 selected_scenarios = sort(unique(profiles_df.scenario))
 mapping = Dict(old => new for (new, old) in enumerate(selected_scenarios))
@@ -67,7 +68,7 @@ df_stochastic_scenario = DataFrame(;
 CSV.write(joinpath(input_data_path, "stochastic-scenario.csv"), df_stochastic_scenario; writeheader=true)
 
 case_studies_info = CSV.read(
-    "case-studies-info.csv",
+    joinpath(project_root, "case-studies-info.csv"),
     DataFrame;
     types=Dict(
         :base_name => String,
@@ -106,6 +107,32 @@ results_df = DataFrame(;
     value_at_risk_threshold_mu=Float64[],
 )
 
+function log_variable_domains(model::JuMP.Model; label::AbstractString="")
+    vars = JuMP.all_variables(model)
+    n_total = length(vars)
+    n_binary = count(JuMP.is_binary, vars)
+    n_integer = count(v -> JuMP.is_integer(v) && !JuMP.is_binary(v), vars)
+    n_continuous = n_total - n_binary - n_integer
+
+    @info "Variable domain summary" label n_total n_binary n_integer n_continuous
+
+    if n_binary + n_integer == 0
+        @info "Model variable domains are fully continuous" label
+    else
+        @info "Model includes discrete variable domains" label
+    end
+end
+
+function log_scenario_support(connection)
+    df_scen = TIO.get_table(connection, "stochastic_scenario")
+    n_scenarios = nrow(df_scen)
+    ids = sort(unique(df_scen.scenario))
+    probs_sum = sum(skipmissing(df_scen.probability))
+    ids_preview = ids[1:min(end, 10)]
+
+    @info "Scenario support loaded" n_scenarios probs_sum ids_preview
+end
+
 function main()
     # optimize for the base case study (0_HourlyBenchmark)
     # set up the connection and read the data
@@ -124,6 +151,7 @@ function main()
         # set up the connection and read the data
         connection_benchmark = DuckDB.DBInterface.connect(DuckDB.DB)
         TIO.read_csv_folder(connection_benchmark, input_data_path)
+        log_scenario_support(connection_benchmark)
         # update the CSV input data for Tulipa from the config file info
         DuckDB.query(
             connection_benchmark,
@@ -163,6 +191,10 @@ function main()
                 model_file_name="",
                 enable_names=enable_names,
                 direct_model=direct_model,
+            )
+            log_variable_domains(
+                energy_problem_benchmark.model;
+                label="0_HourlyBenchmark / $(solver)",
             )
 
             output_folder = joinpath(@__DIR__, "outputs", base_name, string(solver))
@@ -247,6 +279,7 @@ function main()
 
             connection = DuckDB.DBInterface.connect(DuckDB.DB)
             TIO.read_csv_folder(connection, input_data_path)
+            log_scenario_support(connection)
 
             DuckDB.query(
                 connection,
@@ -384,6 +417,7 @@ function main()
                     model_file_name="",
                     enable_names=enable_names,
                 )
+                log_variable_domains(energy_problem.model; label="$(case_name) / $(solver)")
 
                 output_folder = joinpath(@__DIR__, "outputs", case_name, string(solver))
                 mkpath(output_folder)

@@ -511,6 +511,18 @@ function get_scenario_set(input_df::DataFrame, cardinality::Int)
     scenarios = unique(input_df.scenario)
     @assert cardinality ≤ length(scenarios) "Requested more scenarios than available."
     selected = sort(shuffle(scenarios)[1:cardinality])
+
+    @info "Input table overview" nrow=nrow(input_df) ncol=ncol(input_df)
+    @info "Columns" names=names(input_df)
+    @info "Column types" types=Dict(string(n) => eltype(input_df[!, n]) for n in names(input_df))
+    @info "Scenario IDs in input" total=length(scenarios) min=minimum(scenarios) max=maximum(scenarios)
+    @info "Sampled scenarios" selected=selected
+
+    # rows per scenario (quick distribution check)
+    counts = combine(groupby(input_df, :scenario), nrow => :rows)
+    @info "Rows per scenario (first 10)" preview=first(counts, min(10, nrow(counts)))
+
+
     return filter(row -> row.scenario in selected, input_df)
 end
 
