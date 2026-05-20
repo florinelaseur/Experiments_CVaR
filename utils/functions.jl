@@ -564,11 +564,160 @@ function export_total_cost_per_scenario(energy_problem, output_folder)
     return df
 end
 
-function plot_cost_per_scenario(input_df::DataFrame, output_folder)
-    p = plot(input_df.scenario, input_df.operational_cost; xlabel="Scenario", ylabel="Operational Cost", title="Operational Cost per Scenario", marker=:circle)
-    sorted_scenario_costs = input_df.operational_cost |> sort
-    h = histogram(sorted_scenario_costs; bins=100, normalize=true, label="Operational Cost Distribution")
-    savefig(p, joinpath(output_folder, "operational_cost_per_scenario.png"))
-    savefig(h, joinpath(output_folder, "operational_cost_distribution.png"))
-    @info "Plots saved in: $(joinpath(output_folder, "operational_cost_per_scenario.png")) and $(joinpath(output_folder, "operational_cost_distribution.png"))"
+# function plot_operational_cost_per_scenario(input_df::DataFrame, output_folder)
+#     p = plot(input_df.scenario, input_df.operational_cost; xlabel="Scenario", ylabel="Operational Cost", title="Operational Cost per Scenario", marker=:circle)
+#     sorted_scenario_costs = input_df.operational_cost |> sort
+#     h = histogram(sorted_scenario_costs; bins=100, normalize=true, label="Operational Cost Distribution")
+#     savefig(p, joinpath(output_folder, "operational_cost_per_scenario.png"))
+#     savefig(h, joinpath(output_folder, "operational_cost_distribution.png"))
+#     @info "Plots saved in: $(joinpath(output_folder, "operational_cost_per_scenario.png")) and $(joinpath(output_folder, "operational_cost_distribution.png"))"
+# end
+
+function plot_cost_per_scenario(
+    input_df::DataFrame,
+    output_folder,
+    mu_value_df::DataFrame,
+)
+
+    folder_parts = splitpath(output_folder)
+    title_suffix = join(folder_parts[end-1:end], Base.Filesystem.path_separator)
+
+    p = scatter(
+        input_df.scenario,
+        input_df.total_cost;
+        xlabel="Scenario",
+        ylabel="Total Cost",
+        title="Total Cost per Scenario - $title_suffix",
+        marker=:circle,
+        color=:blue,
+        label="Scenario cost",
+    )
+
+    if nrow(mu_value_df) > 0
+        mu_value = only(mu_value_df.solution)
+
+        hline!(
+            p,
+            [mu_value];
+            linestyle=:dash,
+            linewidth=2,
+            label="VaR threshold μ",
+        )
+    end
+
+    savefig(p, joinpath(output_folder, "total_cost_per_scenario.png"))
+
+    @info "Plots saved in: $(joinpath(output_folder, "total_cost_per_scenario.png"))"
+
+    return p
+end
+
+function plot_cost_per_scenario_inc_tail(
+    total_cost_per_scenario_df::DataFrame,
+    df_tail_scenarios::DataFrame,
+    output_folder,
+    mu_value_df::DataFrame,
+    case_name,
+)
+    p = scatter(
+        total_cost_per_scenario_df.scenario,
+        total_cost_per_scenario_df.total_cost;
+        xlabel="Scenario",
+        ylabel="Total Cost",
+        title="Tail scenarios of $case_name",
+        marker=:circle,
+        color=:blue,
+        label="All scenarios",
+    )
+
+    scatter!(
+        p,
+        df_tail_scenarios.scenario,
+        df_tail_scenarios.total_cost;
+        marker=:circle,
+        color=:red,
+        label="Tail scenarios",
+    )
+
+    if nrow(mu_value_df) > 0
+        mu_value = only(mu_value_df.solution)
+
+        hline!(
+            p,
+            [mu_value];
+            linestyle=:dash,
+            linewidth=2,
+            color=:black,
+            label="VaR threshold μ",
+        )
+    end
+
+    savefig(
+        p,
+        joinpath(output_folder, "total_cost_per_scenario.png"),
+    )
+
+    @info "Plots saved in: $(joinpath(output_folder, "total_cost_per_scenario.png"))"
+
+    return p
+end
+
+function plot_cost_per_scenario_inc_tail_inc_representative(
+    total_cost_per_scenario_df::DataFrame,
+    df_tail_scenarios::DataFrame,
+    df_representative_scenarios::DataFrame,
+    output_folder,
+    mu_value_df::DataFrame,
+    case_name,
+)
+    p = scatter(
+        total_cost_per_scenario_df.scenario,
+        total_cost_per_scenario_df.total_cost;
+        xlabel="Scenario",
+        ylabel="Total Cost",
+        title="Tail scenarios of $case_name",
+        marker=:circle,
+        color=:blue,
+        label="All scenarios",
+    )
+
+    scatter!(
+        p,
+        df_tail_scenarios.scenario,
+        df_tail_scenarios.total_cost;
+        marker=:circle,
+        color=:red,
+        label="Tail scenarios",
+    )
+
+    scatter!(
+        p,
+        df_representative_scenarios.scenario,
+        df_representative_scenarios.total_cost;
+        marker=:circle,
+        color=:green,
+        label="Representative scenarios",
+    )
+
+    if nrow(mu_value_df) > 0
+        mu_value = only(mu_value_df.solution)
+
+        hline!(
+            p,
+            [mu_value];
+            linestyle=:dash,
+            linewidth=2,
+            color=:black,
+            label="VaR threshold μ",
+        )
+    end
+
+    savefig(
+        p,
+        joinpath(output_folder, "total_cost_per_scenario.png"),
+    )
+
+    @info "Plots saved in: $(joinpath(output_folder, "total_cost_per_scenario.png"))"
+
+    return p
 end

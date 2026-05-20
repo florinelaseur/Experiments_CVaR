@@ -191,6 +191,10 @@ function main()
             else
                 only(mu_value_df.solution)
             end
+
+            total_cost_per_scenario_df = export_total_cost_per_scenario(energy_problem_benchmark, output_folder)
+            plot_cost_per_scenario(total_cost_per_scenario_df, output_folder, mu_value_df)
+
             var_flow_df = TIO.get_table(connection_benchmark, "var_flow")
             flow_ens = filter(row -> row.from_asset == "ens" && row.to_asset == "e_demand", var_flow_df)
             flow_smr_ccs =
@@ -498,10 +502,14 @@ function main()
                         only(mu_value_df.solution)
                     end
 
-                    df_total_cost_per_scenario = export_total_cost_per_scenario(energy_problem_benchmark, output_folder)
+                    output_folder = joinpath(@__DIR__, "outputs_proxy", "fixed", case_name, string(solver))
+                    mkpath(output_folder)
+
+                    total_cost_per_scenario_df = export_total_cost_per_scenario(energy_problem_benchmark, output_folder)
+
                     tol = 1e-5
 
-                    df_tail_scenarios = copy(df_total_cost_per_scenario)
+                    df_tail_scenarios = copy(total_cost_per_scenario_df)
 
                     df_tail_scenarios[!, :solution] =
                         max.(0.0, df_tail_scenarios.total_cost .- mu_value)
@@ -511,11 +519,16 @@ function main()
                         df_tail_scenarios,
                     )
 
-                    df_tail_scenarios = df_tail_scenarios[:, [:id, :scenario, :probability, :solution]]
+                    df_tail_scenarios = df_tail_scenarios[:, [:id, :scenario, :probability, :total_cost]]
 
+                    plot_cost_per_scenario_inc_tail(
+                        total_cost_per_scenario_df,
+                        df_tail_scenarios,
+                        output_folder,
+                        mu_value_df,
+                        case_name,
+                    )
 
-                    output_folder = joinpath(@__DIR__, "outputs_proxy", "fixed", case_name, string(solver))
-                    mkpath(output_folder)
                     CSV.write(
                         joinpath(output_folder, "tail_scenarios.csv"),
                         df_tail_scenarios;
@@ -593,7 +606,9 @@ function main()
             joinpath(@__DIR__, "base-input-data", "RIDM-case-study", "stochastic-scenario.csv"),
             DataFrame,
         )
+
         output_folder = joinpath(@__DIR__, "outputs_proxy", "fixed", "convex_conicalb_cross_rp_30", string(solver))
+
         df_tail_scenarios = CSV.read(
             joinpath(output_folder, "tail_scenarios.csv"),
             DataFrame,
@@ -611,6 +626,17 @@ function main()
         df_representative_non_tail_scenario = DataFrame(
             scenario=[average_case_row.scenario],
             cost=[average_case_row.total_cost],
+        )
+
+        mu_value_df = CSV.read(joinpath(output_folder, "var_value_at_risk_threshold_mu.csv"), DataFrame)
+
+        plot_cost_per_scenario_inc_tail_inc_representative(
+            df_total_cost_per_scenario,
+            df_tail_scenarios,
+            df_representative_non_tail_scenario,
+            output_folder,
+            mu_value_df,
+            "convex_conicalb_cross_rp_30",
         )
 
         representative_non_tail_scenario =
@@ -709,6 +735,10 @@ function main()
         else
             only(mu_value_df.solution)
         end
+
+        total_cost_per_scenario_df = export_total_cost_per_scenario(energy_problem_benchmark, output_folder)
+        plot_cost_per_scenario(total_cost_per_scenario_df, output_folder, mu_value_df, blue)
+
         var_flow_df = TIO.get_table(connection_benchmark, "var_flow")
         flow_ens = filter(row -> row.from_asset == "ens" && row.to_asset == "e_demand", var_flow_df)
         flow_smr_ccs =
