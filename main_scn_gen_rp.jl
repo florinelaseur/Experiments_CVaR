@@ -231,7 +231,7 @@ function main()
             average_case_row = df_sorted[middle_idx, :]
             df_average_case_cost = DataFrame(
                 scenario=[average_case_row.scenario],
-                operational_cost=[average_case_row.operational_cost],
+                operational_cost=[average_case_row.total_cost],
             )
 
             CSV.write(joinpath(output_folder, "average-case-cost.csv"), df_average_case_cost; writeheader=true,)

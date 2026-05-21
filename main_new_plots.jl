@@ -623,11 +623,22 @@ function main()
         middle_idx = ceil(Int, nrow(df_sorted) / 2)
         average_case_row = df_sorted[middle_idx, :]
 
+        if average_case_row.scenario in tail_scenarios_ids
+            df_non_tail = filter(
+                row -> !(row.scenario in tail_scenarios_ids),
+                df_total_cost_per_scenario,
+            )
+
+            df_sorted_non_tail = sort(df_non_tail, :total_cost)
+            middle_idx_non_tail = ceil(Int, nrow(df_sorted_non_tail) / 2)
+            average_case_row = df_sorted_non_tail[middle_idx_non_tail, :]
+        end
+
         df_representative_non_tail_scenario = DataFrame(
             scenario=[average_case_row.scenario],
-            cost=[average_case_row.total_cost],
+            total_cost=[average_case_row.total_cost],
         )
-
+        CSV.write(joinpath(@__DIR__, output_folder, "average_case_scenario.csv"), df_representative_non_tail_scenario; writeheader=true)
         mu_value_df = CSV.read(joinpath(output_folder, "var_value_at_risk_threshold_mu.csv"), DataFrame)
 
         plot_cost_per_scenario_inc_tail_inc_representative(
@@ -737,7 +748,7 @@ function main()
         end
 
         total_cost_per_scenario_df = export_total_cost_per_scenario(energy_problem_benchmark, output_folder)
-        plot_cost_per_scenario(total_cost_per_scenario_df, output_folder, mu_value_df, blue)
+        plot_cost_per_scenario(total_cost_per_scenario_df, output_folder, mu_value_df)
 
         var_flow_df = TIO.get_table(connection_benchmark, "var_flow")
         flow_ens = filter(row -> row.from_asset == "ens" && row.to_asset == "e_demand", var_flow_df)

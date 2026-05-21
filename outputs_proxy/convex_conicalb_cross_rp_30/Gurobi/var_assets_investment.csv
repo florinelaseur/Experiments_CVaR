@@ -5,4 +5,4 @@ id,asset,milestone_year,investment_integer,capacity,investment_limit,solution
 4,ocgt,2030,false,0.1,,0.0
 5,electrolizer,2030,false,0.1,,1.0
 6,wind_offshore,2030,false,0.4,,0.0
-7,battery,2030,false,0.05,,28002.472460220546
+7,battery,2030,false,0.05,,28002.47246022055
