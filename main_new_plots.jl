@@ -184,7 +184,6 @@ function main()
             time_to_save = @elapsed TEM.save_solution!(energy_problem_benchmark)
             TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
 
-
             mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
             mu_value = if nrow(mu_value_df) == 0
                 NaN
@@ -594,131 +593,133 @@ function main()
         end
     end
 
+    @info "Beginning of Contribution C (CC)"
+
+    profiles_df = CSV.read(
+        joinpath(@__DIR__, "base-input-data", "RIDM-case-study", "profiles-wide.csv"),
+        DataFrame,
+    )
+
+    df_stochastic_scenario = CSV.read(
+        joinpath(@__DIR__, "base-input-data", "RIDM-case-study", "stochastic-scenario.csv"),
+        DataFrame,
+    )
+
+    output_folder = joinpath(@__DIR__, "outputs_proxy", "fixed", "convex_conicalb_cross_rp_30", "Gurobi")
+
+    df_tail_scenarios = CSV.read(
+        joinpath(output_folder, "tail_scenarios.csv"),
+        DataFrame,
+    )
+
+    tail_scenarios_ids = df_tail_scenarios[!, 2]
+
+    df_total_cost_per_scenario =
+        export_total_cost_per_scenario(energy_problem_benchmark, output_folder)
+
+    df_sorted = sort(df_total_cost_per_scenario, :total_cost)
+    middle_idx = ceil(Int, nrow(df_sorted) / 2)
+    average_case_row = df_sorted[middle_idx, :]
+
+    if average_case_row.scenario in tail_scenarios_ids
+        df_non_tail = filter(
+            row -> !(row.scenario in tail_scenarios_ids),
+            df_total_cost_per_scenario,
+        )
+
+        df_sorted_non_tail = sort(df_non_tail, :total_cost)
+        middle_idx_non_tail = ceil(Int, nrow(df_sorted_non_tail) / 2)
+        average_case_row = df_sorted_non_tail[middle_idx_non_tail, :]
+    end
+
+    df_representative_non_tail_scenario = DataFrame(
+        scenario=[average_case_row.scenario],
+        total_cost=[average_case_row.total_cost],
+    )
+    CSV.write(joinpath(@__DIR__, output_folder, "average_case_scenario.csv"), df_representative_non_tail_scenario; writeheader=true)
+    mu_value_df = CSV.read(joinpath(output_folder, "var_value_at_risk_threshold_mu.csv"), DataFrame)
+
+    plot_cost_per_scenario_inc_tail_inc_representative(
+        df_total_cost_per_scenario,
+        df_tail_scenarios,
+        df_representative_non_tail_scenario,
+        output_folder,
+        mu_value_df,
+        "convex_conicalb_cross_rp_30",
+    )
+
+    representative_non_tail_scenario =
+        df_representative_non_tail_scenario.scenario
+
+    selected_scenarios_ids = vcat(
+        tail_scenarios_ids,
+        representative_non_tail_scenario,
+    )
+
+    profiles_df_CC = filter(
+        row -> row.scenario in selected_scenarios_ids,
+        profiles_df,
+    )
+
+    CSV.write(
+        joinpath(input_data_path_CC, "profiles-wide.csv"),
+        profiles_df_CC;
+        writeheader=true,
+    )
+
+    n_tail = length(tail_scenarios_ids)
+    tail_probability = (1.0 - alpha) / n_tail
+
+    df_stochastic_scenario_CC = DataFrame(
+        scenario=selected_scenarios_ids,
+        probability=[
+            fill(tail_probability, n_tail);
+            alpha
+        ],
+    )
+
+    CSV.write(
+        joinpath(input_data_path_CC, "stochastic-scenario.csv"),
+        df_stochastic_scenario_CC;
+        writeheader=true,
+    )
+
+    @info "Running the base case study (0_HourlyBenchmark) for CC"
+    base_name = "0_HourlyBenchmark_CC"
+
+    # set up the connection and read the data
+    connection_benchmark = DuckDB.DBInterface.connect(DuckDB.DB)
+    TIO.read_csv_folder(connection_benchmark, input_data_path_CC)
+    # update the CSV input data for Tulipa from the config file info
+    DuckDB.query(
+        connection_benchmark,
+        "
+        UPDATE model_parameters -- tables are with underscore in DuckDB world
+        SET
+            risk_aversion_weight_lambda = $(lambda) ,
+            risk_aversion_confidence_level_alpha = $(alpha);
+        ",
+    )
+    # transform the profiles data from wide to long
+    TC.transform_wide_to_long!(
+        connection_benchmark,
+        "profiles_wide",
+        "profiles";
+        exclude_columns=["scenario", "milestone_year", "timestep"],
+    )
+
+    layout = TC.ProfilesTableLayout(;
+        year=:milestone_year,
+        cols_to_groupby=[:milestone_year, :scenario],
+    )
+    time_to_cluster = @elapsed TC.dummy_cluster!(connection_benchmark; layout=layout)
+    TEM.populate_with_defaults!(connection_benchmark)
+    DuckDB.query(connection_benchmark, "UPDATE asset SET is_seasonal = false")
+
+    time_to_read = @elapsed energy_problem_benchmark = TEM.EnergyProblem(connection_benchmark)
 
     for solver in solvers
         optimizer, parameters = get_solver_parameters(solver)
-        profiles_df = CSV.read(
-            joinpath(@__DIR__, "base-input-data", "RIDM-case-study", "profiles-wide.csv"),
-            DataFrame,
-        )
-
-        df_stochastic_scenario = CSV.read(
-            joinpath(@__DIR__, "base-input-data", "RIDM-case-study", "stochastic-scenario.csv"),
-            DataFrame,
-        )
-
-        output_folder = joinpath(@__DIR__, "outputs_proxy", "fixed", "convex_conicalb_cross_rp_30", string(solver))
-
-        df_tail_scenarios = CSV.read(
-            joinpath(output_folder, "tail_scenarios.csv"),
-            DataFrame,
-        )
-
-        tail_scenarios_ids = df_tail_scenarios[!, 2]
-
-        df_total_cost_per_scenario =
-            export_total_cost_per_scenario(energy_problem_benchmark, output_folder)
-
-        df_sorted = sort(df_total_cost_per_scenario, :total_cost)
-        middle_idx = ceil(Int, nrow(df_sorted) / 2)
-        average_case_row = df_sorted[middle_idx, :]
-
-        if average_case_row.scenario in tail_scenarios_ids
-            df_non_tail = filter(
-                row -> !(row.scenario in tail_scenarios_ids),
-                df_total_cost_per_scenario,
-            )
-
-            df_sorted_non_tail = sort(df_non_tail, :total_cost)
-            middle_idx_non_tail = ceil(Int, nrow(df_sorted_non_tail) / 2)
-            average_case_row = df_sorted_non_tail[middle_idx_non_tail, :]
-        end
-
-        df_representative_non_tail_scenario = DataFrame(
-            scenario=[average_case_row.scenario],
-            total_cost=[average_case_row.total_cost],
-        )
-        CSV.write(joinpath(@__DIR__, output_folder, "average_case_scenario.csv"), df_representative_non_tail_scenario; writeheader=true)
-        mu_value_df = CSV.read(joinpath(output_folder, "var_value_at_risk_threshold_mu.csv"), DataFrame)
-
-        plot_cost_per_scenario_inc_tail_inc_representative(
-            df_total_cost_per_scenario,
-            df_tail_scenarios,
-            df_representative_non_tail_scenario,
-            output_folder,
-            mu_value_df,
-            "convex_conicalb_cross_rp_30",
-        )
-
-        representative_non_tail_scenario =
-            df_representative_non_tail_scenario.scenario
-
-        selected_scenarios_ids = vcat(
-            tail_scenarios_ids,
-            representative_non_tail_scenario,
-        )
-
-        profiles_df_CC = filter(
-            row -> row.scenario in selected_scenarios_ids,
-            profiles_df,
-        )
-
-        CSV.write(
-            joinpath(input_data_path_CC, "profiles-wide.csv"),
-            profiles_df_CC;
-            writeheader=true,
-        )
-
-        n_tail = length(tail_scenarios_ids)
-        tail_probability = (1.0 - alpha) / n_tail
-
-        df_stochastic_scenario_CC = DataFrame(
-            scenario=selected_scenarios_ids,
-            probability=[
-                fill(tail_probability, n_tail);
-                alpha
-            ],
-        )
-
-        CSV.write(
-            joinpath(input_data_path_CC, "stochastic-scenario.csv"),
-            df_stochastic_scenario_CC;
-            writeheader=true,
-        )
-
-        @info "Running the base case study (0_HourlyBenchmark) for CC"
-        base_name = "0_HourlyBenchmark_CC"
-
-        # set up the connection and read the data
-        connection_benchmark = DuckDB.DBInterface.connect(DuckDB.DB)
-        TIO.read_csv_folder(connection_benchmark, input_data_path_CC)
-        # update the CSV input data for Tulipa from the config file info
-        DuckDB.query(
-            connection_benchmark,
-            "
-            UPDATE model_parameters -- tables are with underscore in DuckDB world
-            SET
-                risk_aversion_weight_lambda = $(lambda) ,
-                risk_aversion_confidence_level_alpha = $(alpha);
-            ",
-        )
-        # transform the profiles data from wide to long
-        TC.transform_wide_to_long!(
-            connection_benchmark,
-            "profiles_wide",
-            "profiles";
-            exclude_columns=["scenario", "milestone_year", "timestep"],
-        )
-
-        layout = TC.ProfilesTableLayout(;
-            year=:milestone_year,
-            cols_to_groupby=[:milestone_year, :scenario],
-        )
-        time_to_cluster = @elapsed TC.dummy_cluster!(connection_benchmark; layout=layout)
-        TEM.populate_with_defaults!(connection_benchmark)
-        DuckDB.query(connection_benchmark, "UPDATE asset SET is_seasonal = false")
-
-        time_to_read = @elapsed energy_problem_benchmark = TEM.EnergyProblem(connection_benchmark)
 
         @info "Creating the model for the base case study (0_HourlyBenchmark_CC) with $solver"
         time_to_create = @elapsed TEM.create_model!(
@@ -733,12 +734,11 @@ function main()
         output_folder = joinpath(@__DIR__, "outputs_proxy", base_name, string(solver))
         mkpath(output_folder)
 
-        @info "Solving the model and saving the solution for the base case study (0_HourlyBenchmark) with $solver"
+        @info "Solving the model and saving the solution for the base case study (0_HourlyBenchmark_CC) with $solver"
         time_to_solve = @elapsed TEM.solve_model!(energy_problem_benchmark)
 
         time_to_save = @elapsed TEM.save_solution!(energy_problem_benchmark)
         TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
-
 
         mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
         mu_value = if nrow(mu_value_df) == 0

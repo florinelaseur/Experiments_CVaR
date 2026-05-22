@@ -32,3 +32,6 @@ outputs/
 
 # Configuration filees for VS Code Julia extension
 .vscode/
+
+outputs_proxy/
+outputs_proxy_CC/
