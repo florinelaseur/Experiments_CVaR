@@ -58,16 +58,6 @@ function solve_one_scenario(
         """,
     )
 
-    DuckDB.query(
-        conn,
-        "
-        UPDATE model_parameters
-        SET
-            risk_aversion_weight_lambda = $(lambda),
-            risk_aversion_confidence_level_alpha = $(alpha);
-        ",
-    )
-
     TC.transform_wide_to_long!(
         conn,
         "profiles_wide",
@@ -104,6 +94,8 @@ function solve_one_scenario(
             investments=nothing,
         )
     end
+
+    TEM.save_solution!(energy_problem)
 
     inv_df = DataFrame(TIO.get_table(conn, "var_assets_investment"))
     asset_df = DataFrame(TIO.get_table(conn, "asset"))
