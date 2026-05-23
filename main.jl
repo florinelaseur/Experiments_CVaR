@@ -32,6 +32,7 @@ using DataFrames
 @info "Including helper functions"
 include("utils/functions.jl")
 include("utils/constants.jl")
+include("ScenarioReduction/src/utils.jl")
 
 distance_map = Dict(
     :Euclidean => Distances.Euclidean(),
@@ -143,7 +144,7 @@ function main()
             "profiles";
             exclude_columns=["scenario", "milestone_year", "timestep"],
         )
-
+ #       print_model_variables_before_clustering(connection_benchmark)
         layout = TC.ProfilesTableLayout(;
             year=:milestone_year,
             cols_to_groupby=[:milestone_year, :scenario],
@@ -286,6 +287,7 @@ function main()
                 "profiles";
                 exclude_columns=["scenario", "milestone_year", "timestep"],
             )
+  #          print_model_variables_before_clustering(connection_benchmark)
 
             if stochastic_method == :per_scenario
                 layout = TC.ProfilesTableLayout(;

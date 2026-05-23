@@ -1,3 +1,36 @@
+function save_duckdb_tables_json(
+    connection,
+    stage::String,
+    output_dir::AbstractString;
+    run_name::AbstractString = basename(output_dir),
+    solver = nothing,
+)
+    tables_df = DataFrame(DuckDB.query(connection, "SHOW TABLES"))
+    name_col = hasproperty(tables_df, :name) ? tables_df.name : tables_df[!, 1]
+    table_names = sort(unique(string.(name_col)))
+
+    filename = if stage == "create_model" && solver !== nothing
+        "create_model_$(solver).json"
+    else
+        "$(stage).json"
+    end
+    filepath = joinpath(output_dir, filename)
+    mkpath(output_dir)
+
+    solver_field = solver === nothing ? "" : ",\n  \"solver\": \"$(solver)\""
+    tables_json = join(map(t -> "\"$t\"", table_names), ", ")
+    json_content = """
+{
+  "run_name": "$(run_name)",
+  "stage": "$(stage)"$(solver_field),
+  "table_count": $(length(table_names)),
+  "tables": [$tables_json]
+}
+"""
+    write(filepath, json_content)
+    @info "Wrote DuckDB table list to $filepath ($(length(table_names)) tables)"
+    return nothing
+end
 
 function get_solver_parameters(optimizer::Symbol)
     if optimizer == :HiGHS
