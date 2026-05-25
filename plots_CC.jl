@@ -7,6 +7,13 @@ plots_folder = joinpath(@__DIR__, "outputs_proxy", "plots")
 mkpath(plots_folder)
 
 case_labels = ["Hourly Benchmark", "30 RPs", "60 RPs", "90 RPs", "Hourly CC"]
+runtime_case_labels = [
+    "Hourly Benchmark",
+    "30 RPs",
+    "60 RPs",
+    "90 RPs",
+    "CC (30 RPs + hourly reduced scenario set)",
+]
 
 df_plot = copy(df_results)
 df_plot[!, :case_label] = case_labels
@@ -31,12 +38,6 @@ idx_cc = findfirst(==("Hourly CC"), df_plot.case_label)
 runtime_30_total = df_plot[idx_30, :runtime_total]
 runtime_cc_own = df_plot[idx_cc, :runtime_own]
 
-runtime_base = copy(df_plot.runtime_total)
-runtime_cc_extra = zeros(nrow(df_plot))
-
-runtime_base[idx_cc] = runtime_30_total
-runtime_cc_extra[idx_cc] = runtime_cc_own
-
 # System costs
 df_plot[!, :system_cost] = df_plot.objective_value
 df_plot[rp_rows, :system_cost] =
@@ -58,30 +59,24 @@ end
 
 # 1. Runtime comparison
 
-x = collect(1:nrow(df_plot))
+runtime_comparison = copy(df_plot.runtime_total)
 
-runtime_30_share = copy(df_plot.runtime_total)
-runtime_cc_own_share = zeros(nrow(df_plot))
-
-# Hourly CC = 30 RPs total runtime + own Hourly CC runtime
-runtime_30_share[idx_cc] = runtime_30_total
-runtime_cc_own_share[idx_cc] = runtime_cc_own
+# CC runtime = full 30 RPs runtime + own hourly reduced scenario set runtime
+runtime_comparison[idx_cc] = runtime_30_total + runtime_cc_own
 
 @show runtime_30_total
 @show runtime_cc_own
-@show runtime_30_share[idx_cc] + runtime_cc_own_share[idx_cc]
+@show runtime_comparison[idx_cc]
 
 p_runtime = bar(
-    x,
-    [runtime_30_share runtime_cc_own_share];
-    bar_position=:stack,
+    runtime_case_labels,
+    runtime_comparison;
     xlabel="Case",
     ylabel="Runtime [s]",
     title="Runtime Comparison",
-    label=["Runtime / 30 RPs share" "Hourly CC own runtime"],
-    xticks=(x, df_plot.case_label),
-    xrotation=30,
-    legend=:topright,
+    label=false,
+    xrotation=20,
+    legend=false,
 )
 
 savefig(p_runtime, joinpath(plots_folder, "runtime_comparison.png"))
