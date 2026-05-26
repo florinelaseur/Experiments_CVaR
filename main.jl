@@ -166,7 +166,7 @@ function main()
                 direct_model=direct_model,
             )
 
-            output_folder = joinpath(@__DIR__, "outputs", base_name, string(solver))
+            output_folder = joinpath(@__DIR__, "outputs", base_name, "N$(number_of_scenarios)", string(solver))
             mkpath(output_folder)
 
             @info "Solving the model and saving the solution for the base case study (0_HourlyBenchmark) with $solver"
@@ -559,7 +559,7 @@ function main()
         end
     end
 
-    results_df |> CSV.write("outputs/results.csv"; writeheader=true)
+    results_df |> CSV.write("outputs/results_N$(number_of_scenarios).csv"; writeheader=true)
 
     return nothing
 end
