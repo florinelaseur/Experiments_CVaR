@@ -29,9 +29,7 @@ Random.seed!(19990907)
 
 include(joinpath("..", "utils", "functions.jl"))
 include(joinpath("..", "utils", "constants.jl"))
-
-const INVESTABLE_ASSETS =
-    ["ccgt", "ocgt", "solar", "wind", "wind_offshore", "electrolizer", "battery"]
+include(joinpath(@__DIR__, "src", "utils.jl"))
 
 function solve_one_scenario(
     scenario_id,
