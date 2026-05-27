@@ -24,110 +24,110 @@ function fix_variables_from_solution!(benchmark_model, reduced_model, var_symbol
     end
 end
 
-function plot_mu_vs_rp(
-    results_df::DataFrame,
-    case_studies_df::DataFrame;
-    savepath="value_at_risk_threshold_mu.png",
-)
-    results_with_options =
-        outerjoin(case_studies_df, results_df; on="base_name", makeunique=true)
+# function plot_mu_vs_rp(
+#     results_df::DataFrame,
+#     case_studies_df::DataFrame;
+#     savepath="value_at_risk_threshold_mu.png",
+# )
+#     results_with_options =
+#         outerjoin(case_studies_df, results_df; on="base_name", makeunique=true)
 
-    results_with_options =
-        filter(row -> !ismissing(row.value_at_risk_threshold_mu), results_with_options)
+#     results_with_options =
+#         filter(row -> !ismissing(row.value_at_risk_threshold_mu), results_with_options)
 
-    benchmark_df = filter(row -> row.base_name == "0_HourlyBenchmark", results_with_options)
-    nonbenchmark_df = filter(row -> row.base_name != "0_HourlyBenchmark", results_with_options)
+#     benchmark_df = filter(row -> row.base_name == "0_HourlyBenchmark", results_with_options)
+#     nonbenchmark_df = filter(row -> row.base_name != "0_HourlyBenchmark", results_with_options)
 
-    rp_vals = sort(unique(nonbenchmark_df.rp))
-    rp_labels = string.(rp_vals)
-    rp_index = Dict(rp => i for (i, rp) in enumerate(rp_vals))
+#     rp_vals = sort(unique(nonbenchmark_df.rp))
+#     rp_labels = string.(rp_vals)
+#     rp_index = Dict(rp => i for (i, rp) in enumerate(rp_vals))
 
-    p = plot(;
-        xlabel="Number of representative_periods",
-        ylabel="Optimal value_at_risk_threshold_mu",
-        title="",
-        legend=:topright,
-        size=(800, 500),
-        xticks=(1:length(rp_vals), rp_labels),
-    )
+#     p = plot(;
+#         xlabel="Number of representative_periods",
+#         ylabel="Optimal value_at_risk_threshold_mu",
+#         title="",
+#         legend=:topright,
+#         size=(800, 500),
+#         xticks=(1:length(rp_vals), rp_labels),
+#     )
 
-    for g in groupby(nonbenchmark_df, :base_name)
-        g_sorted = sort(g, :rp)
+#     for g in groupby(nonbenchmark_df, :base_name)
+#         g_sorted = sort(g, :rp)
 
-        stochastic_method = g.stochastic_method[1]
-        mk = get(MARKER_MAP, stochastic_method, :circle)
+#         stochastic_method = g.stochastic_method[1]
+#         mk = get(MARKER_MAP, stochastic_method, :circle)
 
-        weight_type = g.weight_type[1]
-        mcol = get(COLOR_MAP_weight, weight_type, :black)
+#         weight_type = g.weight_type[1]
+#         mcol = get(COLOR_MAP_weight, weight_type, :black)
 
-        xidx = [rp_index[rp] for rp in g_sorted.rp]
+#         xidx = [rp_index[rp] for rp in g_sorted.rp]
 
-        scatter!(
-            p,
-            xidx,
-            g_sorted.value_at_risk_threshold_mu;
-            markershape=mk,
-            markersize=8,
-            markercolor=mcol,
-            label="",
-        )
+#         scatter!(
+#             p,
+#             xidx,
+#             g_sorted.value_at_risk_threshold_mu;
+#             markershape=mk,
+#             markersize=8,
+#             markercolor=mcol,
+#             label="",
+#         )
 
-        plot!(
-            p,
-            xidx,
-            g_sorted.value_at_risk_threshold_mu;
-            color=mcol,
-            linewidth=1.5,
-            label="",
-        )
-    end
+#         plot!(
+#             p,
+#             xidx,
+#             g_sorted.value_at_risk_threshold_mu;
+#             color=mcol,
+#             linewidth=1.5,
+#             label="",
+#         )
+#     end
 
-    # Benchmark as horizontal reference line
-    if nrow(benchmark_df) > 0
-        mu_benchmark = benchmark_df.value_at_risk_threshold_mu[1]
+#     # Benchmark as horizontal reference line
+#     if nrow(benchmark_df) > 0
+#         mu_benchmark = benchmark_df.value_at_risk_threshold_mu[1]
 
-        hline!(
-            p,
-            [mu_benchmark];
-            color=:black,
-            linestyle=:dash,
-            linewidth=2,
-            label="Hourly benchmark",
-        )
-    end
+#         hline!(
+#             p,
+#             [mu_benchmark];
+#             color=:black,
+#             linestyle=:dash,
+#             linewidth=2,
+#             label="Hourly benchmark",
+#         )
+#     end
 
-    # Legend for shapes (stochastic methods)
-    for (label, marker) in MARKER_MAP
-        short_label = replace(string(label), "_scenario" => "-scenario")
-        scatter!(
-            p,
-            [NaN],
-            [NaN];
-            markershape=marker,
-            markersize=8,
-            markercolor=:gray30,
-            label=short_label,
-        )
-    end
+#     # Legend for shapes (stochastic methods)
+#     for (label, marker) in MARKER_MAP
+#         short_label = replace(string(label), "_scenario" => "-scenario")
+#         scatter!(
+#             p,
+#             [NaN],
+#             [NaN];
+#             markershape=marker,
+#             markersize=8,
+#             markercolor=:gray30,
+#             label=short_label,
+#         )
+#     end
 
-    # Legend for colors (weight types)
-    for (label, color) in COLOR_MAP_weight
-        scatter!(
-            p,
-            [NaN],
-            [NaN];
-            markershape=:rect,
-            markersize=8,
-            markercolor=color,
-            label=get(LEGEND_METHOD_MAP, label) do
-                return error("Unknown method: $label")
-            end,
-        )
-    end
+#     # Legend for colors (weight types)
+#     for (label, color) in COLOR_MAP_weight
+#         scatter!(
+#             p,
+#             [NaN],
+#             [NaN];
+#             markershape=:rect,
+#             markersize=8,
+#             markercolor=color,
+#             label=get(LEGEND_METHOD_MAP, label) do
+#                 return error("Unknown method: $label")
+#             end,
+#         )
+#     end
 
-    savefig(p, savepath)
-    @info "Plot saved in: $savepath"
-end
+#     savefig(p, savepath)
+#     @info "Plot saved in: $savepath"
+# end
 
 function plot_values_stocmethod_weight( #considering different options: stochastic_method, weight_type
     results_df::DataFrame,
@@ -720,4 +720,49 @@ function plot_cost_per_scenario_inc_tail_inc_representative(
     @info "Plots saved in: $(joinpath(output_folder, "total_cost_per_scenario.png"))"
 
     return p
+end
+
+function plot_normalized_asset_investment_differences(
+    benchmark_df::DataFrame,
+    approximation_df::DataFrame;
+    output_folder,
+    case_name,)
+    assets = benchmark_df[!, :asset]
+
+    benchmark_solution = benchmark_df[!, :solution]
+    approximation_solution = approximation_df[!, :solution]
+
+    inv_diff = zeros(length(benchmark_solution))
+
+    for i in eachindex(benchmark_solution)
+        if benchmark_solution[i] > 0
+            inv_diff[i] =
+                (approximation_solution[i] - benchmark_solution[i]) /
+                benchmark_solution[i]
+        else
+            inv_diff[i] = approximation_solution[i] - benchmark_solution[i]
+        end
+    end
+
+    inv_diff_df = DataFrame(
+        asset=assets,
+        diff=inv_diff,
+    )
+
+    p_investment = bar(
+        inv_diff_df.asset,
+        inv_diff_df.diff;
+        xlabel="Asset",
+        ylabel="Normalized Investment Difference",
+        title="Normalized Investment Differences of $case_name Compared to Benchmark",
+        titlefontsize=8,
+    )
+    savefig(
+        p_investment,
+        joinpath(output_folder, "normalized_investment_differences.png"),
+    )
+
+    @info "Plots saved in: $(joinpath(output_folder, "normalized_investment_differences.png"))"
+
+    return p_investment
 end
