@@ -1,5 +1,5 @@
 base_name,period_duration,method,distance,weight_type,niters,learning_rate,stochastic_method,run_case
-convex_dirac_cross,24,convex_hull,Euclidean,dirac,2000,0.001,cross_scenario,false
+convex_dirac_cross,24,convex_hull,Euclidean,dirac,2000,0.001,cross_scenario,true
 convex_dirac_per,24,convex_hull,Euclidean,dirac,2000,0.001,per_scenario,false
 convex_convex_cross,24,convex_hull,Euclidean,convex,2000,0.001,cross_scenario,false
 convex_convex_per,24,convex_hull,Euclidean,convex,2000,0.001,per_scenario,false

@@ -32,3 +32,9 @@ const LEGEND_METHOD_MAP = Dict(
     "convex_hull_with_null" => "Bounded conical hull",
     "conical_hull" => "Conical hull",
 )
+
+const IPDSR_THREADS = 8
+const IPDSR_TIME_LIMIT = 60.0
+const IPDSR_MIP_GAP = 0.01
+const IPDSR_MAX_ITER = 5
+const N_TARGET_SCENARIOS = 3
