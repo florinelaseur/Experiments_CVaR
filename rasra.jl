@@ -2,15 +2,15 @@
 #
 # Based on Arpon et al. (2018) Algorithm 3, finetuned for mixed E[cost] + CVaR objectives from Nijhoff (2025)
 # The original RASRA targets a pure CVaR objective, but our GEP problem minimizes (1-lambda) * E[cost] + lambda * CVaR_alpha[cost]
-# Therefore we finetune by adjusting the effective scenario probabilities to reflect both terms correctly
+# Therefore we finetune by adjusting the reduced scenario probabilities to reflect both terms correctly
 #
 # Algorithm steps:
-#   1. Backward reduction on all N scenarios to select subset J
-#   2. Solve on J only to get the approximating solution x_hat
-#   3. Approximate G(x_hat, xi) for all N scenarios using duals from the J solve
-#   4. Identify effective scenarios (those with G(x_hat, xi) >= VaR_alpha)
-#   5. Assign finetuned probabilities to effective scenarios (Nijhoff dual representation)
-#   6. Solve the final problem on the effective set with the adjusted probabilities
+# 1. Backward reduction on all N scenarios to select subset J
+# 2. Solve on J only to get the approximating solution x_hat
+# 3. Approximate the total cost of all N scenarios at x_hat using dual variables from the J-solve
+# 4. Identify tail scenarios (approximated cost >= VaR_alpha) and non-tail scenarios from J to represent the expected cost term
+# 5. Assign finetuned probabilities to the reduced set (tail and non-tail scenarios) via Nijhoff dual representation
+# 6. Solve the final problem on the reduced set with the adjusted probabilities
 
 cd(@__DIR__)
 using Pkg: Pkg
@@ -69,6 +69,8 @@ results_df = DataFrame(;
     num_scenarios_initial = Int[],
     num_scenarios_j = Int[],
     num_scenarios_effective = Int[],
+    num_scenarios_ineffective = Int[],
+    num_scenarios_reduced = Int[],
     solver = Symbol[],
     time_step1_backward_reduction = Float64[],
     time_step2_solve_j = Float64[],
@@ -338,19 +340,19 @@ end
 # - Tail scenarios: w = 1, because they contribute to both the expectation and CVaR term
 # - Non-tail scenarios: w = (1-lambda), since they only contribute to the expectation term
 # The finetuned probability is calculated as p_hat_s = (p_s / w_s) / sum_{s' in effective scenario set} (p_s' / w_s')
-function compute_finetuned_probabilities(effective_df, all_costs_df, lambda, alpha, var_threshold)
+function compute_finetuned_probabilities(merged_df, all_costs_df, lambda, alpha, var_threshold)
     n_total   = nrow(all_costs_df)
     base_prob = 1.0 / n_total
 
     # Recompute tail membership from raw costs and the VaR threshold
-    in_tail = effective_df.operational_cost .>= var_threshold
+    in_tail = merged_df.operational_cost .>= var_threshold
 
     # Calculate the weights, so 1 for tail scenarios and (1-lambda) for the non-tail scenarios. Then normalize the probabilities
     w = ifelse.(in_tail, 1.0, 1.0 - lambda)
     unweighted = base_prob ./ w
     finetuned_probs = unweighted ./ sum(unweighted)
 
-    result_df = copy(effective_df)
+    result_df = copy(merged_df)
     result_df[!, :in_tail] = in_tail
     result_df[!, :finetuned_probability] = finetuned_probs
 
@@ -360,7 +362,7 @@ end
 # Main RASRA function
 function run_rasra()
     base_name = "RASRA"
-    @info "=== RASRA: $number_of_scenarios initial scenarios, lambda=$lambda, alpha=$alpha ==="
+    @info "RASRA: $number_of_scenarios initial scenarios, lambda=$lambda, alpha=$alpha"
 
     for solver in solvers
         optimizer, parameters = get_solver_parameters(solver)
@@ -393,8 +395,8 @@ function run_rasra()
             @warn "J-subset solve did not reach optimality: $(energy_problem_j.termination_status)"
         end
 
-        # Step 3: Approximate G(x_hat, xi) for all N using duals from J
-        @info "Step 3 – Approximating G(x_hat, xi) for all $number_of_scenarios scenarios via duals"
+        # Step 3: Approximate the total cost for all N at x_hat using duals from J
+        @info "Step 3 – Approximating the total cost of all $number_of_scenarios scenarios at x_hat using dual variables from the solve on subset J"
         t3 = @elapsed begin
             TEM.save_solution!(energy_problem_j; compute_duals = true)
             costs_df = approximate_costs_via_duals(
@@ -402,45 +404,50 @@ function run_rasra()
             )
         end
 
-        # Step 4: Identify effective scenarios (Algorithm 2 from Arpon)
+        # Step 4: Identify effective (tail) and ineffective (non-tail) scenarios (Algorithm 2 from Arpon)
         @info "Step 4 – Identifying effective scenarios via raw cost VaR threshold"
         t4 = @elapsed begin
             effective_df, var_threshold = identify_effective_scenarios(costs_df, alpha)
             num_effective = nrow(effective_df)
+            j_nontail_ids = filter(s -> s ∉ effective_df.scenario, j_scenario_ids)
+            j_nontail_df = filter(r -> r.scenario in j_nontail_ids, costs_df)
+            num_ineffective = nrow(j_nontail_df)
+            merged_df = vcat(effective_df, j_nontail_df)
+            num_reduced = nrow(merged_df)
         end
 
         # Step 5: Assign finetuned probabilities (Algorithm 1 from Nijhoff)
-        @info "Step 5 – Computing finetuned probabilities for $num_effective effective scenarios"
+        @info "Step 5 – Computing finetuned probabilities for $num_effective tail and $num_ineffective non-tail scenarios"
         t5 = @elapsed begin
-            effective_with_probs = compute_finetuned_probabilities(
-                effective_df, costs_df, lambda, alpha, var_threshold,
+            reduced_with_probs = compute_finetuned_probabilities(
+                merged_df, costs_df, lambda, alpha, var_threshold,
             )
 
             # Build the reduced profile and probability tables for Tulipa
-            effective_scenario_ids = effective_with_probs.scenario
-            effective_profiles = filter(r -> r.scenario in effective_scenario_ids, profiles_df)
+            reduced_scenario_ids = reduced_with_probs.scenario
+            reduced_profiles = filter(r -> r.scenario in reduced_scenario_ids, profiles_df)
 
-            eff_sorted = sort(unique(effective_profiles.scenario))
-            eff_mapping = Dict(old => new for (new, old) in enumerate(eff_sorted))
-            effective_profiles[!, :scenario] = [eff_mapping[s] for s in effective_profiles.scenario]
+            reduced_sorted = sort(unique(reduced_profiles.scenario))
+            reduced_mapping = Dict(old => new for (new, old) in enumerate(reduced_sorted))
+            reduced_profiles[!, :scenario] = [reduced_mapping[s] for s in reduced_profiles.scenario]
 
             # Map finetuned probabilities to the new scenario indices
             old_to_prob = Dict(
-                row.scenario => row.finetuned_probability for row in eachrow(effective_with_probs)
+                row.scenario => row.finetuned_probability for row in eachrow(reduced_with_probs)
             )
-            new_probs = [old_to_prob[s] for s in sort(unique(effective_with_probs.scenario))]
+            new_probs = [old_to_prob[s] for s in sort(unique(reduced_with_probs.scenario))]
 
             df_reduced_scenario = DataFrame(;
-                scenario = 1:num_effective,
+                scenario = 1:num_reduced,
                 probability = new_probs,
             )
 
-            CSV.write(joinpath(input_data_path, "profiles-wide.csv"), effective_profiles; writeheader=true)
+            CSV.write(joinpath(input_data_path, "profiles-wide.csv"), reduced_profiles; writeheader=true)
             CSV.write(joinpath(input_data_path, "stochastic-scenario.csv"), df_reduced_scenario; writeheader=true)
         end
 
         # Step 6: Solve the final reduced problem with adjusted probabilities
-        @info "Step 6 – Solving final problem on $num_effective effective scenarios"
+        @info "Step 6 – Solving final problem on $num_reduced reduced scenarios"
         t6 = @elapsed begin
             conn_reduced = setup_connection(input_data_path, lambda, alpha, use_ratio)
             prepare_connection_for_solve!(conn_reduced)
@@ -484,6 +491,8 @@ function run_rasra()
             num_scenarios_initial = number_of_scenarios,
             num_scenarios_j = size_of_j,
             num_scenarios_effective = num_effective,
+            num_scenarios_ineffective = num_ineffective,
+            num_scenarios_reduced = num_reduced,
             solver = solver,
             time_step1_backward_reduction = t1,
             time_step2_solve_j = t2,
@@ -505,7 +514,7 @@ function run_rasra()
             water_borrowed = amount_water,
         ))
 
-        @info "RASRA done — solver: $solver | effective scenarios: $num_effective | objective: $(energy_problem_reduced.objective_value)"
+        @info "RASRA done — solver: $solver | effective scenarios: $num_effective | reduced scenarios: $num_reduced | objective: $(energy_problem_reduced.objective_value)"
     end
 
     rasra_results_path = "outputs/results_rasra_N$(number_of_scenarios).csv"
