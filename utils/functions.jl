@@ -766,3 +766,191 @@ function plot_normalized_asset_investment_differences(
 
     return p_investment
 end
+
+function zoom_limits(v; margin_fraction=0.08)
+    vmin = minimum(v)
+    vmax = maximum(v)
+
+    if vmin == vmax
+        margin = abs(vmin) > 0 ? margin_fraction * abs(vmin) : 1.0
+    else
+        margin = margin_fraction * (vmax - vmin)
+    end
+
+    return (vmin - margin, vmax + margin)
+end
+
+function create_case_label(base_name, rp)
+    if occursin("HourlyBenchmark_CC", base_name)
+        return "Hourly CC"
+
+    elseif occursin("HourlyBenchmark", base_name)
+        return "Hourly Benchmark"
+
+    elseif rp > 1
+        return "$(rp) RPs"
+
+    else
+        return base_name
+    end
+end
+
+function plot_comparison(output_folder, number_of_scenarios)
+
+    results = joinpath(output_folder, "results.csv")
+    df_results = CSV.read(results, DataFrame)
+
+    plots_folder = joinpath(output_folder, "plots")
+    mkpath(plots_folder)
+
+    df_plot = copy(df_results)
+
+    # Dynamic labels
+    df_plot[!, :case_label] = [
+        create_case_label(row.base_name, row.rp)
+        for row in eachrow(df_plot)
+    ]
+
+    runtime_case_labels = copy(df_plot.case_label)
+
+    # Find important rows dynamically
+    idx_rp_reference = findfirst(df_plot.rp .> 1 .&& .!occursin.("CC", df_plot.base_name))
+
+    idx_cc = findfirst(occursin.("CC", df_plot.base_name))
+
+    # More descriptive runtime label for CC
+    if idx_cc !== nothing && idx_rp_reference !== nothing
+        rp_reference = df_plot[idx_rp_reference, :rp]
+
+        runtime_case_labels[idx_cc] = "CC ($(rp_reference) RPs + hourly reduced scenario set)"
+    end
+
+    # Runtime
+    df_plot[!, :runtime_own] =
+        df_plot.time_to_read .+
+        df_plot.time_to_create .+
+        df_plot.time_to_solve .+
+        df_plot.time_to_save
+
+    rp_rows = df_plot.rp .> 1
+
+    df_plot[!, :runtime_total] = copy(df_plot.runtime_own)
+
+    df_plot[rp_rows, :runtime_total] =
+        df_plot[rp_rows, :runtime_own] .+
+        df_plot[rp_rows, :time_to_resolve_benchmark]
+
+    runtime_comparison = copy(df_plot.runtime_total)
+
+    # CC runtime logic
+    if idx_cc !== nothing && idx_rp_reference !== nothing
+
+        runtime_reference_total =
+            df_plot[idx_rp_reference, :runtime_total]
+
+        runtime_cc_own =
+            df_plot[idx_cc, :runtime_own]
+
+        runtime_comparison[idx_cc] =
+            runtime_reference_total + runtime_cc_own
+
+        @show runtime_reference_total
+        @show runtime_cc_own
+        @show runtime_comparison[idx_cc]
+    end
+
+    p_runtime = bar(
+        runtime_case_labels,
+        runtime_comparison;
+        xlabel="Case",
+        ylabel="Runtime [s]",
+        title="Runtime Comparison",
+        label=false,
+        xrotation=20,
+        legend=false,
+    )
+
+    savefig(
+        p_runtime,
+        joinpath(plots_folder, "runtime_comparison.png"),
+    )
+
+    # System costs
+    df_plot[!, :system_cost] = df_plot.objective_value
+
+    df_plot[rp_rows, :system_cost] =
+        df_plot[rp_rows, :objective_value_resolve_benchmark]
+
+    p_costs = bar(
+        df_plot.case_label,
+        df_plot.system_cost;
+        xlabel="Case",
+        ylabel="System Cost",
+        title="System Costs Comparison",
+        label=false,
+        xrotation=30,
+        ylim=zoom_limits(df_plot.system_cost),
+    )
+
+    savefig(
+        p_costs,
+        joinpath(plots_folder, "system_costs_comparison.png"),
+    )
+
+    # LOLE
+    df_plot[!, :lole_e_demand] =
+        df_plot.num_loss_of_load_e_demand ./ number_of_scenarios
+
+    df_plot[!, :lole_h2_demand] =
+        df_plot.num_loss_of_load_h2_demand ./ number_of_scenarios
+
+    x = collect(1:nrow(df_plot))
+    w = 0.35
+
+    p_lole = bar(
+        x .- w / 2,
+        df_plot.lole_e_demand;
+        bar_width=w,
+        xlabel="Case",
+        ylabel="LOLE [expected events per scenario]",
+        title="Loss of Load Expected Comparison",
+        label="Electricity demand",
+        xticks=(x, df_plot.case_label),
+        xrotation=30,
+        legend=:topright,
+    )
+
+    bar!(
+        p_lole,
+        x .+ w / 2,
+        df_plot.lole_h2_demand;
+        bar_width=w,
+        label="Hydrogen demand",
+    )
+
+    savefig(
+        p_lole,
+        joinpath(plots_folder, "lole_comparison.png"),
+    )
+
+    # VaR
+    p_var = bar(
+        df_plot.case_label,
+        df_plot.value_at_risk_threshold_mu;
+        xlabel="Case",
+        ylabel="VaR threshold μ",
+        title="Value at Risk Threshold Comparison",
+        label=false,
+        xrotation=30,
+        ylim=zoom_limits(df_plot.value_at_risk_threshold_mu),
+    )
+
+    savefig(
+        p_var,
+        joinpath(plots_folder, "var_threshold_comparison.png"),
+    )
+
+    @info "Comparison plots saved in: $plots_folder"
+
+    return df_plot
+end

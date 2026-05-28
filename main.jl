@@ -22,10 +22,10 @@ using JuMP: JuMP
 using TOML: TOML
 using Plots
 using Random
+using DataFrames
+using Statistics
 
 Random.seed!(19990907)
-
-using DataFrames
 
 # helper functions
 @info "Including helper functions"
@@ -43,6 +43,7 @@ distance_map = Dict(
 # Read and transform user input files to Tulipa input files
 config = TOML.parsefile("config.toml")
 input_data_path = config["simulation"]["input_data"]
+input_data_path_CC = config["simulation"]["input_data_CC"]
 use_ratio = config["clustering"]["use_ratio"]
 heuristic_distance = config["clustering"]["heuristic_distance"]
 fix_level_storage = config["simulation"]["fix_level_storage"]
@@ -76,7 +77,7 @@ CSV.write(joinpath(input_data_path, "stochastic-scenario.csv"), df_stochastic_sc
 # df_stochastic_scenario = CSV.read(joinpath(input_data_path, "stochastic-scenario.csv"), DataFrame)
 
 case_studies_info = CSV.read(
-    "case-studies-info.csv",
+    "case-studies-info-proxy.csv",
     DataFrame;
     types=Dict(
         :base_name => String,
@@ -174,43 +175,14 @@ function main()
                 direct_model=direct_model,
             )
 
-            output_folder = joinpath(@__DIR__, "outputsBM", base_name, string(solver))
+            output_folder = joinpath(@__DIR__, "outputs", base_name, string(solver))
             mkpath(output_folder)
 
             @info "Solving the model and saving the solution for the base case study (0_HourlyBenchmark) with $solver"
             time_to_solve = @elapsed TEM.solve_model!(energy_problem_benchmark)
-            #        mu_value =
-            #            JuMP.value(energy_problem_benchmark.variables[:value_at_risk_threshold_mu].container)
+
             time_to_save = @elapsed TEM.save_solution!(energy_problem_benchmark)
             TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
-
-
-            # df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem_benchmark, output_folder)
-            # #put this into a function later
-            # worst_case_row = df_cost_per_scenario[
-            #     argmax(df_cost_per_scenario.operational_cost),
-            #     :
-            # ]
-
-            # df_worst_case_tail_cost = DataFrame(
-            #     scenario=[worst_case_row.scenario],
-            #     operational_cost=[worst_case_row.operational_cost],
-            # )
-
-            # CSV.write(joinpath(output_folder, "worst-case-tail-cost.csv"), df_worst_case_tail_cost; writeheader=true)
-            # #put this into a function later
-            # df_sorted = sort(df_cost_per_scenario, :operational_cost)
-            # middle_idx = ceil(Int, nrow(df_sorted) / 2)
-            # average_case_row = df_sorted[middle_idx, :]
-            # df_average_case_cost = DataFrame(
-            #     scenario=[average_case_row.scenario],
-            #     operational_cost=[average_case_row.operational_cost],
-            # )
-
-            # CSV.write(joinpath(output_folder, "average-case-cost.csv"), df_average_case_cost; writeheader=true,)
-
-            # plot_operational_cost_per_scenario(df_cost_per_scenario, output_folder)
-
 
             mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
             mu_value = if nrow(mu_value_df) == 0
@@ -218,6 +190,10 @@ function main()
             else
                 only(mu_value_df.solution)
             end
+
+            total_cost_per_scenario_df = export_total_cost_per_scenario(energy_problem_benchmark, output_folder)
+            plot_cost_per_scenario(total_cost_per_scenario_df, output_folder, mu_value_df)
+
             var_flow_df = TIO.get_table(connection_benchmark, "var_flow")
             flow_ens = filter(row -> row.from_asset == "ens" && row.to_asset == "e_demand", var_flow_df)
             flow_smr_ccs =
@@ -233,6 +209,11 @@ function main()
 
             # count how much water_borrowed
             amount_water_borrowed_b = sum(water_borrowed.solution)
+
+            # get investment decisions
+
+            benchmark_df = TIO.get_table(connection_benchmark, "var_assets_investment")
+            CSV.write(joinpath(output_folder, "benchmark_investment_decisions.csv"), benchmark_df; writeheader=true)
 
             new_results_row = (
                 base_name=base_name,
@@ -426,39 +407,13 @@ function main()
                     enable_names=enable_names,
                 )
 
-                output_folder = joinpath(@__DIR__, "outputsBM", case_name, string(solver))
+                output_folder = joinpath(@__DIR__, "outputs", case_name, string(solver))
                 mkpath(output_folder)
 
                 @info "Solving the model and saving the solution for the case study: $case_name with $solver"
                 time_to_solve = @elapsed TEM.solve_model!(energy_problem)
                 time_to_save = @elapsed TEM.save_solution!(energy_problem)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem)
-                # df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem, output_folder)
-
-                # #put this into a function later
-                # worst_case_row = df_cost_per_scenario[
-                #     argmax(df_cost_per_scenario.operational_cost),
-                #     :
-                # ]
-
-                # df_worst_case_tail_cost = DataFrame(
-                #     scenario=[worst_case_row.scenario],
-                #     operational_cost=[worst_case_row.operational_cost],
-                # )
-
-                # CSV.write(joinpath(output_folder, "worst-case-tail-cost.csv"), df_worst_case_tail_cost; writeheader=true)
-                # #put this into a function later
-                # df_sorted = sort(df_cost_per_scenario, :operational_cost)
-                # middle_idx = ceil(Int, nrow(df_sorted) / 2)
-                # average_case_row = df_sorted[middle_idx, :]
-                # df_average_case_cost = DataFrame(
-                #     scenario=[average_case_row.scenario],
-                #     operational_cost=[average_case_row.operational_cost],
-                # )
-
-                # CSV.write(joinpath(output_folder, "average-case-cost.csv"), df_average_case_cost; writeheader=true,)
-
-                # plot_operational_cost_per_scenario(df_cost_per_scenario, output_folder)
 
                 var_flow_df = TIO.get_table(connection, "var_flow")
                 water_borrowed = filter(
@@ -551,9 +506,47 @@ function main()
                         only(mu_value_df.solution)
                     end
 
-                    output_folder = joinpath(@__DIR__, "outputsBM", "fixed", case_name, string(solver))
+                    output_folder = joinpath(@__DIR__, "outputs", "fixed", case_name, string(solver))
                     mkpath(output_folder)
+
+                    total_cost_per_scenario_df = export_total_cost_per_scenario(energy_problem_benchmark, output_folder)
+
+                    tol = 1e-5
+
+                    df_tail_scenarios = copy(total_cost_per_scenario_df)
+
+                    df_tail_scenarios[!, :solution] =
+                        max.(0.0, df_tail_scenarios.total_cost .- mu_value)
+
+                    df_tail_scenarios = filter(
+                        row -> row.total_cost >= mu_value - tol,
+                        df_tail_scenarios,
+                    )
+
+                    df_tail_scenarios = df_tail_scenarios[:, [:id, :scenario, :probability, :total_cost]]
+
+                    plot_cost_per_scenario_inc_tail(
+                        total_cost_per_scenario_df,
+                        df_tail_scenarios,
+                        output_folder,
+                        mu_value_df,
+                        case_name,
+                    )
+
+                    CSV.write(
+                        joinpath(output_folder, "tail_scenarios.csv"),
+                        df_tail_scenarios;
+                        writeheader=true,
+                    )
                     TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
+
+                    approximation_df = TIO.get_table(connection_benchmark, "var_assets_investment")
+                    benchmark_df = CSV.read(joinpath(@__DIR__, "outputs", "0_HourlyBenchmark", "Gurobi", "benchmark_investment_decisions.csv"), DataFrame)
+                    plot_normalized_asset_investment_differences(
+                        benchmark_df::DataFrame,
+                        approximation_df::DataFrame;
+                        output_folder,
+                        case_name,)
 
                     new_results_row = (
                         base_name=base_name,
@@ -613,7 +606,216 @@ function main()
         end
     end
 
-    results_df |> CSV.write("outputsBM/results.csv"; writeheader=true)
+    @info "Beginning of Contribution C (CC)"
+
+    profiles_df = CSV.read(
+        joinpath(@__DIR__, "base-input-data", "RIDM-case-study", "profiles-wide.csv"),
+        DataFrame,
+    )
+
+    df_stochastic_scenario = CSV.read(
+        joinpath(@__DIR__, "base-input-data", "RIDM-case-study", "stochastic-scenario.csv"),
+        DataFrame,
+    )
+
+    output_folder = joinpath(@__DIR__, "outputs", "fixed", "convex_conicalb_cross_rp_30", "Gurobi")
+
+    df_tail_scenarios = CSV.read(
+        joinpath(output_folder, "tail_scenarios.csv"),
+        DataFrame,
+    )
+
+    tail_scenarios_ids = df_tail_scenarios[!, 2]
+
+    df_total_cost_per_scenario =
+        export_total_cost_per_scenario(energy_problem_benchmark, output_folder)
+
+    df_sorted = sort(df_total_cost_per_scenario, :total_cost)
+    middle_idx = ceil(Int, nrow(df_sorted) / 2)
+    average_case_row = df_sorted[middle_idx, :]
+
+    if average_case_row.scenario in tail_scenarios_ids
+        df_non_tail = filter(
+            row -> !(row.scenario in tail_scenarios_ids),
+            df_total_cost_per_scenario,
+        )
+
+        df_sorted_non_tail = sort(df_non_tail, :total_cost)
+        middle_idx_non_tail = ceil(Int, nrow(df_sorted_non_tail) / 2)
+        average_case_row = df_sorted_non_tail[middle_idx_non_tail, :]
+    end
+
+    df_representative_non_tail_scenario = DataFrame(
+        scenario=[average_case_row.scenario],
+        total_cost=[average_case_row.total_cost],
+    )
+    CSV.write(joinpath(@__DIR__, output_folder, "average_case_scenario.csv"), df_representative_non_tail_scenario; writeheader=true)
+    mu_value_df = CSV.read(joinpath(output_folder, "var_value_at_risk_threshold_mu.csv"), DataFrame)
+
+    plot_cost_per_scenario_inc_tail_inc_representative(
+        df_total_cost_per_scenario,
+        df_tail_scenarios,
+        df_representative_non_tail_scenario,
+        output_folder,
+        mu_value_df,
+        "convex_conicalb_cross_rp_30",
+    )
+
+    representative_non_tail_scenario =
+        df_representative_non_tail_scenario.scenario
+
+    selected_scenarios_ids = vcat(
+        tail_scenarios_ids,
+        representative_non_tail_scenario,
+    )
+
+    profiles_df_CC = filter(
+        row -> row.scenario in selected_scenarios_ids,
+        profiles_df,
+    )
+
+    CSV.write(
+        joinpath(input_data_path_CC, "profiles-wide.csv"),
+        profiles_df_CC;
+        writeheader=true,
+    )
+
+    n_tail = length(tail_scenarios_ids)
+    tail_probability = (1.0 - alpha) / n_tail
+
+    df_stochastic_scenario_CC = DataFrame(
+        scenario=selected_scenarios_ids,
+        probability=[
+            fill(tail_probability, n_tail);
+            alpha
+        ],
+    )
+
+    CSV.write(
+        joinpath(input_data_path_CC, "stochastic-scenario.csv"),
+        df_stochastic_scenario_CC;
+        writeheader=true,
+    )
+
+    @info "Running the base case study (0_HourlyBenchmark) for CC"
+    base_name = "0_HourlyBenchmark_CC"
+
+    # set up the connection and read the data
+    connection_benchmark = DuckDB.DBInterface.connect(DuckDB.DB)
+    TIO.read_csv_folder(connection_benchmark, input_data_path_CC)
+    # update the CSV input data for Tulipa from the config file info
+    DuckDB.query(
+        connection_benchmark,
+        "
+        UPDATE model_parameters -- tables are with underscore in DuckDB world
+        SET
+            risk_aversion_weight_lambda = $(lambda) ,
+            risk_aversion_confidence_level_alpha = $(alpha);
+        ",
+    )
+    # transform the profiles data from wide to long
+    TC.transform_wide_to_long!(
+        connection_benchmark,
+        "profiles_wide",
+        "profiles";
+        exclude_columns=["scenario", "milestone_year", "timestep"],
+    )
+
+    layout = TC.ProfilesTableLayout(;
+        year=:milestone_year,
+        cols_to_groupby=[:milestone_year, :scenario],
+    )
+    time_to_cluster = @elapsed TC.dummy_cluster!(connection_benchmark; layout=layout)
+    TEM.populate_with_defaults!(connection_benchmark)
+    DuckDB.query(connection_benchmark, "UPDATE asset SET is_seasonal = false")
+
+    time_to_read = @elapsed energy_problem_benchmark = TEM.EnergyProblem(connection_benchmark)
+
+    for solver in solvers
+        optimizer, parameters = get_solver_parameters(solver)
+
+        @info "Creating the model for the base case study (0_HourlyBenchmark_CC) with $solver"
+        time_to_create = @elapsed TEM.create_model!(
+            energy_problem_benchmark;
+            optimizer=optimizer,
+            optimizer_parameters=parameters,
+            model_file_name="",
+            enable_names=enable_names,
+            direct_model=direct_model,
+        )
+
+        output_folder = joinpath(@__DIR__, "outputs", base_name, string(solver))
+        mkpath(output_folder)
+
+        @info "Solving the model and saving the solution for the base case study (0_HourlyBenchmark_CC) with $solver"
+        time_to_solve = @elapsed TEM.solve_model!(energy_problem_benchmark)
+
+        time_to_save = @elapsed TEM.save_solution!(energy_problem_benchmark)
+        TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
+
+        mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
+        mu_value = if nrow(mu_value_df) == 0
+            NaN
+        else
+            only(mu_value_df.solution)
+        end
+
+        total_cost_per_scenario_df = export_total_cost_per_scenario(energy_problem_benchmark, output_folder)
+        plot_cost_per_scenario(total_cost_per_scenario_df, output_folder, mu_value_df)
+
+        approximation_df = TIO.get_table(connection_benchmark, "var_assets_investment")
+        benchmark_df = CSV.read(joinpath(@__DIR__, "outputs", "0_HourlyBenchmark", "Gurobi", "benchmark_investment_decisions.csv"), DataFrame)
+        plot_normalized_asset_investment_differences(
+            benchmark_df::DataFrame,
+            approximation_df::DataFrame;
+            output_folder,
+            case_name="Hourly CC",)
+
+        var_flow_df = TIO.get_table(connection_benchmark, "var_flow")
+        flow_ens = filter(row -> row.from_asset == "ens" && row.to_asset == "e_demand", var_flow_df)
+        flow_smr_ccs =
+            filter(row -> row.from_asset == "smr_ccs" && row.to_asset == "h2_demand", var_flow_df)
+        water_borrowed = filter(
+            row -> row.from_asset == "water_borrower" && row.to_asset == "hydro_reservoir",
+            var_flow_df,
+        )
+
+        # count steps with loss of load
+        n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
+        n_lol_smr_cca = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
+
+        # count how much water_borrowed
+        amount_water_borrowed_b = sum(water_borrowed.solution)
+
+        new_results_row = (
+            base_name=base_name,
+            rp=1,
+            solver=solver,
+            time_to_cluster=0.0,
+            time_to_read=time_to_read,
+            time_to_create=time_to_create,
+            time_to_solve=time_to_solve,
+            time_to_save=time_to_save,
+            objective_value=energy_problem_benchmark.objective_value,
+            termination_status=string(energy_problem_benchmark.termination_status),
+            num_constraints=JuMP.num_constraints(
+                energy_problem_benchmark.model;
+                count_variable_in_set_constraints=false,
+            ),
+            num_variables=JuMP.num_variables(energy_problem_benchmark.model),
+            time_to_resolve_benchmark=0.0,
+            objective_value_resolve_benchmark=0.0,
+            termination_status_resolve_benchmark="",
+            num_loss_of_load_e_demand=n_lol_ens,
+            num_loss_of_load_h2_demand=n_lol_smr_cca,
+            water_borrowed=amount_water_borrowed_b,
+            value_at_risk_threshold_mu=mu_value,
+        )
+        push!(results_df, new_results_row)
+    end
+
+    results_df |> CSV.write("outputs/results.csv"; writeheader=true)
+    plot_comparison(joinpath(@__DIR__, "outputs"), number_of_scenarios)
 
     return nothing
 end
