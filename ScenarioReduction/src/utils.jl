@@ -3,15 +3,12 @@ using DataFrames: DataFrame
 using Statistics: Statistics
 using QuasiMonteCarlo: QuasiMonteCarlo
 
-const INVESTABLE_ASSETS = [
-    "ccgt",
-    "ocgt",
-    "solar",
-    "wind",
-    "wind_offshore",
-    "electrolizer",
-    "battery",
-]
+# Quasi-random Gaussian sampling (sobol_gaussian_samples,
+# sobol_gaussian_samples_nonneg, shrink_covariance) lives in its own file so
+# that the unit tests under ScenarioReduction/test/ can load it without
+# pulling in JuMP/Tulipa/DuckDB.
+include(joinpath(@__DIR__, "sampling.jl"))
+include(joinpath(@__DIR__, "investment_mapping.jl"))
 
 struct AssetInvestmentBounds
     max::Float64
@@ -162,17 +159,17 @@ function print_model_variables_before_clustering(connection)
 end
 
 
-function solve_model(model::JuMP.Model)
-
+function solve_model(model::JuMP.Model; diagnose_infeasibility=true)
     JuMP.optimize!(model)
-
-    # Check solution status
-    if JuMP.termination_status(model) != JuMP.OPTIMAL
-        @warn("Model status different from optimal")
-        return nothing
+    status = JuMP.termination_status(model)
+    if status == JuMP.OPTIMAL
+        return status
     end
-
-    return
+    @warn "Model status: $status"
+    if diagnose_infeasibility && status in (JuMP.INFEASIBLE, JuMP.INFEASIBLE_OR_UNBOUNDED)
+        print_infeasibility_conflict!(model)
+    end
+    return status
 end
 
 function generate_scrambled_Sobol_samples(
@@ -194,6 +191,63 @@ function generate_scrambled_Sobol_samples(
     ]
 end
 
+function build_capacity_lookup(connection)
+    asset_df = DataFrame(TIO.get_table(connection, "asset"))
+    return Dict(string(a) => Float64(c) for (a, c) in zip(asset_df.asset, asset_df.capacity))
+end
+
+function audit_investment_mapping(
+    variables;
+    assets=INVESTABLE_ASSETS,
+    capacity_lookup=nothing,
+)
+    inv_df = DataFrame(variables[:assets_investment].indices)
+    result = audit_investment_mapping_order(inv_df; assets)
+
+    @info "Investment mapping audit" (
+        permutation_ok=result.permutation_ok,
+        dim_ok=result.dim_ok,
+        n_container=result.n_container,
+        n_sample_assets=result.n_sample_assets,
+    )
+
+    if !result.permutation_ok
+        for (i, expected, actual) in result.mismatches
+            @warn "Positional mismatch at index $i" expected=expected actual=actual
+        end
+        !result.dim_ok &&
+            @warn "Container dimension $(result.n_container) != sample dimension $(result.n_sample_assets)"
+    end
+
+    if capacity_lookup !== nothing
+        for row in eachrow(inv_df)
+            asset = string(row.asset)
+            if haskey(capacity_lookup, asset)
+                @debug "Capacity for $asset" capacity=capacity_lookup[asset]
+            else
+                @warn "Missing capacity for investment asset: $asset"
+            end
+        end
+    end
+
+    return result
+end
+
+function align_investment_sample_to_container(
+    variables,
+    sample_mw::AbstractVector{Float64};
+    capacity_lookup::Dict{String,Float64},
+    assets=INVESTABLE_ASSETS,
+)
+    inv_df = DataFrame(variables[:assets_investment].indices)
+    return align_investment_sample_to_indices(
+        inv_df,
+        sample_mw,
+        capacity_lookup;
+        assets,
+    )
+end
+
 function assert_variables_fixed!(vars, targets::AbstractVector{Float64}; tol=1e-8)
     length(vars) == length(targets) ||
         error(
@@ -212,7 +266,22 @@ function assert_variables_fixed!(vars, targets::AbstractVector{Float64}; tol=1e-
     return nothing
 end
 
-function fix_variables_from_sample(variables, var_symbol, val_to_fix::AbstractVector{Float64})
+function fix_variables_from_sample(
+    variables,
+    var_symbol,
+    val_to_fix::AbstractVector{Float64};
+    capacity_lookup=nothing,
+    assets=INVESTABLE_ASSETS,
+)
+    if var_symbol == :assets_investment && capacity_lookup !== nothing
+        val_to_fix = align_investment_sample_to_container(
+            variables,
+            val_to_fix;
+            capacity_lookup,
+            assets,
+        )
+    end
+
     var_to_fix = variables[var_symbol].container
 
     for (var, val) in zip(var_to_fix, val_to_fix)

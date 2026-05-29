@@ -13,6 +13,7 @@ const OUTPUT_DIR = joinpath(SCRIPT_DIR, "outputs")
 const REPRESENTATIVE_PERIODS = 30
 const RUN_FILTER = true
 const RUN_SOLVE = false
+const RUN_VERIFY_MAPPING = false
 
 using Pkg: Pkg
 Pkg.activate(REPO_ROOT)
@@ -99,6 +100,62 @@ function setup_connection()
     )
 
     return connection
+end
+
+function prepare_stochastic_dominance_indices!(connection)
+    layout = TC.ProfilesTableLayout(;
+        year=:milestone_year,
+        cols_to_groupby=[:milestone_year, :scenario],
+    )
+    TC.dummy_cluster!(connection; layout=layout)
+    TEM.populate_with_defaults!(connection)
+    TEM.create_internal_tables!(connection)
+    return TEM.compute_variables_indices(connection)
+end
+
+"""
+    verify_investment_fix_mapping!(connection; tol=1e-8)
+
+Integration smoke test: fix sentinel MW values per asset and read back model-unit
+fix values via the indices-aligned path. Returns the audit result.
+"""
+function verify_investment_fix_mapping!(connection; tol=1e-8)
+    variables = prepare_stochastic_dominance_indices!(connection)
+    capacity_lookup = build_capacity_lookup(connection)
+    audit = audit_investment_mapping(variables; capacity_lookup)
+
+    constraints = TEM.compute_constraints_indices(connection)
+    profiles = TEM.prepare_profiles_structure(connection)
+    model, _ = TEM.create_model(connection, variables, constraints, profiles)
+    JuMP.set_optimizer(model, HiGHS.Optimizer)
+    JuMP.set_silent(model)
+
+    sample_mw = Float64[1000, 2000, 3000, 4000, 5000, 6000, 7000]
+    fix_variables_from_sample(
+        variables,
+        :assets_investment,
+        sample_mw;
+        capacity_lookup,
+    )
+
+    inv_df = DataFrame(variables[:assets_investment].indices)
+    container = variables[:assets_investment].container
+    sample_by_asset = sample_vector_by_asset(sample_mw)
+
+    for (i, row) in enumerate(eachrow(inv_df))
+        asset = string(row.asset)
+        expected = sample_by_asset[asset] / capacity_lookup[asset]
+        actual = JuMP.fix_value(container[i])
+        @info "Fix verification" index=i asset=asset expected=expected actual=actual
+        abs(actual - expected) > tol &&
+            error("Fix mismatch at index $i ($asset): got $actual, expected $expected")
+    end
+
+    @info "Investment fix mapping verification passed" (
+        permutation_ok=audit.permutation_ok,
+        n_mismatches=length(audit.mismatches),
+    )
+    return audit
 end
 
 function run_filter!(connection)
@@ -203,6 +260,10 @@ end
 function run!()
     prepare_scenario_input!()
     connection = setup_connection()
+
+    if RUN_VERIFY_MAPPING
+        verify_investment_fix_mapping!(connection)
+    end
 
     if RUN_FILTER
         run_filter!(connection)

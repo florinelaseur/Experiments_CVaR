@@ -2,6 +2,10 @@ function stochastic_dominance(
     connection;
     bounds::InvestmentBounds=load_investment_bounds(),
     covariance::InvestmentCovariance=investment_covariance(),
+    sampling_mode::Symbol=:gaussian,            # :uniform | :gaussian
+    gaussian_shrinkage::Real=0.2,
+    gaussian_nonneg_mode::Symbol=:clip,
+    solver::Symbol=:Gurobi,
 )
     num_assets = length(INVESTABLE_ASSETS)
     num_samples = 512
@@ -14,7 +18,23 @@ function stochastic_dominance(
     lb = zeros(num_assets)
     ub = bounds.ub
 
-    samples = generate_scrambled_Sobol_samples(num_samples, num_assets, lb, ub, number_of_samples_sequences)
+    samples = if sampling_mode === :uniform
+        generate_scrambled_Sobol_samples(num_samples, num_assets, lb, ub, number_of_samples_sequences)
+    elseif sampling_mode === :gaussian
+        Σ_shrunk = shrink_covariance(covariance.matrix; α=gaussian_shrinkage)
+        [
+            sobol_gaussian_samples_nonneg(
+                num_samples,
+                bounds.mean,
+                Σ_shrunk;
+                mode=gaussian_nonneg_mode,
+                ub=ub,
+                seed=seq,
+            ) for seq in 1:number_of_samples_sequences
+        ]
+    else
+        throw(ArgumentError("sampling_mode must be :uniform or :gaussian (got :$sampling_mode)"))
+    end
 
     layout = TC.ProfilesTableLayout(;
         year=:milestone_year,
@@ -28,41 +48,73 @@ function stochastic_dominance(
     variables   = TEM.compute_variables_indices(connection)
     constraints = TEM.compute_constraints_indices(connection)
     profiles    = TEM.prepare_profiles_structure(connection)
-    
+
+    capacity_lookup = build_capacity_lookup(connection)
+    mapping_audit = audit_investment_mapping(
+        variables;
+        capacity_lookup,
+    )
+    if !mapping_audit.permutation_ok
+        @warn "Naive sample-to-container zip would mis-assign investments; using indices-based alignment"
+    end
+
     # === Build model ONCE ===
+    # copy_conflict (IIS) requires a non-direct JuMP model; TEM.create_model uses direct_model=false by default.
     time_to_create = @elapsed model, expressions = TEM.create_model(connection, variables, constraints, profiles)
     println("Time to create model (one-time): $(time_to_create)")
-    
-    JuMP.set_silent(model)  # mute solver chatter; do once
-    
-    # (Optional) configure solver for warm-starting — see below
-    configure_for_warmstart!(model)
-    
-    count = 0
+
+    optimizer, parameters = get_solver_parameters(solver)
+    JuMP.set_optimizer(model, optimizer)
+    JuMP.set_optimizer_attributes(model, [pair for pair in parameters]...)
+    JuMP.set_silent(model)
+
+    configure_for_warmstart!(model; solver=solver)
+
+    presolve_disabled = false
+    stop = false
     for sequence in 1:number_of_samples_sequences
+        stop && break
         for sample in eachcol(samples[sequence])
-            if count == 1
-                JuMP.set_optimizer_attribute(model, "presolve", "off")
+            time_to_fix = @elapsed fix_variables_from_sample(
+                variables,
+                :assets_investment,
+                Vector(sample);
+                capacity_lookup,
+            )
+            elapsed_time = @elapsed status = solve_model(model)
+            if status == JuMP.OPTIMAL
+                println("fix=$(time_to_fix)  solve=$(elapsed_time)  obj=$(JuMP.objective_value(model))  status=$status")
+            else
+                println("fix=$(time_to_fix)  solve=$(elapsed_time)  status=$status")
             end
-            time_to_fix = @elapsed fix_variables_from_sample(variables, :assets_investment, Vector(sample))
-            elapsed_time = @elapsed solve_model(model)
-            println("fix=$(time_to_fix)  solve=$(elapsed_time)  obj=$(JuMP.objective_value(model))  status=$(JuMP.termination_status(model))")
-            count += 1
+            if !presolve_disabled
+                # After the first solve the basis is informative; presolve would
+                # discard it and prevent warm-starting subsequent re-solves.
+                disable_presolve!(model; solver=solver)
+                presolve_disabled = true
+            end
         end
     end
+    return nothing
 end
 
-function configure_for_warmstart!(model)
-    # Use the simplex method, not interior-point.
-    # Simplex maintains a "basis" (the set of active variables at the corner solution)
-    # which can be reused across re-solves. Interior-point (IPM) cannot warm-start.
-    JuMP.set_optimizer_attribute(model, "solver", "simplex")
+function configure_for_warmstart!(model; solver::Symbol=:Gurobi)
+    # Use simplex, not interior-point — simplex maintains a basis reusable across re-solves.
+    # Dual simplex: after fix() changes bounds, the current basis stays dual-feasible.
+    if solver == :Gurobi
+        JuMP.set_optimizer_attribute(model, "Method", 1)  # dual simplex
+    elseif solver == :HiGHS
+        JuMP.set_optimizer_attribute(model, "solver", "simplex")
+        JuMP.set_optimizer_attribute(model, "simplex_strategy", 1)  # dual simplex
+    end
+    return nothing
+end
 
-    # Use the *dual* simplex specifically.
-    # When you change variable bounds (which is what fix() does — it sets lb=ub=value),
-    # the current basis remains feasible for the DUAL problem but not the primal.
-    # Dual simplex restarts from there and converges in few iterations.
-    # Primal simplex would have to repair primal infeasibility — slower in this case.
-    # In HiGHS: simplex_strategy = 1 means dual simplex.
-    JuMP.set_optimizer_attribute(model, "simplex_strategy", 1)
+function disable_presolve!(model; solver::Symbol=:Gurobi)
+    if solver == :Gurobi
+        JuMP.set_optimizer_attribute(model, "Presolve", 0)
+    elseif solver == :HiGHS
+        JuMP.set_optimizer_attribute(model, "presolve", "off")
+    end
+    return nothing
 end
