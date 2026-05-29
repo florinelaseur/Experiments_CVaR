@@ -18,6 +18,10 @@ const RUN_VERIFY_MAPPING = false
 using Pkg: Pkg
 Pkg.activate(REPO_ROOT)
 Pkg.instantiate()
+# The project's asset.csv uses the OLD TEM schema (storage_method_energy as a string
+# enum); registry v0.21.0 expects a BOOLEAN and crashes in populate_with_defaults!.
+# Pin the same git rev main.jl uses so this runner works without running main.jl first.
+Pkg.add(url="https://github.com/TulipaEnergy/TulipaEnergyModel.jl", rev="227a80f7907e2c7178edb0697874cfb6666ad644")
 
 import TulipaEnergyModel as TEM
 import TulipaIO as TIO

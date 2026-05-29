@@ -1,0 +1,90 @@
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+  Activating project at `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df`
+   Resolving package versions...
+     Project No packages added to or removed from `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\Project.toml`
+    Manifest No packages added to or removed from `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\Manifest.toml`
+┌ Info: Investment mapping audit
+└   (permutation_ok = result.permutation_ok, dim_ok = result.dim_ok, n_container = result.n_container, n_sample_assets = result.n_sample_assets) = (permutation_ok = false, dim_ok = true, n_container = 7, n_sample_assets = 7)
+┌ Warning: Positional mismatch at index 2
+│   expected = "ocgt"
+│   actual = "wind"
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:218
+┌ Warning: Positional mismatch at index 4
+│   expected = "wind"
+│   actual = "ocgt"
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:218
+┌ Warning: Positional mismatch at index 5
+│   expected = "wind_offshore"
+│   actual = "electrolizer"
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:218
+┌ Warning: Positional mismatch at index 6
+│   expected = "electrolizer"
+│   actual = "wind_offshore"
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:218
+┌ Warning: Naive sample-to-container zip would mis-assign investments; using indices-based alignment
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\stochastic_dominance.jl:43
+Selected scenarios: [96, 129]
+Adequacy params: peak_demand=1.5 hydro_cap=0.1 ens_cap=2.0
+
+==============================================================================
+PART A — soundness + yield for scenarios [96, 129]
+  scenario 96: 118 demanding-hour cuts
+  scenario 129: 68 demanding-hour cuts
+  feasibility_center LP=OPTIMAL
+  bounds.mean = Dict("ccgt" => 37697.2, "ocgt" => 3671.7, "solar" => 5186.2, "wind_offshore" => 32.4, "electrolizer" => 0.1, "battery" => 4374.5, "wind" => 35358.3)
+  μ*          = Dict("ccgt" => 45291.4, "ocgt" => 3671.7, "solar" => 5186.2, "wind_offshore" => 32.4, "electrolizer" => 0.1, "battery" => 4374.5, "wind" => 35358.3)
+  shift MW    = Dict("ccgt" => 7594.1, "ocgt" => 0.0, "solar" => 0.0, "wind_offshore" => 0.0, "electrolizer" => 0.0, "battery" => 0.0, "wind" => 0.0)
+
+  centre = bounds.mean  (N=64)
+    cut-pass rate      : 9/64  (14.1%)
+    LP-joint-feasible  : 4/64  (6.2%)
+    SOUNDNESS false-rejections (cut=NO but LP=feasible): 0  (must be 0)
+
+  centre = μ* (shifted)  (N=64)
+    cut-pass rate      : 32/64  (50.0%)
+    LP-joint-feasible  : 20/64  (31.2%)
+    SOUNDNESS false-rejections (cut=NO but LP=feasible): 0  (must be 0)
+
+==============================================================================
+PART B — tiny end-to-end stochastic_dominance (num_samples=8, 1 sequence)
+Asset values: AssetInvestmentBounds(49793.46104269772, 37697.24299150759, 6152.070344195317)
+Asset values: AssetInvestmentBounds(8878.500654796604, 3671.710211560329, 1204.237844401413)
+Asset values: AssetInvestmentBounds(25316.40834895353, 5186.213227357428, 5342.80470336249)
+Asset values: AssetInvestmentBounds(53231.233532298065, 35358.2859298978, 13281.266805430965)
+Asset values: AssetInvestmentBounds(4669.574285137742, 32.42759920234543, 389.1311904281453)
+Asset values: AssetInvestmentBounds(0.13737153534724386, 0.10469174352445874, 0.00518830193290132)
+Asset values: AssetInvestmentBounds(13534.948482146487, 4374.526699518643, 1931.597090255857)
+Investment covariance: [3.78479695199275e7 2.749005459752808e6 -3.4577296873559463e6 2.7418219047064386e7 298344.2313214293 5.651907423141254 407842.3222137223; 2.749005459752808e6 1.4501887858885615e6 1.7561773638240807e6 9.315492633408496e6 -13717.616779138572 0.9189337918286634 -374638.69889195403; -3.4577296873559463e6 1.7561773638240807e6 2.854556209827236e7 1.0685293361151338e7 -169352.5029630032 2.6711278243126007 635237.786307628; 2.7418219047064386e7 9.315492633408496e6 1.0685293361151338e7 1.7639204795704246e8 75078.97973361365 5.368008683366009 7.997575021518203e6; 298344.2313214293 -13717.616779138572 -169352.5029630032 75078.97973361365 151423.08336402554 0.04797874928315783 79097.28020948995; 5.651907423141254 0.9189337918286634 2.6711278243126007 5.368008683366009 0.04797874928315783 2.691847694694756e-5 -0.3741512568820247; 407842.3222137223 -374638.69889195403 635237.786307628 7.997575021518203e6 79097.28020948995 -0.3741512568820247 3.7310673190848944e6]
+Adequacy cuts: scenarios=[1, 2]  demanding-hours per scenario=[118, 68]  (peak_demand=1.5)
+Feasibility centre μ* (LP=OPTIMAL); shift MW=[7594.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+Time to create model (one-time): 7.2030498
+seq=1 sample=2  fix=0.0022198  solve=10.7912785  obj=2.2972326850343797e7  status=OPTIMAL
+seq=1 sample=3  fix=0.0011865  solve=2.7865167  obj=2.241612731885638e7  status=OPTIMAL
+seq=1 sample=7  fix=8.81e-5  solve=13.6906602  obj=2.294086783918727e7  status=OPTIMAL
+Screening summary: rejected(adequacy)=5  LP-optimal=3  LP-infeasible=0  (total=8)
+  LP solves avoided by adequacy pre-filter: 5/8
+  returned: rejected=5 optimal=3 infeasible=0
+  output adequacy_cuts.csv: exists=true
+  output feasibility_center.csv: exists=true
+  output screening_diagnostics.csv: exists=true
+
+DONE.

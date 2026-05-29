@@ -113,6 +113,11 @@ Modes:
                  with a negative or out-of-bounds coordinate, keep the first
                  `N` survivors. Preserves the conditional distribution exactly
                  but loses Sobol' low-discrepancy structure of the survivors.
+
+The optional `accept` predicate (`:reject` mode only) additionally drops any
+sample column `x` for which `accept(x)` is `false` — e.g. an adequacy-cut check
+`x -> adequacy_verdict(x, cuts_list).passed`, so that every kept sample satisfies
+the necessary feasibility condition.
 """
 function sobol_gaussian_samples_nonneg(
     N::Int,
@@ -124,6 +129,7 @@ function sobol_gaussian_samples_nonneg(
     seed::Int=1,
     jitter::Real=1e-8,
     oversample::Real=3.0,
+    accept::Union{Nothing,Function}=nothing,
 )
     if mode === :clip
         Z = sobol_gaussian_samples(N, μ, Σ; scramble, seed, jitter)
@@ -146,6 +152,10 @@ function sobol_gaussian_samples_nonneg(
                 continue
             end
             if !isnothing(ub) && any(i -> col[i] > ub[i], eachindex(col))
+                keep[k] = false
+                continue
+            end
+            if !isnothing(accept) && !accept(col)
                 keep[k] = false
             end
         end
@@ -182,4 +192,76 @@ function shrink_covariance(Σ_emp::AbstractMatrix; α::Real=0.2, target::Symbol=
         throw(ArgumentError("target must be :diagonal or :identity (got :$target)"))
     end
     return (1 - α) * Σ_emp + α * T
+end
+
+# ---- Reject-to-target sampling: keep drawing until N samples are accepted ----
+#
+# Unlike `:reject` mode (fixed oversample, errors if short), these grow the draw
+# budget until at least `N` samples pass `accept`, so callers always get a full
+# pool of "probable" candidates (e.g. samples that satisfy the adequacy cuts).
+# Sampling is cheap vs the downstream LP, so regenerating the batch as it grows is
+# fine and keeps the result deterministic for a given seed.
+
+"""
+    _reject_to_target(gen_batch, accept, N; init_oversample=3.0, max_draws=200_000)
+
+`gen_batch(M)` returns a `d × M` candidate matrix (deterministic in `M`). Grows `M`
+until ≥ `N` columns satisfy `accept`, or `max_draws` is hit (then warns). Returns
+`(kept_indices::Vector{Int}, n_drawn::Int, batch::Matrix)`.
+"""
+function _reject_to_target(gen_batch, accept, N::Int; init_oversample::Real=3.0, max_draws::Int=200_000)
+    # Scrambled-Sobol nets require a power-of-two point count, so the batch size is
+    # always rounded up to a power of two and doubled (stays a power of two).
+    M = nextpow(2, max(N, ceil(Int, init_oversample * N)))
+    while true
+        batch = gen_batch(M)
+        kept = Int[j for j in 1:size(batch, 2) if accept(@view batch[:, j])]
+        if length(kept) >= N || M >= max_draws
+            length(kept) < N && @warn "reject_to_target: only $(length(kept))/$N accepted after $M draws (≥ max_draws=$max_draws); returning $(length(kept))."
+            return (kept, M, batch)
+        end
+        M *= 2
+    end
+end
+
+"""
+    sobol_gaussian_reject_to_target(N, μ, Σ; accept, ub=nothing, seed=1, ...) -> (samples, n_drawn)
+
+Scrambled-Sobol draws from `N(μ, Σ)`, keeping the first `N` that are ≥ 0, ≤ `ub`
+(if given), and satisfy `accept` (a predicate on a sample vector), growing the draw
+budget until `N` are found. `samples` is `d × N` (or fewer if `max_draws` is hit);
+`n_drawn` is the total candidates generated (for acceptance-rate reporting).
+"""
+function sobol_gaussian_reject_to_target(
+    N::Int, μ::AbstractVector, Σ::AbstractMatrix;
+    accept::Function, ub::Union{Nothing,AbstractVector}=nothing,
+    seed::Int=1, jitter::Real=1e-8, init_oversample::Real=3.0, max_draws::Int=200_000,
+)
+    gen = M -> sobol_gaussian_samples(M, μ, Σ; scramble=true, seed=seed, jitter=jitter)
+    full_accept = x -> all(>=(0.0), x) &&
+        (isnothing(ub) || all(i -> x[i] <= ub[i], eachindex(x))) &&
+        accept(x)
+    kept, n_drawn, batch = _reject_to_target(gen, full_accept, N; init_oversample, max_draws)
+    take = min(N, length(kept))
+    return (samples=batch[:, kept[1:take]], n_drawn=n_drawn)
+end
+
+"""
+    scrambled_sobol_uniform_reject_to_target(N, lb, ub; accept, seed=1, ...) -> (samples, n_drawn)
+
+Scrambled-Sobol uniform draws over `[lb, ub]` (no Gaussian centre), keeping the
+first `N` that satisfy `accept`. Same return shape as
+[`sobol_gaussian_reject_to_target`](@ref).
+"""
+function scrambled_sobol_uniform_reject_to_target(
+    N::Int, lb::AbstractVector, ub::AbstractVector;
+    accept::Function, seed::Int=1, init_oversample::Real=3.0, max_draws::Int=200_000,
+)
+    gen = M -> QuasiMonteCarlo.sample(
+        M, lb, ub,
+        QuasiMonteCarlo.SobolSample(; R=QuasiMonteCarlo.OwenScramble(base=2, pad=32, rng=Xoshiro(seed))),
+    )
+    kept, n_drawn, batch = _reject_to_target(gen, accept, N; init_oversample, max_draws)
+    take = min(N, length(kept))
+    return (samples=batch[:, kept[1:take]], n_drawn=n_drawn)
 end

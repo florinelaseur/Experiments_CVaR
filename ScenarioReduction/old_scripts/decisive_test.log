@@ -1,0 +1,53 @@
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+  Activating project at `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df`
+   Resolving package versions...
+    Updating `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\Project.toml`
+  [5d7bd171] ~ TulipaEnergyModel v0.21.0 ⇒ v0.21.0 `https://github.com/TulipaEnergy/TulipaEnergyModel.jl#227a80f`
+    Updating `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\Manifest.toml`
+  [5d7bd171] ~ TulipaEnergyModel v0.21.0 ⇒ v0.21.0 `https://github.com/TulipaEnergy/TulipaEnergyModel.jl#227a80f`
+Precompiling packages...
+   5933.0 ms  ✓ TulipaEnergyModel
+  1 dependency successfully precompiled in 7 seconds. 264 already precompiled.
+
+==============================================================================
+>>> Scenario 1 — Variant A (is_seasonal=false, generation env)
+    fixed MW = Dict("ccgt" => 29224.0, "ocgt" => 2790.3, "solar" => 0.0, "wind_offshore" => 0.0, "electrolizer" => 0.1, "battery" => 8179.8, "wind" => 31926.2)
+>>> Scenario 1 — Variant A (is_seasonal=false, generation env)  => status=OPTIMAL  obj=1.362961324025664e7
+
+==============================================================================
+>>> Scenario 1 — Variant B (is_seasonal default, SD-loop env)
+    fixed MW = Dict("ccgt" => 29224.0, "ocgt" => 2790.3, "solar" => 0.0, "wind_offshore" => 0.0, "electrolizer" => 0.1, "battery" => 8179.8, "wind" => 31926.2)
+>>> Scenario 1 — Variant B (is_seasonal default, SD-loop env)  => status=OPTIMAL  obj=1.362961323972692e7
+
+==============================================================================
+>>> Scenario 19 — Variant A (is_seasonal=false, generation env)
+    fixed MW = Dict("ccgt" => 33411.4, "ocgt" => 1544.1, "solar" => 0.0, "wind_offshore" => 0.0, "electrolizer" => 0.1, "battery" => 2115.7, "wind" => 106.6)
+>>> Scenario 19 — Variant A (is_seasonal=false, generation env)  => status=OPTIMAL  obj=1.3898811188985882e7
+
+==============================================================================
+>>> Scenario 19 — Variant B (is_seasonal default, SD-loop env)
+    fixed MW = Dict("ccgt" => 33411.4, "ocgt" => 1544.1, "solar" => 0.0, "wind_offshore" => 0.0, "electrolizer" => 0.1, "battery" => 2115.7, "wind" => 106.6)
+>>> Scenario 19 — Variant B (is_seasonal default, SD-loop env)  => status=OPTIMAL  obj=1.3898811172068e7
+
+##############################################################################
+# DECISIVE TEST SUMMARY
+##############################################################################
+  scenario=1  variant=A  status=OPTIMAL  obj=1.362961324025664e7
+  scenario=1  variant=B  status=OPTIMAL  obj=1.362961323972692e7
+  scenario=19  variant=A  status=OPTIMAL  obj=1.3898811188985882e7
+  scenario=19  variant=B  status=OPTIMAL  obj=1.3898811172068e7

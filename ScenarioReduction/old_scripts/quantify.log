@@ -1,0 +1,35 @@
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+  Activating project at `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df`
+   Resolving package versions...
+     Project No packages added to or removed from `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\Project.toml`
+    Manifest No packages added to or removed from `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\Manifest.toml`
+[ Info: Building + screening scenario 96
+[ Info: Building + screening scenario 129
+Selected scenarios (the SD loop screens these): [96, 129]
+Testing 128 samples (of 512) from sequence 1; centered on bounds.mean.
+
+##############################################################################
+# INFEASIBILITY QUANTIFICATION  (N=128 Sobol-Gaussian samples)
+##############################################################################
+  scenario 96 : feasible 32/128  (25.0%)  -> infeasible 75.0%
+  scenario 129 : feasible 7/128  (5.5%)  -> infeasible 94.5%
+  JOINT (both): feasible 7/128  (5.5%)  -> infeasible 94.5%
+
+# Reference: is bounds.mean feasible per scenario?
+  scenario 96 : bounds.mean -> INFEASIBLE
+  scenario 129 : bounds.mean -> INFEASIBLE

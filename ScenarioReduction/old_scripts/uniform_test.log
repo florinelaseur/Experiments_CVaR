@@ -1,0 +1,28 @@
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+  Activating project at `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df`
+   Resolving package versions...
+     Project No packages added to or removed from `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\Project.toml`
+    Manifest No packages added to or removed from `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\Manifest.toml`
+Selected scenarios: [96, 129]
+Adequacy cuts: [(96, 118), (129, 68)]
+feasibility_center LP=OPTIMAL; μ* shift MW=[7594.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+##############################################################################
+# UNIFORM-vs-GAUSSIAN ADEQUACY SAMPLING (target=256, scenarios [96, 129])
+##############################################################################
+  UNIFORM  [0,ub], no mean : acceptance 12.5%  (256 kept from 2048 draws)
+  GAUSSIAN around μ*       : acceptance 6.25%  (256 kept from 4096 draws)
+  Uniform cut→LP precision : 22/48 LP-feasible across [96, 129]  (45.8%)
+  (cut is a NECESSARY condition; <100% precision = samples that pass cuts but fail
+   the full LP on storage/ramping/H2 — the LP remains the final check.)

@@ -1,0 +1,410 @@
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+  Activating project at `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df`
+   Resolving package versions...
+     Project No packages added to or removed from `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\Project.toml`
+    Manifest No packages added to or removed from `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\Manifest.toml`
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:168
+┌ Warning: Infeasibility conflict (IIS) — 83 constraints, 18 variable bounds in conflict (status=INFEASIBLE, primal=NO_SOLUTION)
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\utils\functions.jl:116
+┌ Info: [constraint] consumer_balance[e_demand,2030,1,228:228]
+└   con_str = "consumer_balance[e_demand,2030,1,228:228] : flow[(ens,e_demand),2030,1,228:228] + flow[(ocgt,e_demand),2030,1,228:228] + flow[(ccgt,e_demand),2030,1,228:228] + flow[(wind,e_demand),2030,1,228:228] + flow[(solar,e_demand),2030,1,228:228] - flow[(e_demand,electrolizer),2030,1,228:228] + flow[(wind_offshore,e_demand),2030,1,228:228] + flow[(battery,e_demand),2030,1,228:228] - flow[(e_demand,battery),2030,1,228:228] + flow[(hydro_reservoir,e_demand),2030,1,228:228] == 54572.399999999994"
+┌ Info: [constraint] consumer_balance[e_demand,2030,1,229:229]
+└   con_str = "consumer_balance[e_demand,2030,1,229:229] : flow[(ens,e_demand),2030,1,229:229] + flow[(ocgt,e_demand),2030,1,229:229] + flow[(ccgt,e_demand),2030,1,229:229] + flow[(wind,e_demand),2030,1,229:229] + flow[(solar,e_demand),2030,1,229:229] - flow[(e_demand,electrolizer),2030,1,229:229] + flow[(wind_offshore,e_demand),2030,1,229:229] + flow[(battery,e_demand),2030,1,229:229] - flow[(e_demand,battery),2030,1,229:229] + flow[(hydro_reservoir,e_demand),2030,1,229:229] == 53011.5"
+┌ Info: [constraint] consumer_balance[e_demand,2030,1,230:230]
+└   con_str = "consumer_balance[e_demand,2030,1,230:230] : flow[(ens,e_demand),2030,1,230:230] + flow[(ocgt,e_demand),2030,1,230:230] + flow[(ccgt,e_demand),2030,1,230:230] + flow[(wind,e_demand),2030,1,230:230] + flow[(solar,e_demand),2030,1,230:230] - flow[(e_demand,electrolizer),2030,1,230:230] + flow[(wind_offshore,e_demand),2030,1,230:230] + flow[(battery,e_demand),2030,1,230:230] - flow[(e_demand,battery),2030,1,230:230] + flow[(hydro_reservoir,e_demand),2030,1,230:230] == 53337.149999999994"
+┌ Info: [constraint] consumer_balance[e_demand,2030,1,231:231]
+└   con_str = "consumer_balance[e_demand,2030,1,231:231] : flow[(ens,e_demand),2030,1,231:231] + flow[(ocgt,e_demand),2030,1,231:231] + flow[(ccgt,e_demand),2030,1,231:231] + flow[(wind,e_demand),2030,1,231:231] + flow[(solar,e_demand),2030,1,231:231] - flow[(e_demand,electrolizer),2030,1,231:231] + flow[(wind_offshore,e_demand),2030,1,231:231] + flow[(battery,e_demand),2030,1,231:231] - flow[(e_demand,battery),2030,1,231:231] + flow[(hydro_reservoir,e_demand),2030,1,231:231] == 53339.25"
+┌ Info: [constraint] consumer_balance[e_demand,2030,1,233:233]
+└   con_str = "consumer_balance[e_demand,2030,1,233:233] : flow[(ens,e_demand),2030,1,233:233] + flow[(ocgt,e_demand),2030,1,233:233] + flow[(ccgt,e_demand),2030,1,233:233] + flow[(wind,e_demand),2030,1,233:233] + flow[(solar,e_demand),2030,1,233:233] - flow[(e_demand,electrolizer),2030,1,233:233] + flow[(wind_offshore,e_demand),2030,1,233:233] + flow[(battery,e_demand),2030,1,233:233] - flow[(e_demand,battery),2030,1,233:233] + flow[(hydro_reservoir,e_demand),2030,1,233:233] == 53332.799999999996"
+┌ Info: [constraint] consumer_balance[e_demand,2030,1,234:234]
+└   con_str = "consumer_balance[e_demand,2030,1,234:234] : flow[(ens,e_demand),2030,1,234:234] + flow[(ocgt,e_demand),2030,1,234:234] + flow[(ccgt,e_demand),2030,1,234:234] + flow[(wind,e_demand),2030,1,234:234] + flow[(solar,e_demand),2030,1,234:234] - flow[(e_demand,electrolizer),2030,1,234:234] + flow[(wind_offshore,e_demand),2030,1,234:234] + flow[(battery,e_demand),2030,1,234:234] - flow[(e_demand,battery),2030,1,234:234] + flow[(hydro_reservoir,e_demand),2030,1,234:234] == 52961.100000000006"
+┌ Info: [constraint] balance_storage_rep_period[battery,2030,1,228:228]
+└   con_str = "balance_storage_rep_period[battery,2030,1,228:228] : 1.0526315789473684 flow[(battery,e_demand),2030,1,228:228] - 0.95 flow[(e_demand,battery),2030,1,228:228] - storage_level_rep_period[battery,2030,1,227:227] + storage_level_rep_period[battery,2030,1,228:228] == 0"
+┌ Info: [constraint] balance_storage_rep_period[battery,2030,1,229:229]
+└   con_str = "balance_storage_rep_period[battery,2030,1,229:229] : 1.0526315789473684 flow[(battery,e_demand),2030,1,229:229] - 0.95 flow[(e_demand,battery),2030,1,229:229] - storage_level_rep_period[battery,2030,1,228:228] + storage_level_rep_period[battery,2030,1,229:229] == 0"
+┌ Info: [constraint] balance_storage_rep_period[battery,2030,1,230:230]
+└   con_str = "balance_storage_rep_period[battery,2030,1,230:230] : 1.0526315789473684 flow[(battery,e_demand),2030,1,230:230] - 0.95 flow[(e_demand,battery),2030,1,230:230] - storage_level_rep_period[battery,2030,1,229:229] + storage_level_rep_period[battery,2030,1,230:230] == 0"
+┌ Info: [constraint] balance_storage_rep_period[battery,2030,1,231:231]
+└   con_str = "balance_storage_rep_period[battery,2030,1,231:231] : 1.0526315789473684 flow[(battery,e_demand),2030,1,231:231] - 0.95 flow[(e_demand,battery),2030,1,231:231] - storage_level_rep_period[battery,2030,1,230:230] + storage_level_rep_period[battery,2030,1,231:231] == 0"
+┌ Info: [constraint] balance_storage_rep_period[battery,2030,1,232:232]
+└   con_str = "balance_storage_rep_period[battery,2030,1,232:232] : 1.0526315789473684 flow[(battery,e_demand),2030,1,232:232] - 0.95 flow[(e_demand,battery),2030,1,232:232] - storage_level_rep_period[battery,2030,1,231:231] + storage_level_rep_period[battery,2030,1,232:232] == 0"
+┌ Info: [constraint] balance_storage_rep_period[battery,2030,1,233:233]
+└   con_str = "balance_storage_rep_period[battery,2030,1,233:233] : 1.0526315789473684 flow[(battery,e_demand),2030,1,233:233] - 0.95 flow[(e_demand,battery),2030,1,233:233] - storage_level_rep_period[battery,2030,1,232:232] + storage_level_rep_period[battery,2030,1,233:233] == 0"
+┌ Info: [constraint] balance_storage_rep_period[battery,2030,1,234:234]
+└   con_str = "balance_storage_rep_period[battery,2030,1,234:234] : 1.0526315789473684 flow[(battery,e_demand),2030,1,234:234] - 0.95 flow[(e_demand,battery),2030,1,234:234] - storage_level_rep_period[battery,2030,1,233:233] + storage_level_rep_period[battery,2030,1,234:234] == 0"
+┌ Info: [constraint] conversion_balance[electrolizer,2030,1,230:230]
+└   con_str = "conversion_balance[electrolizer,2030,1,230:230] : -flow[(electrolizer,h2_demand),2030,1,230:230] + 0.65 flow[(e_demand,electrolizer),2030,1,230:230] + 0.65 flow[(wind_offshore,electrolizer),2030,1,230:230] == 0"
+┌ Info: [constraint] conversion_balance[electrolizer,2030,1,234:234]
+└   con_str = "conversion_balance[electrolizer,2030,1,234:234] : -flow[(electrolizer,h2_demand),2030,1,234:234] + 0.65 flow[(e_demand,electrolizer),2030,1,234:234] + 0.65 flow[(wind_offshore,electrolizer),2030,1,234:234] == 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ccgt,2030,1,228:228]
+└   con_str = "max_output_flows_limit_simple_method[ccgt,2030,1,228:228] : flow[(ccgt,e_demand),2030,1,228:228] - 0.8 assets_investment[2030,ccgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ccgt,2030,1,229:229]
+└   con_str = "max_output_flows_limit_simple_method[ccgt,2030,1,229:229] : flow[(ccgt,e_demand),2030,1,229:229] - 0.8 assets_investment[2030,ccgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ccgt,2030,1,230:230]
+└   con_str = "max_output_flows_limit_simple_method[ccgt,2030,1,230:230] : flow[(ccgt,e_demand),2030,1,230:230] - 0.8 assets_investment[2030,ccgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ccgt,2030,1,231:231]
+└   con_str = "max_output_flows_limit_simple_method[ccgt,2030,1,231:231] : flow[(ccgt,e_demand),2030,1,231:231] - 0.8 assets_investment[2030,ccgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ccgt,2030,1,233:233]
+└   con_str = "max_output_flows_limit_simple_method[ccgt,2030,1,233:233] : flow[(ccgt,e_demand),2030,1,233:233] - 0.8 assets_investment[2030,ccgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ccgt,2030,1,234:234]
+└   con_str = "max_output_flows_limit_simple_method[ccgt,2030,1,234:234] : flow[(ccgt,e_demand),2030,1,234:234] - 0.8 assets_investment[2030,ccgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ens,2030,1,228:228]
+└   con_str = "max_output_flows_limit_simple_method[ens,2030,1,228:228] : flow[(ens,e_demand),2030,1,228:228] <= 2"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ens,2030,1,229:229]
+└   con_str = "max_output_flows_limit_simple_method[ens,2030,1,229:229] : flow[(ens,e_demand),2030,1,229:229] <= 2"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ens,2030,1,230:230]
+└   con_str = "max_output_flows_limit_simple_method[ens,2030,1,230:230] : flow[(ens,e_demand),2030,1,230:230] <= 2"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ens,2030,1,231:231]
+└   con_str = "max_output_flows_limit_simple_method[ens,2030,1,231:231] : flow[(ens,e_demand),2030,1,231:231] <= 2"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ens,2030,1,233:233]
+└   con_str = "max_output_flows_limit_simple_method[ens,2030,1,233:233] : flow[(ens,e_demand),2030,1,233:233] <= 2"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ens,2030,1,234:234]
+└   con_str = "max_output_flows_limit_simple_method[ens,2030,1,234:234] : flow[(ens,e_demand),2030,1,234:234] <= 2"
+┌ Info: [constraint] max_output_flows_limit_simple_method[hydro_reservoir,2030,1,228:228]
+└   con_str = "max_output_flows_limit_simple_method[hydro_reservoir,2030,1,228:228] : flow[(hydro_reservoir,e_demand),2030,1,228:228] <= 0.1"
+┌ Info: [constraint] max_output_flows_limit_simple_method[hydro_reservoir,2030,1,229:229]
+└   con_str = "max_output_flows_limit_simple_method[hydro_reservoir,2030,1,229:229] : flow[(hydro_reservoir,e_demand),2030,1,229:229] <= 0.1"
+┌ Info: [constraint] max_output_flows_limit_simple_method[hydro_reservoir,2030,1,230:230]
+└   con_str = "max_output_flows_limit_simple_method[hydro_reservoir,2030,1,230:230] : flow[(hydro_reservoir,e_demand),2030,1,230:230] <= 0.1"
+┌ Info: [constraint] max_output_flows_limit_simple_method[hydro_reservoir,2030,1,231:231]
+└   con_str = "max_output_flows_limit_simple_method[hydro_reservoir,2030,1,231:231] : flow[(hydro_reservoir,e_demand),2030,1,231:231] <= 0.1"
+┌ Info: [constraint] max_output_flows_limit_simple_method[hydro_reservoir,2030,1,233:233]
+└   con_str = "max_output_flows_limit_simple_method[hydro_reservoir,2030,1,233:233] : flow[(hydro_reservoir,e_demand),2030,1,233:233] <= 0.1"
+┌ Info: [constraint] max_output_flows_limit_simple_method[hydro_reservoir,2030,1,234:234]
+└   con_str = "max_output_flows_limit_simple_method[hydro_reservoir,2030,1,234:234] : flow[(hydro_reservoir,e_demand),2030,1,234:234] <= 0.1"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ocgt,2030,1,228:228]
+└   con_str = "max_output_flows_limit_simple_method[ocgt,2030,1,228:228] : flow[(ocgt,e_demand),2030,1,228:228] - 0.1 assets_investment[2030,ocgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ocgt,2030,1,229:229]
+└   con_str = "max_output_flows_limit_simple_method[ocgt,2030,1,229:229] : flow[(ocgt,e_demand),2030,1,229:229] - 0.1 assets_investment[2030,ocgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ocgt,2030,1,230:230]
+└   con_str = "max_output_flows_limit_simple_method[ocgt,2030,1,230:230] : flow[(ocgt,e_demand),2030,1,230:230] - 0.1 assets_investment[2030,ocgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ocgt,2030,1,231:231]
+└   con_str = "max_output_flows_limit_simple_method[ocgt,2030,1,231:231] : flow[(ocgt,e_demand),2030,1,231:231] - 0.1 assets_investment[2030,ocgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ocgt,2030,1,233:233]
+└   con_str = "max_output_flows_limit_simple_method[ocgt,2030,1,233:233] : flow[(ocgt,e_demand),2030,1,233:233] - 0.1 assets_investment[2030,ocgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ocgt,2030,1,234:234]
+└   con_str = "max_output_flows_limit_simple_method[ocgt,2030,1,234:234] : flow[(ocgt,e_demand),2030,1,234:234] - 0.1 assets_investment[2030,ocgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[solar,2030,1,228:228]
+└   con_str = "max_output_flows_limit_simple_method[solar,2030,1,228:228] : flow[(solar,e_demand),2030,1,228:228] - 0.0922825 assets_investment[2030,solar] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[solar,2030,1,229:229]
+└   con_str = "max_output_flows_limit_simple_method[solar,2030,1,229:229] : flow[(solar,e_demand),2030,1,229:229] - 0.08304 assets_investment[2030,solar] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[solar,2030,1,230:230]
+└   con_str = "max_output_flows_limit_simple_method[solar,2030,1,230:230] : flow[(solar,e_demand),2030,1,230:230] - 0.09352 assets_investment[2030,solar] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[solar,2030,1,231:231]
+└   con_str = "max_output_flows_limit_simple_method[solar,2030,1,231:231] : flow[(solar,e_demand),2030,1,231:231] - 0.11438874999999998 assets_investment[2030,solar] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[solar,2030,1,233:233]
+└   con_str = "max_output_flows_limit_simple_method[solar,2030,1,233:233] : flow[(solar,e_demand),2030,1,233:233] - 0.0063012499999999996 assets_investment[2030,solar] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[solar,2030,1,234:234]
+└   con_str = "max_output_flows_limit_simple_method[solar,2030,1,234:234] : flow[(solar,e_demand),2030,1,234:234] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[wind,2030,1,228:228]
+└   con_str = "max_output_flows_limit_simple_method[wind,2030,1,228:228] : flow[(wind,e_demand),2030,1,228:228] - 0.0030802470145184706 assets_investment[2030,wind] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[wind,2030,1,229:229]
+└   con_str = "max_output_flows_limit_simple_method[wind,2030,1,229:229] : flow[(wind,e_demand),2030,1,229:229] - 0.0024843812744076224 assets_investment[2030,wind] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[wind,2030,1,230:230]
+└   con_str = "max_output_flows_limit_simple_method[wind,2030,1,230:230] : flow[(wind,e_demand),2030,1,230:230] - 0.0016508710553865176 assets_investment[2030,wind] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[wind,2030,1,231:231]
+└   con_str = "max_output_flows_limit_simple_method[wind,2030,1,231:231] : flow[(wind,e_demand),2030,1,231:231] - 0.0009394895739348857 assets_investment[2030,wind] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[wind,2030,1,233:233]
+└   con_str = "max_output_flows_limit_simple_method[wind,2030,1,233:233] : flow[(wind,e_demand),2030,1,233:233] - 0.0010767353372910834 assets_investment[2030,wind] <= 0"
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:168
+┌ Warning: Infeasibility conflict (IIS) — 68 constraints, 16 variable bounds in conflict (status=INFEASIBLE, primal=NO_SOLUTION)
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\utils\functions.jl:116
+┌ Info: [constraint] consumer_balance[e_demand,2030,1,8289:8289]
+└   con_str = "consumer_balance[e_demand,2030,1,8289:8289] : flow[(ens,e_demand),2030,1,8289:8289] + flow[(ocgt,e_demand),2030,1,8289:8289] + flow[(ccgt,e_demand),2030,1,8289:8289] + flow[(wind,e_demand),2030,1,8289:8289] + flow[(solar,e_demand),2030,1,8289:8289] - flow[(e_demand,electrolizer),2030,1,8289:8289] + flow[(wind_offshore,e_demand),2030,1,8289:8289] + flow[(battery,e_demand),2030,1,8289:8289] - flow[(e_demand,battery),2030,1,8289:8289] + flow[(hydro_reservoir,e_demand),2030,1,8289:8289] == 53374.049999999996"
+┌ Info: [constraint] consumer_balance[e_demand,2030,1,8290:8290]
+└   con_str = "consumer_balance[e_demand,2030,1,8290:8290] : flow[(ens,e_demand),2030,1,8290:8290] + flow[(ocgt,e_demand),2030,1,8290:8290] + flow[(ccgt,e_demand),2030,1,8290:8290] + flow[(wind,e_demand),2030,1,8290:8290] + flow[(solar,e_demand),2030,1,8290:8290] - flow[(e_demand,electrolizer),2030,1,8290:8290] + flow[(wind_offshore,e_demand),2030,1,8290:8290] + flow[(battery,e_demand),2030,1,8290:8290] - flow[(e_demand,battery),2030,1,8290:8290] + flow[(hydro_reservoir,e_demand),2030,1,8290:8290] == 54346.799999999996"
+┌ Info: [constraint] consumer_balance[e_demand,2030,1,8291:8291]
+└   con_str = "consumer_balance[e_demand,2030,1,8291:8291] : flow[(ens,e_demand),2030,1,8291:8291] + flow[(ocgt,e_demand),2030,1,8291:8291] + flow[(ccgt,e_demand),2030,1,8291:8291] + flow[(wind,e_demand),2030,1,8291:8291] + flow[(solar,e_demand),2030,1,8291:8291] - flow[(e_demand,electrolizer),2030,1,8291:8291] + flow[(wind_offshore,e_demand),2030,1,8291:8291] + flow[(battery,e_demand),2030,1,8291:8291] - flow[(e_demand,battery),2030,1,8291:8291] + flow[(hydro_reservoir,e_demand),2030,1,8291:8291] == 53912.549999999996"
+┌ Info: [constraint] consumer_balance[e_demand,2030,1,8292:8292]
+└   con_str = "consumer_balance[e_demand,2030,1,8292:8292] : flow[(ens,e_demand),2030,1,8292:8292] + flow[(ocgt,e_demand),2030,1,8292:8292] + flow[(ccgt,e_demand),2030,1,8292:8292] + flow[(wind,e_demand),2030,1,8292:8292] + flow[(solar,e_demand),2030,1,8292:8292] - flow[(e_demand,electrolizer),2030,1,8292:8292] + flow[(wind_offshore,e_demand),2030,1,8292:8292] + flow[(battery,e_demand),2030,1,8292:8292] - flow[(e_demand,battery),2030,1,8292:8292] + flow[(hydro_reservoir,e_demand),2030,1,8292:8292] == 52350.149999999994"
+┌ Info: [constraint] consumer_balance[e_demand,2030,1,8293:8293]
+└   con_str = "consumer_balance[e_demand,2030,1,8293:8293] : flow[(ens,e_demand),2030,1,8293:8293] + flow[(ocgt,e_demand),2030,1,8293:8293] + flow[(ccgt,e_demand),2030,1,8293:8293] + flow[(wind,e_demand),2030,1,8293:8293] + flow[(solar,e_demand),2030,1,8293:8293] - flow[(e_demand,electrolizer),2030,1,8293:8293] + flow[(wind_offshore,e_demand),2030,1,8293:8293] + flow[(battery,e_demand),2030,1,8293:8293] - flow[(e_demand,battery),2030,1,8293:8293] + flow[(hydro_reservoir,e_demand),2030,1,8293:8293] == 53509.200000000004"
+┌ Info: [constraint] balance_storage_rep_period[battery,2030,1,8289:8289]
+└   con_str = "balance_storage_rep_period[battery,2030,1,8289:8289] : 1.0526315789473684 flow[(battery,e_demand),2030,1,8289:8289] - 0.95 flow[(e_demand,battery),2030,1,8289:8289] - storage_level_rep_period[battery,2030,1,8288:8288] + storage_level_rep_period[battery,2030,1,8289:8289] == 0"
+┌ Info: [constraint] balance_storage_rep_period[battery,2030,1,8290:8290]
+└   con_str = "balance_storage_rep_period[battery,2030,1,8290:8290] : 1.0526315789473684 flow[(battery,e_demand),2030,1,8290:8290] - 0.95 flow[(e_demand,battery),2030,1,8290:8290] - storage_level_rep_period[battery,2030,1,8289:8289] + storage_level_rep_period[battery,2030,1,8290:8290] == 0"
+┌ Info: [constraint] balance_storage_rep_period[battery,2030,1,8291:8291]
+└   con_str = "balance_storage_rep_period[battery,2030,1,8291:8291] : 1.0526315789473684 flow[(battery,e_demand),2030,1,8291:8291] - 0.95 flow[(e_demand,battery),2030,1,8291:8291] - storage_level_rep_period[battery,2030,1,8290:8290] + storage_level_rep_period[battery,2030,1,8291:8291] == 0"
+┌ Info: [constraint] balance_storage_rep_period[battery,2030,1,8292:8292]
+└   con_str = "balance_storage_rep_period[battery,2030,1,8292:8292] : 1.0526315789473684 flow[(battery,e_demand),2030,1,8292:8292] - 0.95 flow[(e_demand,battery),2030,1,8292:8292] - storage_level_rep_period[battery,2030,1,8291:8291] + storage_level_rep_period[battery,2030,1,8292:8292] == 0"
+┌ Info: [constraint] balance_storage_rep_period[battery,2030,1,8293:8293]
+└   con_str = "balance_storage_rep_period[battery,2030,1,8293:8293] : 1.0526315789473684 flow[(battery,e_demand),2030,1,8293:8293] - 0.95 flow[(e_demand,battery),2030,1,8293:8293] - storage_level_rep_period[battery,2030,1,8292:8292] + storage_level_rep_period[battery,2030,1,8293:8293] == 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ccgt,2030,1,8289:8289]
+└   con_str = "max_output_flows_limit_simple_method[ccgt,2030,1,8289:8289] : flow[(ccgt,e_demand),2030,1,8289:8289] - 0.8 assets_investment[2030,ccgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ccgt,2030,1,8290:8290]
+└   con_str = "max_output_flows_limit_simple_method[ccgt,2030,1,8290:8290] : flow[(ccgt,e_demand),2030,1,8290:8290] - 0.8 assets_investment[2030,ccgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ccgt,2030,1,8291:8291]
+└   con_str = "max_output_flows_limit_simple_method[ccgt,2030,1,8291:8291] : flow[(ccgt,e_demand),2030,1,8291:8291] - 0.8 assets_investment[2030,ccgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ccgt,2030,1,8292:8292]
+└   con_str = "max_output_flows_limit_simple_method[ccgt,2030,1,8292:8292] : flow[(ccgt,e_demand),2030,1,8292:8292] - 0.8 assets_investment[2030,ccgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ccgt,2030,1,8293:8293]
+└   con_str = "max_output_flows_limit_simple_method[ccgt,2030,1,8293:8293] : flow[(ccgt,e_demand),2030,1,8293:8293] - 0.8 assets_investment[2030,ccgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ens,2030,1,8289:8289]
+└   con_str = "max_output_flows_limit_simple_method[ens,2030,1,8289:8289] : flow[(ens,e_demand),2030,1,8289:8289] <= 2"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ens,2030,1,8290:8290]
+└   con_str = "max_output_flows_limit_simple_method[ens,2030,1,8290:8290] : flow[(ens,e_demand),2030,1,8290:8290] <= 2"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ens,2030,1,8291:8291]
+└   con_str = "max_output_flows_limit_simple_method[ens,2030,1,8291:8291] : flow[(ens,e_demand),2030,1,8291:8291] <= 2"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ens,2030,1,8292:8292]
+└   con_str = "max_output_flows_limit_simple_method[ens,2030,1,8292:8292] : flow[(ens,e_demand),2030,1,8292:8292] <= 2"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ens,2030,1,8293:8293]
+└   con_str = "max_output_flows_limit_simple_method[ens,2030,1,8293:8293] : flow[(ens,e_demand),2030,1,8293:8293] <= 2"
+┌ Info: [constraint] max_output_flows_limit_simple_method[hydro_reservoir,2030,1,8289:8289]
+└   con_str = "max_output_flows_limit_simple_method[hydro_reservoir,2030,1,8289:8289] : flow[(hydro_reservoir,e_demand),2030,1,8289:8289] <= 0.1"
+┌ Info: [constraint] max_output_flows_limit_simple_method[hydro_reservoir,2030,1,8290:8290]
+└   con_str = "max_output_flows_limit_simple_method[hydro_reservoir,2030,1,8290:8290] : flow[(hydro_reservoir,e_demand),2030,1,8290:8290] <= 0.1"
+┌ Info: [constraint] max_output_flows_limit_simple_method[hydro_reservoir,2030,1,8291:8291]
+└   con_str = "max_output_flows_limit_simple_method[hydro_reservoir,2030,1,8291:8291] : flow[(hydro_reservoir,e_demand),2030,1,8291:8291] <= 0.1"
+┌ Info: [constraint] max_output_flows_limit_simple_method[hydro_reservoir,2030,1,8292:8292]
+└   con_str = "max_output_flows_limit_simple_method[hydro_reservoir,2030,1,8292:8292] : flow[(hydro_reservoir,e_demand),2030,1,8292:8292] <= 0.1"
+┌ Info: [constraint] max_output_flows_limit_simple_method[hydro_reservoir,2030,1,8293:8293]
+└   con_str = "max_output_flows_limit_simple_method[hydro_reservoir,2030,1,8293:8293] : flow[(hydro_reservoir,e_demand),2030,1,8293:8293] <= 0.1"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ocgt,2030,1,8289:8289]
+└   con_str = "max_output_flows_limit_simple_method[ocgt,2030,1,8289:8289] : flow[(ocgt,e_demand),2030,1,8289:8289] - 0.1 assets_investment[2030,ocgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ocgt,2030,1,8290:8290]
+└   con_str = "max_output_flows_limit_simple_method[ocgt,2030,1,8290:8290] : flow[(ocgt,e_demand),2030,1,8290:8290] - 0.1 assets_investment[2030,ocgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ocgt,2030,1,8291:8291]
+└   con_str = "max_output_flows_limit_simple_method[ocgt,2030,1,8291:8291] : flow[(ocgt,e_demand),2030,1,8291:8291] - 0.1 assets_investment[2030,ocgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ocgt,2030,1,8292:8292]
+└   con_str = "max_output_flows_limit_simple_method[ocgt,2030,1,8292:8292] : flow[(ocgt,e_demand),2030,1,8292:8292] - 0.1 assets_investment[2030,ocgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[ocgt,2030,1,8293:8293]
+└   con_str = "max_output_flows_limit_simple_method[ocgt,2030,1,8293:8293] : flow[(ocgt,e_demand),2030,1,8293:8293] - 0.1 assets_investment[2030,ocgt] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[solar,2030,1,8289:8289]
+└   con_str = "max_output_flows_limit_simple_method[solar,2030,1,8289:8289] : flow[(solar,e_demand),2030,1,8289:8289] - 0.00033625 assets_investment[2030,solar] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[solar,2030,1,8290:8290]
+└   con_str = "max_output_flows_limit_simple_method[solar,2030,1,8290:8290] : flow[(solar,e_demand),2030,1,8290:8290] - 0.034515 assets_investment[2030,solar] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[solar,2030,1,8291:8291]
+└   con_str = "max_output_flows_limit_simple_method[solar,2030,1,8291:8291] : flow[(solar,e_demand),2030,1,8291:8291] - 0.10992874999999999 assets_investment[2030,solar] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[solar,2030,1,8292:8292]
+└   con_str = "max_output_flows_limit_simple_method[solar,2030,1,8292:8292] : flow[(solar,e_demand),2030,1,8292:8292] - 0.09827125 assets_investment[2030,solar] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[solar,2030,1,8293:8293]
+└   con_str = "max_output_flows_limit_simple_method[solar,2030,1,8293:8293] : flow[(solar,e_demand),2030,1,8293:8293] - 0.08677875 assets_investment[2030,solar] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[wind,2030,1,8289:8289]
+└   con_str = "max_output_flows_limit_simple_method[wind,2030,1,8289:8289] : flow[(wind,e_demand),2030,1,8289:8289] - 0.03431983218691802 assets_investment[2030,wind] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[wind,2030,1,8290:8290]
+└   con_str = "max_output_flows_limit_simple_method[wind,2030,1,8290:8290] : flow[(wind,e_demand),2030,1,8290:8290] - 0.03554298989299453 assets_investment[2030,wind] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[wind,2030,1,8291:8291]
+└   con_str = "max_output_flows_limit_simple_method[wind,2030,1,8291:8291] : flow[(wind,e_demand),2030,1,8291:8291] - 0.034054236761894924 assets_investment[2030,wind] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[wind,2030,1,8292:8292]
+└   con_str = "max_output_flows_limit_simple_method[wind,2030,1,8292:8292] : flow[(wind,e_demand),2030,1,8292:8292] - 0.02978558067080543 assets_investment[2030,wind] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[wind,2030,1,8293:8293]
+└   con_str = "max_output_flows_limit_simple_method[wind,2030,1,8293:8293] : flow[(wind,e_demand),2030,1,8293:8293] - 0.024990206312411688 assets_investment[2030,wind] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[wind_offshore,2030,1,8289:8289]
+└   con_str = "max_output_flows_limit_simple_method[wind_offshore,2030,1,8289:8289] : flow[(wind_offshore,e_demand),2030,1,8289:8289] + flow[(wind_offshore,electrolizer),2030,1,8289:8289] - 0.14270186881765942 assets_investment[2030,wind_offshore] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[wind_offshore,2030,1,8290:8290]
+└   con_str = "max_output_flows_limit_simple_method[wind_offshore,2030,1,8290:8290] : flow[(wind_offshore,e_demand),2030,1,8290:8290] + flow[(wind_offshore,electrolizer),2030,1,8290:8290] - 0.12614980215293276 assets_investment[2030,wind_offshore] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[wind_offshore,2030,1,8291:8291]
+└   con_str = "max_output_flows_limit_simple_method[wind_offshore,2030,1,8291:8291] : flow[(wind_offshore,e_demand),2030,1,8291:8291] + flow[(wind_offshore,electrolizer),2030,1,8291:8291] - 0.10132293310963975 assets_investment[2030,wind_offshore] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[wind_offshore,2030,1,8292:8292]
+└   con_str = "max_output_flows_limit_simple_method[wind_offshore,2030,1,8292:8292] : flow[(wind_offshore,e_demand),2030,1,8292:8292] + flow[(wind_offshore,electrolizer),2030,1,8292:8292] - 0.07739754702140779 assets_investment[2030,wind_offshore] <= 0"
+┌ Info: [constraint] max_output_flows_limit_simple_method[wind_offshore,2030,1,8293:8293]
+└   con_str = "max_output_flows_limit_simple_method[wind_offshore,2030,1,8293:8293] : flow[(wind_offshore,e_demand),2030,1,8293:8293] + flow[(wind_offshore,electrolizer),2030,1,8293:8293] - 0.057603039646513456 assets_investment[2030,wind_offshore] <= 0"
+┌ Info: [constraint] max_storage_level_rep_period_limit[battery,2030,1,8288:8288]
+└   con_str = "max_storage_level_rep_period_limit[battery,2030,1,8288:8288] : -0.1 assets_investment[2030,battery] + storage_level_rep_period[battery,2030,1,8288:8288] <= 0"
+┌ Info: [constraint] assets_investment[2030,ccgt] == 47121.553739384486
+└   con_str = "assets_investment[2030,ccgt] == 47121.553739384486"
+┌ Info: [constraint] assets_investment[2030,wind] == 88395.7148247445
+└   con_str = "assets_investment[2030,wind] == 88395.7148247445"
+┌ Info: [constraint] assets_investment[2030,solar] == 10372.426454714856
+└   con_str = "assets_investment[2030,solar] == 10372.426454714856"
+┌ Info: [constraint] assets_investment[2030,ocgt] == 36717.10211560329
+└   con_str = "assets_investment[2030,ocgt] == 36717.10211560329"
+Selected original scenarios: [96, 129]
+bounds.mean MW   = Dict("ccgt" => 37697.2, "ocgt" => 3671.7, "solar" => 5186.2, "wind_offshore" => 32.4, "electrolizer" => 0.1, "battery" => 4374.5, "wind" => 35358.3)
+generous max MW  = Dict("ccgt" => 46322.8, "ocgt" => 6323.6, "solar" => 1400.9, "wind_offshore" => 0.0, "electrolizer" => 0.1, "battery" => 7064.6, "wind" => 49924.7)
+
+==============================================================================
+>>> bounds.mean | Variant A is_seasonal=false (benchmark env)
+Feasibility
+Subject to
+ consumer_balance[e_demand,2030,1,228:228] : flow[(ens,e_demand),2030,1,228:228] + flow[(ocgt,e_demand),2030,1,228:228] + flow[(ccgt,e_demand),2030,1,228:228] + flow[(wind,e_demand),2030,1,228:228] + flow[(solar,e_demand),2030,1,228:228] - flow[(e_demand,electrolizer),2030,1,228:228] + flow[(wind_offshore,e_demand),2030,1,228:228] + flow[(battery,e_demand),2030,1,228:228] - flow[(e_demand,battery),2030,1,228:228] + flow[(hydro_reservoir,e_demand),2030,1,228:228] == 54572.399999999994
+ consumer_balance[e_demand,2030,1,229:229] : flow[(ens,e_demand),2030,1,229:229] + flow[(ocgt,e_demand),2030,1,229:229] + flow[(ccgt,e_demand),2030,1,229:229] + flow[(wind,e_demand),2030,1,229:229] + flow[(solar,e_demand),2030,1,229:229] - flow[(e_demand,electrolizer),2030,1,229:229] + flow[(wind_offshore,e_demand),2030,1,229:229] + flow[(battery,e_demand),2030,1,229:229] - flow[(e_demand,battery),2030,1,229:229] + flow[(hydro_reservoir,e_demand),2030,1,229:229] == 53011.5
+ consumer_balance[e_demand,2030,1,230:230] : flow[(ens,e_demand),2030,1,230:230] + flow[(ocgt,e_demand),2030,1,230:230] + flow[(ccgt,e_demand),2030,1,230:230] + flow[(wind,e_demand),2030,1,230:230] + flow[(solar,e_demand),2030,1,230:230] - flow[(e_demand,electrolizer),2030,1,230:230] + flow[(wind_offshore,e_demand),2030,1,230:230] + flow[(battery,e_demand),2030,1,230:230] - flow[(e_demand,battery),2030,1,230:230] + flow[(hydro_reservoir,e_demand),2030,1,230:230] == 53337.149999999994
+ consumer_balance[e_demand,2030,1,231:231] : flow[(ens,e_demand),2030,1,231:231] + flow[(ocgt,e_demand),2030,1,231:231] + flow[(ccgt,e_demand),2030,1,231:231] + flow[(wind,e_demand),2030,1,231:231] + flow[(solar,e_demand),2030,1,231:231] - flow[(e_demand,electrolizer),2030,1,231:231] + flow[(wind_offshore,e_demand),2030,1,231:231] + flow[(battery,e_demand),2030,1,231:231] - flow[(e_demand,battery),2030,1,231:231] + flow[(hydro_reservoir,e_demand),2030,1,231:231] == 53339.25
+ consumer_balance[e_demand,2030,1,233:233] : flow[(ens,e_demand),2030,1,233:233] + flow[(ocgt,e_demand),2030,1,233:233] + flow[(ccgt,e_demand),2030,1,233:233] + flow[(wind,e_demand),2030,1,233:233] + flow[(solar,e_demand),2030,1,233:233] - flow[(e_demand,electrolizer),2030,1,233:233] + flow[(wind_offshore,e_demand),2030,1,233:233] + flow[(battery,e_demand),2030,1,233:233] - flow[(e_demand,battery),2030,1,233:233] + flow[(hydro_reservoir,e_demand),2030,1,233:233] == 53332.799999999996
+ consumer_balance[e_demand,2030,1,234:234] : flow[(ens,e_demand),2030,1,234:234] + flow[(ocgt,e_demand),2030,1,234:234] + flow[(ccgt,e_demand),2030,1,234:234] + flow[(wind,e_demand),2030,1,234:234] + flow[(solar,e_demand),2030,1,234:234] - flow[(e_demand,electrolizer),2030,1,234:234] + flow[(wind_offshore,e_demand),2030,1,234:234] + flow[(battery,e_demand),2030,1,234:234] - flow[(e_demand,battery),2030,1,234:234] + flow[(hydro_reservoir,e_demand),2030,1,234:234] == 52961.100000000006
+ balance_storage_rep_period[battery,2030,1,228:228] : 1.0526315789473684 flow[(battery,e_demand),2030,1,228:228] - 0.95 flow[(e_demand,battery),2030,1,228:228] - storage_level_rep_period[battery,2030,1,227:227] + storage_level_rep_period[battery,2030,1,228:228] == 0
+ balance_storage_rep_period[battery,2030,1,229:229] : 1.0526315789473684 flow[(battery,e_demand),2030,1,229:229] - 0.95 flow[(e_demand,battery),2030,1,229:229] - storage_level_rep_period[battery,2030,1,228:228] + storage_level_rep_period[battery,2030,1,229:229] == 0
+ balance_storage_rep_period[battery,2030,1,230:230] : 1.0526315789473684 flow[(battery,e_demand),2030,1,230:230] - 0.95 flow[(e_demand,battery),2030,1,230:230] - storage_level_rep_period[battery,2030,1,229:229] + storage_level_rep_period[battery,2030,1,230:230] == 0
+ balance_storage_rep_period[battery,2030,1,231:231] : 1.0526315789473684 flow[(battery,e_demand),2030,1,231:231] - 0.95 flow[(e_demand,battery),2030,1,231:231] - storage_level_rep_period[battery,2030,1,230:230] + storage_level_rep_period[battery,2030,1,231:231] == 0
+ balance_storage_rep_period[battery,2030,1,232:232] : 1.0526315789473684 flow[(battery,e_demand),2030,1,232:232] - 0.95 flow[(e_demand,battery),2030,1,232:232] - storage_level_rep_period[battery,2030,1,231:231] + storage_level_rep_period[battery,2030,1,232:232] == 0
+ balance_storage_rep_period[battery,2030,1,233:233] : 1.0526315789473684 flow[(battery,e_demand),2030,1,233:233] - 0.95 flow[(e_demand,battery),2030,1,233:233] - storage_level_rep_period[battery,2030,1,232:232] + storage_level_rep_period[battery,2030,1,233:233] == 0
+ balance_storage_rep_period[battery,2030,1,234:234] : 1.0526315789473684 flow[(battery,e_demand),2030,1,234:234] - 0.95 flow[(e_demand,battery),2030,1,234:234] - storage_level_rep_period[battery,2030,1,233:233] + storage_level_rep_period[battery,2030,1,234:234] == 0
+ conversion_balance[electrolizer,2030,1,230:230] : -flow[(electrolizer,h2_demand),2030,1,230:230] + 0.65 flow[(e_demand,electrolizer),2030,1,230:230] + 0.65 flow[(wind_offshore,electrolizer),2030,1,230:230] == 0
+ conversion_balance[electrolizer,2030,1,234:234] : -flow[(electrolizer,h2_demand),2030,1,234:234] + 0.65 flow[(e_demand,electrolizer),2030,1,234:234] + 0.65 flow[(wind_offshore,electrolizer),2030,1,234:234] == 0
+ max_output_flows_limit_simple_method[ccgt,2030,1,228:228] : flow[(ccgt,e_demand),2030,1,228:228] - 0.8 assets_investment[2030,ccgt] <= 0
+ max_output_flows_limit_simple_method[ccgt,2030,1,229:229] : flow[(ccgt,e_demand),2030,1,229:229] - 0.8 assets_investment[2030,ccgt] <= 0
+ max_output_flows_limit_simple_method[ccgt,2030,1,230:230] : flow[(ccgt,e_demand),2030,1,230:230] - 0.8 assets_investment[2030,ccgt] <= 0
+ max_output_flows_limit_simple_method[ccgt,2030,1,231:231] : flow[(ccgt,e_demand),2030,1,231:231] - 0.8 assets_investment[2030,ccgt] <= 0
+ max_output_flows_limit_simple_method[ccgt,2030,1,233:233] : flow[(ccgt,e_demand),2030,1,233:233] - 0.8 assets_investment[2030,ccgt] <= 0
+ max_output_flows_limit_simple_method[ccgt,2030,1,234:234] : flow[(ccgt,e_demand),2030,1,234:234] - 0.8 assets_investment[2030,ccgt] <= 0
+ max_output_flows_limit_simple_method[ens,2030,1,228:228] : flow[(ens,e_demand),2030,1,228:228] <= 2
+ max_output_flows_limit_simple_method[ens,2030,1,229:229] : flow[(ens,e_demand),2030,1,229:229] <= 2
+ max_output_flows_limit_simple_method[ens,2030,1,230:230] : flow[(ens,e_demand),2030,1,230:230] <= 2
+ max_output_flows_limit_simple_method[ens,2030,1,231:231] : flow[(ens,e_demand),2030,1,231:231] <= 2
+ max_output_flows_limit_simple_method[ens,2030,1,233:233] : flow[(ens,e_demand),2030,1,233:233] <= 2
+ max_output_flows_limit_simple_method[ens,2030,1,234:234] : flow[(ens,e_demand),2030,1,234:234] <= 2
+ max_output_flows_limit_simple_method[hydro_reservoir,2030,1,228:228] : flow[(hydro_reservoir,e_demand),2030,1,228:228] <= 0.1
+ max_output_flows_limit_simple_method[hydro_reservoir,2030,1,229:229] : flow[(hydro_reservoir,e_demand),2030,1,229:229] <= 0.1
+ max_output_flows_limit_simple_method[hydro_reservoir,2030,1,230:230] : flow[(hydro_reservoir,e_demand),2030,1,230:230] <= 0.1
+ max_output_flows_limit_simple_method[hydro_reservoir,2030,1,231:231] : flow[(hydro_reservoir,e_demand),2030,1,231:231] <= 0.1
+ max_output_flows_limit_simple_method[hydro_reservoir,2030,1,233:233] : flow[(hydro_reservoir,e_demand),2030,1,233:233] <= 0.1
+ max_output_flows_limit_simple_method[hydro_reservoir,2030,1,234:234] : flow[(hydro_reservoir,e_demand),2030,1,234:234] <= 0.1
+ max_output_flows_limit_simple_method[ocgt,2030,1,228:228] : flow[(ocgt,e_demand),2030,1,228:228] - 0.1 assets_investment[2030,ocgt] <= 0
+ max_output_flows_limit_simple_method[ocgt,2030,1,229:229] : flow[(ocgt,e_demand),2030,1,229:229] - 0.1 assets_investment[2030,ocgt] <= 0
+ max_output_flows_limit_simple_method[ocgt,2030,1,230:230] : flow[(ocgt,e_demand),2030,1,230:230] - 0.1 assets_investment[2030,ocgt] <= 0
+ max_output_flows_limit_simple_method[ocgt,2030,1,231:231] : flow[(ocgt,e_demand),2030,1,231:231] - 0.1 assets_investment[2030,ocgt] <= 0
+ max_output_flows_limit_simple_method[ocgt,2030,1,233:233] : flow[(ocgt,e_demand),2030,1,233:233] - 0.1 assets_investment[2030,ocgt] <= 0
+ max_output_flows_limit_simple_method[ocgt,2030,1,234:234] : flow[(ocgt,e_demand),2030,1,234:234] - 0.1 assets_investment[2030,ocgt] <= 0
+ max_output_flows_limit_simple_method[solar,2030,1,228:228] : flow[(solar,e_demand),2030,1,228:228] - 0.0922825 assets_investment[2030,solar] <= 0
+ max_output_flows_limit_simple_method[solar,2030,1,229:229] : flow[(solar,e_demand),2030,1,229:229] - 0.08304 assets_investment[2030,solar] <= 0
+ max_output_flows_limit_simple_method[solar,2030,1,230:230] : flow[(solar,e_demand),2030,1,230:230] - 0.09352 assets_investment[2030,solar] <= 0
+ max_output_flows_limit_simple_method[solar,2030,1,231:231] : flow[(solar,e_demand),2030,1,231:231] - 0.11438874999999998 assets_investment[2030,solar] <= 0
+ max_output_flows_limit_simple_method[solar,2030,1,233:233] : flow[(solar,e_demand),2030,1,233:233] - 0.0063012499999999996 assets_investment[2030,solar] <= 0
+ max_output_flows_limit_simple_method[solar,2030,1,234:234] : flow[(solar,e_demand),2030,1,234:234] <= 0
+ max_output_flows_limit_simple_method[wind,2030,1,228:228] : flow[(wind,e_demand),2030,1,228:228] - 0.0030802470145184706 assets_investment[2030,wind] <= 0
+ max_output_flows_limit_simple_method[wind,2030,1,229:229] : flow[(wind,e_demand),2030,1,229:229] - 0.0024843812744076224 assets_investment[2030,wind] <= 0
+ max_output_flows_limit_simple_method[wind,2030,1,230:230] : flow[(wind,e_demand),2030,1,230:230] - 0.0016508710553865176 assets_investment[2030,wind] <= 0
+ max_output_flows_limit_simple_method[wind,2030,1,231:231] : flow[(wind,e_demand),2030,1,231:231] - 0.0009394895739348857 assets_investment[2030,wind] <= 0
+ max_output_flows_limit_simple_method[wind,2030,1,233:233] : flow[(wind,e_demand),2030,1,233:233] - 0.0010767353372910834 assets_investment[2030,wind] <= 0
+ max_output_flows_limit_simple_method[wind,2030,1,234:234] : flow[(wind,e_demand),2030,1,234:234] - 0.002520012520168488 assets_investment[2030,wind] <= 0
+ max_output_flows_limit_simple_method[wind_offshore,2030,1,228:228] : flow[(wind_offshore,e_demand),2030,1,228:228] + flow[(wind_offshore,electrolizer),2030,1,228:228] - 0.039935612516731604 assets_investment[2030,wind_offshore] <= 0
+ max_output_flows_limit_simple_method[wind_offshore,2030,1,229:229] : flow[(wind_offshore,e_demand),2030,1,229:229] + flow[(wind_offshore,electrolizer),2030,1,229:229] - 0.037895084697156384 assets_investment[2030,wind_offshore] <= 0
+ max_output_flows_limit_simple_method[wind_offshore,2030,1,230:230] : flow[(wind_offshore,e_demand),2030,1,230:230] + flow[(wind_offshore,electrolizer),2030,1,230:230] - 0.035880401490606624 assets_investment[2030,wind_offshore] <= 0
+ max_output_flows_limit_simple_method[wind_offshore,2030,1,231:231] : flow[(wind_offshore,e_demand),2030,1,231:231] + flow[(wind_offshore,electrolizer),2030,1,231:231] - 0.03135688476957937 assets_investment[2030,wind_offshore] <= 0
+ max_output_flows_limit_simple_method[wind_offshore,2030,1,233:233] : flow[(wind_offshore,e_demand),2030,1,233:233] + flow[(wind_offshore,electrolizer),2030,1,233:233] - 0.022225084222563952 assets_investment[2030,wind_offshore] <= 0
+ max_output_flows_limit_simple_method[wind_offshore,2030,1,234:234] : flow[(wind_offshore,e_demand),2030,1,234:234] + flow[(wind_offshore,electrolizer),2030,1,234:234] - 0.01975845582422163 assets_investment[2030,wind_offshore] <= 0
+ max_input_flows_limit_simple_method[battery,2030,1,232:232] : flow[(e_demand,battery),2030,1,232:232] - 0.05 assets_investment[2030,battery] <= 0
+ max_storage_level_rep_period_limit[battery,2030,1,227:227] : -0.1 assets_investment[2030,battery] + storage_level_rep_period[battery,2030,1,227:227] <= 0
+ assets_investment[2030,ccgt] == 47121.553739384486
+ assets_investment[2030,wind] == 88395.7148247445
+ assets_investment[2030,solar] == 10372.426454714856
+ assets_investment[2030,ocgt] == 36717.10211560329
+ assets_investment[2030,wind_offshore] == 81.06899800586356
+ assets_investment[2030,battery] == 87490.53399037286
+ flow[(electrolizer,h2_demand),2030,1,230:230] >= 0
+ flow[(electrolizer,h2_demand),2030,1,234:234] >= 0
+ flow[(e_demand,electrolizer),2030,1,228:228] >= 0
+ flow[(e_demand,electrolizer),2030,1,229:229] >= 0
+ flow[(e_demand,electrolizer),2030,1,231:231] >= 0
+ flow[(e_demand,electrolizer),2030,1,233:233] >= 0
+ flow[(wind_offshore,electrolizer),2030,1,228:228] >= 0
+ flow[(wind_offshore,electrolizer),2030,1,229:229] >= 0
+ flow[(wind_offshore,electrolizer),2030,1,231:231] >= 0
+ flow[(wind_offshore,electrolizer),2030,1,233:233] >= 0
+ flow[(battery,e_demand),2030,1,230:230] >= 0
+ flow[(battery,e_demand),2030,1,232:232] >= 0
+ flow[(e_demand,battery),2030,1,228:228] >= 0
+ flow[(e_demand,battery),2030,1,229:229] >= 0
+ flow[(e_demand,battery),2030,1,231:231] >= 0
+ flow[(e_demand,battery),2030,1,233:233] >= 0
+ flow[(e_demand,battery),2030,1,234:234] >= 0
+ storage_level_rep_period[battery,2030,1,234:234] >= 0
+>>> bounds.mean | Variant A is_seasonal=false (benchmark env) => status=INFEASIBLE  obj=NaN  (rep_periods=2)
+
+==============================================================================
+>>> bounds.mean | Variant B is_seasonal default (SD-loop env)
+Feasibility
+Subject to
+ consumer_balance[e_demand,2030,1,8289:8289] : flow[(ens,e_demand),2030,1,8289:8289] + flow[(ocgt,e_demand),2030,1,8289:8289] + flow[(ccgt,e_demand),2030,1,8289:8289] + flow[(wind,e_demand),2030,1,8289:8289] + flow[(solar,e_demand),2030,1,8289:8289] - flow[(e_demand,electrolizer),2030,1,8289:8289] + flow[(wind_offshore,e_demand),2030,1,8289:8289] + flow[(battery,e_demand),2030,1,8289:8289] - flow[(e_demand,battery),2030,1,8289:8289] + flow[(hydro_reservoir,e_demand),2030,1,8289:8289] == 53374.049999999996
+ consumer_balance[e_demand,2030,1,8290:8290] : flow[(ens,e_demand),2030,1,8290:8290] + flow[(ocgt,e_demand),2030,1,8290:8290] + flow[(ccgt,e_demand),2030,1,8290:8290] + flow[(wind,e_demand),2030,1,8290:8290] + flow[(solar,e_demand),2030,1,8290:8290] - flow[(e_demand,electrolizer),2030,1,8290:8290] + flow[(wind_offshore,e_demand),2030,1,8290:8290] + flow[(battery,e_demand),2030,1,8290:8290] - flow[(e_demand,battery),2030,1,8290:8290] + flow[(hydro_reservoir,e_demand),2030,1,8290:8290] == 54346.799999999996
+ consumer_balance[e_demand,2030,1,8291:8291] : flow[(ens,e_demand),2030,1,8291:8291] + flow[(ocgt,e_demand),2030,1,8291:8291] + flow[(ccgt,e_demand),2030,1,8291:8291] + flow[(wind,e_demand),2030,1,8291:8291] + flow[(solar,e_demand),2030,1,8291:8291] - flow[(e_demand,electrolizer),2030,1,8291:8291] + flow[(wind_offshore,e_demand),2030,1,8291:8291] + flow[(battery,e_demand),2030,1,8291:8291] - flow[(e_demand,battery),2030,1,8291:8291] + flow[(hydro_reservoir,e_demand),2030,1,8291:8291] == 53912.549999999996
+ consumer_balance[e_demand,2030,1,8292:8292] : flow[(ens,e_demand),2030,1,8292:8292] + flow[(ocgt,e_demand),2030,1,8292:8292] + flow[(ccgt,e_demand),2030,1,8292:8292] + flow[(wind,e_demand),2030,1,8292:8292] + flow[(solar,e_demand),2030,1,8292:8292] - flow[(e_demand,electrolizer),2030,1,8292:8292] + flow[(wind_offshore,e_demand),2030,1,8292:8292] + flow[(battery,e_demand),2030,1,8292:8292] - flow[(e_demand,battery),2030,1,8292:8292] + flow[(hydro_reservoir,e_demand),2030,1,8292:8292] == 52350.149999999994
+ consumer_balance[e_demand,2030,1,8293:8293] : flow[(ens,e_demand),2030,1,8293:8293] + flow[(ocgt,e_demand),2030,1,8293:8293] + flow[(ccgt,e_demand),2030,1,8293:8293] + flow[(wind,e_demand),2030,1,8293:8293] + flow[(solar,e_demand),2030,1,8293:8293] - flow[(e_demand,electrolizer),2030,1,8293:8293] + flow[(wind_offshore,e_demand),2030,1,8293:8293] + flow[(battery,e_demand),2030,1,8293:8293] - flow[(e_demand,battery),2030,1,8293:8293] + flow[(hydro_reservoir,e_demand),2030,1,8293:8293] == 53509.200000000004
+ balance_storage_rep_period[battery,2030,1,8289:8289] : 1.0526315789473684 flow[(battery,e_demand),2030,1,8289:8289] - 0.95 flow[(e_demand,battery),2030,1,8289:8289] - storage_level_rep_period[battery,2030,1,8288:8288] + storage_level_rep_period[battery,2030,1,8289:8289] == 0
+ balance_storage_rep_period[battery,2030,1,8290:8290] : 1.0526315789473684 flow[(battery,e_demand),2030,1,8290:8290] - 0.95 flow[(e_demand,battery),2030,1,8290:8290] - storage_level_rep_period[battery,2030,1,8289:8289] + storage_level_rep_period[battery,2030,1,8290:8290] == 0
+ balance_storage_rep_period[battery,2030,1,8291:8291] : 1.0526315789473684 flow[(battery,e_demand),2030,1,8291:8291] - 0.95 flow[(e_demand,battery),2030,1,8291:8291] - storage_level_rep_period[battery,2030,1,8290:8290] + storage_level_rep_period[battery,2030,1,8291:8291] == 0
+ balance_storage_rep_period[battery,2030,1,8292:8292] : 1.0526315789473684 flow[(battery,e_demand),2030,1,8292:8292] - 0.95 flow[(e_demand,battery),2030,1,8292:8292] - storage_level_rep_period[battery,2030,1,8291:8291] + storage_level_rep_period[battery,2030,1,8292:8292] == 0
+ balance_storage_rep_period[battery,2030,1,8293:8293] : 1.0526315789473684 flow[(battery,e_demand),2030,1,8293:8293] - 0.95 flow[(e_demand,battery),2030,1,8293:8293] - storage_level_rep_period[battery,2030,1,8292:8292] + storage_level_rep_period[battery,2030,1,8293:8293] == 0
+ max_output_flows_limit_simple_method[ccgt,2030,1,8289:8289] : flow[(ccgt,e_demand),2030,1,8289:8289] - 0.8 assets_investment[2030,ccgt] <= 0
+ max_output_flows_limit_simple_method[ccgt,2030,1,8290:8290] : flow[(ccgt,e_demand),2030,1,8290:8290] - 0.8 assets_investment[2030,ccgt] <= 0
+ max_output_flows_limit_simple_method[ccgt,2030,1,8291:8291] : flow[(ccgt,e_demand),2030,1,8291:8291] - 0.8 assets_investment[2030,ccgt] <= 0
+ max_output_flows_limit_simple_method[ccgt,2030,1,8292:8292] : flow[(ccgt,e_demand),2030,1,8292:8292] - 0.8 assets_investment[2030,ccgt] <= 0
+ max_output_flows_limit_simple_method[ccgt,2030,1,8293:8293] : flow[(ccgt,e_demand),2030,1,8293:8293] - 0.8 assets_investment[2030,ccgt] <= 0
+ max_output_flows_limit_simple_method[ens,2030,1,8289:8289] : flow[(ens,e_demand),2030,1,8289:8289] <= 2
+ max_output_flows_limit_simple_method[ens,2030,1,8290:8290] : flow[(ens,e_demand),2030,1,8290:8290] <= 2
+ max_output_flows_limit_simple_method[ens,2030,1,8291:8291] : flow[(ens,e_demand),2030,1,8291:8291] <= 2
+ max_output_flows_limit_simple_method[ens,2030,1,8292:8292] : flow[(ens,e_demand),2030,1,8292:8292] <= 2
+ max_output_flows_limit_simple_method[ens,2030,1,8293:8293] : flow[(ens,e_demand),2030,1,8293:8293] <= 2
+ max_output_flows_limit_simple_method[hydro_reservoir,2030,1,8289:8289] : flow[(hydro_reservoir,e_demand),2030,1,8289:8289] <= 0.1
+ max_output_flows_limit_simple_method[hydro_reservoir,2030,1,8290:8290] : flow[(hydro_reservoir,e_demand),2030,1,8290:8290] <= 0.1
+ max_output_flows_limit_simple_method[hydro_reservoir,2030,1,8291:8291] : flow[(hydro_reservoir,e_demand),2030,1,8291:8291] <= 0.1
+ max_output_flows_limit_simple_method[hydro_reservoir,2030,1,8292:8292] : flow[(hydro_reservoir,e_demand),2030,1,8292:8292] <= 0.1
+ max_output_flows_limit_simple_method[hydro_reservoir,2030,1,8293:8293] : flow[(hydro_reservoir,e_demand),2030,1,8293:8293] <= 0.1
+ max_output_flows_limit_simple_method[ocgt,2030,1,8289:8289] : flow[(ocgt,e_demand),2030,1,8289:8289] - 0.1 assets_investment[2030,ocgt] <= 0
+ max_output_flows_limit_simple_method[ocgt,2030,1,8290:8290] : flow[(ocgt,e_demand),2030,1,8290:8290] - 0.1 assets_investment[2030,ocgt] <= 0
+ max_output_flows_limit_simple_method[ocgt,2030,1,8291:8291] : flow[(ocgt,e_demand),2030,1,8291:8291] - 0.1 assets_investment[2030,ocgt] <= 0
+ max_output_flows_limit_simple_method[ocgt,2030,1,8292:8292] : flow[(ocgt,e_demand),2030,1,8292:8292] - 0.1 assets_investment[2030,ocgt] <= 0
+ max_output_flows_limit_simple_method[ocgt,2030,1,8293:8293] : flow[(ocgt,e_demand),2030,1,8293:8293] - 0.1 assets_investment[2030,ocgt] <= 0
+ max_output_flows_limit_simple_method[solar,2030,1,8289:8289] : flow[(solar,e_demand),2030,1,8289:8289] - 0.00033625 assets_investment[2030,solar] <= 0
+ max_output_flows_limit_simple_method[solar,2030,1,8290:8290] : flow[(solar,e_demand),2030,1,8290:8290] - 0.034515 assets_investment[2030,solar] <= 0
+ max_output_flows_limit_simple_method[solar,2030,1,8291:8291] : flow[(solar,e_demand),2030,1,8291:8291] - 0.10992874999999999 assets_investment[2030,solar] <= 0
+ max_output_flows_limit_simple_method[solar,2030,1,8292:8292] : flow[(solar,e_demand),2030,1,8292:8292] - 0.09827125 assets_investment[2030,solar] <= 0
+ max_output_flows_limit_simple_method[solar,2030,1,8293:8293] : flow[(solar,e_demand),2030,1,8293:8293] - 0.08677875 assets_investment[2030,solar] <= 0
+ max_output_flows_limit_simple_method[wind,2030,1,8289:8289] : flow[(wind,e_demand),2030,1,8289:8289] - 0.03431983218691802 assets_investment[2030,wind] <= 0
+ max_output_flows_limit_simple_method[wind,2030,1,8290:8290] : flow[(wind,e_demand),2030,1,8290:8290] - 0.03554298989299453 assets_investment[2030,wind] <= 0
+ max_output_flows_limit_simple_method[wind,2030,1,8291:8291] : flow[(wind,e_demand),2030,1,8291:8291] - 0.034054236761894924 assets_investment[2030,wind] <= 0
+ max_output_flows_limit_simple_method[wind,2030,1,8292:8292] : flow[(wind,e_demand),2030,1,8292:8292] - 0.02978558067080543 assets_investment[2030,wind] <= 0
+ max_output_flows_limit_simple_method[wind,2030,1,8293:8293] : flow[(wind,e_demand),2030,1,8293:8293] - 0.024990206312411688 assets_investment[2030,wind] <= 0
+ max_output_flows_limit_simple_method[wind_offshore,2030,1,8289:8289] : flow[(wind_offshore,e_demand),2030,1,8289:8289] + flow[(wind_offshore,electrolizer),2030,1,8289:8289] - 0.14270186881765942 assets_investment[2030,wind_offshore] <= 0
+ max_output_flows_limit_simple_method[wind_offshore,2030,1,8290:8290] : flow[(wind_offshore,e_demand),2030,1,8290:8290] + flow[(wind_offshore,electrolizer),2030,1,8290:8290] - 0.12614980215293276 assets_investment[2030,wind_offshore] <= 0
+ max_output_flows_limit_simple_method[wind_offshore,2030,1,8291:8291] : flow[(wind_offshore,e_demand),2030,1,8291:8291] + flow[(wind_offshore,electrolizer),2030,1,8291:8291] - 0.10132293310963975 assets_investment[2030,wind_offshore] <= 0
+ max_output_flows_limit_simple_method[wind_offshore,2030,1,8292:8292] : flow[(wind_offshore,e_demand),2030,1,8292:8292] + flow[(wind_offshore,electrolizer),2030,1,8292:8292] - 0.07739754702140779 assets_investment[2030,wind_offshore] <= 0
+ max_output_flows_limit_simple_method[wind_offshore,2030,1,8293:8293] : flow[(wind_offshore,e_demand),2030,1,8293:8293] + flow[(wind_offshore,electrolizer),2030,1,8293:8293] - 0.057603039646513456 assets_investment[2030,wind_offshore] <= 0
+ max_storage_level_rep_period_limit[battery,2030,1,8288:8288] : -0.1 assets_investment[2030,battery] + storage_level_rep_period[battery,2030,1,8288:8288] <= 0
+ assets_investment[2030,ccgt] == 47121.553739384486
+ assets_investment[2030,wind] == 88395.7148247445
+ assets_investment[2030,solar] == 10372.426454714856
+ assets_investment[2030,ocgt] == 36717.10211560329
+ assets_investment[2030,wind_offshore] == 81.06899800586356
+ assets_investment[2030,battery] == 87490.53399037286
+ flow[(e_demand,electrolizer),2030,1,8289:8289] >= 0
+ flow[(e_demand,electrolizer),2030,1,8290:8290] >= 0
+ flow[(e_demand,electrolizer),2030,1,8291:8291] >= 0
+ flow[(e_demand,electrolizer),2030,1,8292:8292] >= 0
+ flow[(e_demand,electrolizer),2030,1,8293:8293] >= 0
+ flow[(wind_offshore,electrolizer),2030,1,8289:8289] >= 0
+ flow[(wind_offshore,electrolizer),2030,1,8290:8290] >= 0
+ flow[(wind_offshore,electrolizer),2030,1,8291:8291] >= 0
+ flow[(wind_offshore,electrolizer),2030,1,8292:8292] >= 0
+ flow[(wind_offshore,electrolizer),2030,1,8293:8293] >= 0
+ flow[(battery,e_demand),2030,1,8291:8291] >= 0
+ flow[(battery,e_demand),2030,1,8292:8292] >= 0
+ flow[(battery,e_demand),2030,1,8293:8293] >= 0
+ flow[(e_demand,battery),2030,1,8289:8289] >= 0
+ flow[(e_demand,battery),2030,1,8290:8290] >= 0
+ storage_level_rep_period[battery,2030,1,8293:8293] >= 0
+>>> bounds.mean | Variant B is_seasonal default (SD-loop env) => status=INFEASIBLE  obj=NaN  (rep_periods=2)
+
+==============================================================================
+>>> max-of-selected-optima | Variant A is_seasonal=false (benchmark env)
+>>> max-of-selected-optima | Variant A is_seasonal=false (benchmark env) => status=OPTIMAL  obj=2.2314579491229206e7  (rep_periods=2)
+
+==============================================================================
+>>> max-of-selected-optima | Variant B is_seasonal default (SD-loop env)
+>>> max-of-selected-optima | Variant B is_seasonal default (SD-loop env) => status=OPTIMAL  obj=2.231457948872515e7  (rep_periods=2)
+
+##############################################################################
+# MULTI-SCENARIO SEASONAL TEST SUMMARY (scenarios [96, 129])
+##############################################################################
+  case=bounds.mean               variant=A  status=INFEASIBLE  obj=NaN
+  case=bounds.mean               variant=B  status=INFEASIBLE  obj=NaN
+  case=max-of-selected-optima    variant=A  status=OPTIMAL  obj=2.2314579491229206e7
+  case=max-of-selected-optima    variant=B  status=OPTIMAL  obj=2.231457948872515e7

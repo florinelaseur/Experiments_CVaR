@@ -108,3 +108,43 @@ end
     @test size(Z) == (d, N)
     @test all(isfinite, Z)
 end
+
+@testitem "scrambled_sobol_uniform_reject_to_target hits target, all accepted, in box" setup = [SamplingSetup] tags = [:sampling, :unit] begin
+    d = 3
+    N = 64
+    lb = zeros(d); ub = fill(10.0, d)
+    accept = x -> sum(x) >= 12.0                      # ~majority of the cube
+    res = scrambled_sobol_uniform_reject_to_target(N, lb, ub; accept=accept, seed=1)
+    @test size(res.samples) == (d, N)
+    @test res.n_drawn >= N
+    @test all(res.samples .>= 0.0) && all(res.samples .<= 10.0)
+    @test all(sum(res.samples[:, j]) >= 12.0 for j in 1:N)   # every kept sample passes
+end
+
+@testitem "sobol_gaussian_reject_to_target honors box + accept, hits target" setup = [SamplingSetup] tags = [:sampling, :unit] begin
+    d = 4
+    N = 64
+    μ = fill(2.0, d); Σ = Matrix{Float64}(I, d, d)
+    ub = fill(6.0, d)
+    accept = x -> x[1] >= 1.0
+    res = sobol_gaussian_reject_to_target(N, μ, Σ; accept=accept, ub=ub, seed=1)
+    @test size(res.samples) == (d, N)
+    @test all(res.samples .>= 0.0) && all(res.samples .<= reshape(ub, :, 1))
+    @test all(res.samples[1, j] >= 1.0 for j in 1:N)
+end
+
+@testitem "reject_to_target is deterministic per seed" setup = [SamplingSetup] tags = [:sampling, :unit] begin
+    lb = zeros(3); ub = fill(10.0, 3)
+    accept = x -> sum(x) >= 12.0
+    a = scrambled_sobol_uniform_reject_to_target(40, lb, ub; accept=accept, seed=7)
+    b = scrambled_sobol_uniform_reject_to_target(40, lb, ub; accept=accept, seed=7)
+    @test a.samples == b.samples
+    @test a.n_drawn == b.n_drawn
+end
+
+@testitem "reject_to_target returns fewer than N (no throw) when accept is unsatisfiable" setup = [SamplingSetup] tags = [:sampling, :unit] begin
+    lb = zeros(2); ub = fill(1.0, 2)
+    res = scrambled_sobol_uniform_reject_to_target(10, lb, ub; accept=(x -> false), max_draws=50)
+    @test size(res.samples, 2) < 10               # cap hit → fewer, but no error
+    @test res.n_drawn <= 128                       # soft cap (rounds up to a power of two ≥ max_draws)
+end

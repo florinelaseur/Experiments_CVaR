@@ -1,0 +1,117 @@
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+Set parameter Username
+Set parameter LicenseID to value 2821089
+Academic license - for non-commercial use only - expires 2027-05-12
+Set parameter OutputFlag to value 1
+  Activating project at `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df`
+   Resolving package versions...
+     Project No packages added to or removed from `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\Project.toml`
+    Manifest No packages added to or removed from `C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\Manifest.toml`
+┌ Info: Investment mapping audit
+└   (permutation_ok = result.permutation_ok, dim_ok = result.dim_ok, n_container = result.n_container, n_sample_assets = result.n_sample_assets) = (permutation_ok = false, dim_ok = true, n_container = 7, n_sample_assets = 7)
+┌ Warning: Positional mismatch at index 2
+│   expected = "ocgt"
+│   actual = "wind"
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:218
+┌ Warning: Positional mismatch at index 4
+│   expected = "wind"
+│   actual = "ocgt"
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:218
+┌ Warning: Positional mismatch at index 5
+│   expected = "wind_offshore"
+│   actual = "electrolizer"
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:218
+┌ Warning: Positional mismatch at index 6
+│   expected = "electrolizer"
+│   actual = "wind_offshore"
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:218
+┌ Warning: Naive sample-to-container zip would mis-assign investments; using indices-based alignment
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\stochastic_dominance.jl:43
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+┌ Warning: Model status: INFEASIBLE
+└ @ Main C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\utils.jl:170
+Asset values: AssetInvestmentBounds(49793.46104269772, 37697.24299150759, 6152.070344195317)
+Asset values: AssetInvestmentBounds(8878.500654796604, 3671.710211560329, 1204.237844401413)
+Asset values: AssetInvestmentBounds(25316.40834895353, 5186.213227357428, 5342.80470336249)
+Asset values: AssetInvestmentBounds(53231.233532298065, 35358.2859298978, 13281.266805430965)
+Asset values: AssetInvestmentBounds(4669.574285137742, 32.42759920234543, 389.1311904281453)
+Asset values: AssetInvestmentBounds(0.13737153534724386, 0.10469174352445874, 0.00518830193290132)
+Asset values: AssetInvestmentBounds(13534.948482146487, 4374.526699518643, 1931.597090255857)
+Investment covariance: [3.78479695199275e7 2.749005459752808e6 -3.4577296873559463e6 2.7418219047064386e7 298344.2313214293 5.651907423141254 407842.3222137223; 2.749005459752808e6 1.4501887858885615e6 1.7561773638240807e6 9.315492633408496e6 -13717.616779138572 0.9189337918286634 -374638.69889195403; -3.4577296873559463e6 1.7561773638240807e6 2.854556209827236e7 1.0685293361151338e7 -169352.5029630032 2.6711278243126007 635237.786307628; 2.7418219047064386e7 9.315492633408496e6 1.0685293361151338e7 1.7639204795704246e8 75078.97973361365 5.368008683366009 7.997575021518203e6; 298344.2313214293 -13717.616779138572 -169352.5029630032 75078.97973361365 151423.08336402554 0.04797874928315783 79097.28020948995; 5.651907423141254 0.9189337918286634 2.6711278243126007 5.368008683366009 0.04797874928315783 2.691847694694756e-5 -0.3741512568820247; 407842.3222137223 -374638.69889195403 635237.786307628 7.997575021518203e6 79097.28020948995 -0.3741512568820247 3.7310673190848944e6]
+Adequacy cuts: scenarios=[1, 2]  demanding-hours per scenario=[118, 68]  (peak_demand=1.5)
+Feasibility centre μ* (LP=OPTIMAL); shift MW=[7594.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  seed=1: kept 16/16 cut-passing from 128 draws (acceptance 12.5%)
+  seed=2: kept 16/16 cut-passing from 128 draws (acceptance 12.5%)
+Time to create model (one-time): 15.8637604
+seq=1 sample=1  fix=0.3767016  solve=21.0335982  obj=2.3479482937260922e7  status=OPTIMAL
+seq=1 sample=2  fix=0.0019912  solve=0.303201  status=INFEASIBLE
+seq=1 sample=3  fix=6.91e-5  solve=30.1363003  obj=2.2763831648577172e7  status=OPTIMAL
+seq=1 sample=4  fix=0.000161  solve=0.3973986  status=INFEASIBLE
+seq=1 sample=5  fix=6.31e-5  solve=8.6923524  obj=2.2801311371846527e7  status=OPTIMAL
+seq=1 sample=6  fix=0.0001067  solve=2.0600305  obj=2.2424910489568383e7  status=OPTIMAL
+seq=1 sample=7  fix=6.64e-5  solve=1.0826654  status=INFEASIBLE
+seq=1 sample=8  fix=7.14e-5  solve=0.0793164  status=INFEASIBLE
+seq=1 sample=9  fix=8.77e-5  solve=43.8926014  obj=2.3261739865293033e7  status=OPTIMAL
+seq=1 sample=10  fix=0.00018  solve=0.1447867  status=INFEASIBLE
+seq=1 sample=11  fix=6.42e-5  solve=0.0672615  status=INFEASIBLE
+seq=1 sample=12  fix=6.29e-5  solve=1.2739101  obj=2.3530277470502004e7  status=OPTIMAL
+seq=1 sample=13  fix=6.62e-5  solve=0.129917  obj=2.2852903524809245e7  status=OPTIMAL
+seq=1 sample=14  fix=6.54e-5  solve=0.2472677  status=INFEASIBLE
+seq=1 sample=15  fix=6.41e-5  solve=0.3047041  obj=2.3671708803462416e7  status=OPTIMAL
+seq=1 sample=16  fix=6.82e-5  solve=0.2016324  status=INFEASIBLE
+seq=2 sample=1  fix=6.49e-5  solve=0.1449273  status=INFEASIBLE
+seq=2 sample=2  fix=6.75e-5  solve=0.8316023  obj=2.2595991417499844e7  status=OPTIMAL
+seq=2 sample=3  fix=6.38e-5  solve=0.3182925  status=INFEASIBLE
+seq=2 sample=4  fix=6.35e-5  solve=0.1767573  obj=2.3406298017119277e7  status=OPTIMAL
+seq=2 sample=5  fix=6.78e-5  solve=0.22947  status=INFEASIBLE
+seq=2 sample=6  fix=6.19e-5  solve=0.1013261  status=INFEASIBLE
+seq=2 sample=7  fix=5.65e-5  solve=0.0649707  status=INFEASIBLE
+seq=2 sample=8  fix=5.43e-5  solve=0.1006752  status=INFEASIBLE
+seq=2 sample=9  fix=6.58e-5  solve=0.1768313  obj=2.3330944021914925e7  status=OPTIMAL
+seq=2 sample=10  fix=6.62e-5  solve=0.240298  status=INFEASIBLE
+seq=2 sample=11  fix=6.44e-5  solve=0.9326635  obj=2.3473072954771675e7  status=OPTIMAL
+seq=2 sample=12  fix=7.31e-5  solve=0.2922661  obj=2.3591722555994436e7  status=OPTIMAL
+seq=2 sample=13  fix=6.86e-5  solve=0.1619676  status=INFEASIBLE
+seq=2 sample=14  fix=6.06e-5  solve=0.0674162  status=INFEASIBLE
+seq=2 sample=15  fix=6.31e-5  solve=28.4609654  obj=2.310290598540288e7  status=OPTIMAL
+seq=2 sample=16  fix=6.99e-5  solve=1.1227603  status=INFEASIBLE
+Screening summary: LP-optimal=14  LP-infeasible=18  in-loop-rejected=0  (total LP attempts=32)
+  Adequacy rejection happens inside the sampler (see sampling_stats.csv); the in-loop pre-filter is a safety net and should report 0.
+  Solver load = num_samples × seeds = 16 × 2 = 32 LP solves; lower the kwargs for quick runs.
+ENDTOEND rejected=0 optimal=14 infeasible=18

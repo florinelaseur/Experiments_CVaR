@@ -1,0 +1,4 @@
+┌ Warning: reject_to_target: only 0/10 accepted after 64 draws (≥ max_draws=50); returning 0.
+└ @ Main.var"##277".SamplingSetup C:\Users\rogin\Experiments_CVaR\.claude\worktrees\nostalgic-black-b6f3df\ScenarioReduction\src\sampling.jl:220
+Test Summary: | Pass  Total  Time
+Package       |   59     59  6.8s
