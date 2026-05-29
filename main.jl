@@ -77,7 +77,7 @@ CSV.write(joinpath(input_data_path, "stochastic-scenario.csv"), df_stochastic_sc
 # df_stochastic_scenario = CSV.read(joinpath(input_data_path, "stochastic-scenario.csv"), DataFrame)
 
 case_studies_info = CSV.read(
-    "case-studies-info-proxy.csv",
+    "case-studies-info.csv",
     DataFrame;
     types=Dict(
         :base_name => String,
