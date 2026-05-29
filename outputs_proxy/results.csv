@@ -1,4 +1,0 @@
-base_name,rp,solver,time_to_cluster,time_to_read,time_to_create,time_to_solve,time_to_save,objective_value,termination_status,num_constraints,num_variables,time_to_resolve_benchmark,objective_value_resolve_benchmark,termination_status_resolve_benchmark,num_loss_of_load_e_demand,num_loss_of_load_h2_demand,water_borrowed,value_at_risk_threshold_mu
-0_HourlyBenchmark,1,Gurobi,0.0,3.0351696,10.0797208,24.3580517,3.8435976,2.0882805631797645e7,OPTIMAL,735843,525611,0.0,0.0,,0,0,0.0,2.0962951886280604e7
-convex_conicalb_cross,90,Gurobi,20.6051006,0.5304335,1.389578,0.5481901,0.2988923,1.6777192673317827e7,OPTIMAL,58413,45401,2.2125908,2.0882805631797645e7,INFEASIBLE,0,0,0.0,2.0962951886280604e7
-0_HourlyBenchmark_CC,1,Gurobi,0.0,3.265442,11.218239,25.4654013,4.5430389,1.9479409816346884e7,OPTIMAL,735843,525611,0.0,0.0,,0,0,0.0,1.751645593703346e7

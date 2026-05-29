@@ -1,2 +1,0 @@
-base_name,period_duration,method,distance,weight_type,niters,learning_rate,stochastic_method,run_case
-convex_conicalb_cross,24,convex_hull_with_null,Euclidean,conical_bounded,2000,0.001,cross_scenario,true
