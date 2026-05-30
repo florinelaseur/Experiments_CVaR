@@ -13,4 +13,5 @@ conicalb_conicalb_cross,24,convex_hull_with_null,Euclidean,conical_bounded,2000,
 conicalb_conicalb_per,24,convex_hull_with_null,Euclidean,conical_bounded,2000,0.001,per_scenario,false
 convex_conicalb_per,24,convex_hull_with_null,Euclidean,conical_bounded,2000,0.001,per_scenario,false
 convex_conicalb_cross,24,convex_hull_with_null,Euclidean,conical_bounded,2000,0.001,cross_scenario,false
+kantorovich,8760,none,Euclidean,none,0,0.0,kantorovich,true
 

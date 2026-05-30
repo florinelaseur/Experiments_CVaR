@@ -32,6 +32,7 @@ using DataFrames
 @info "Including helper functions"
 include("utils/functions.jl")
 include("utils/constants.jl")
+include("utils/kantorovich_reduction.jl")
 
 distance_map = Dict(
     :Euclidean => Distances.Euclidean(),
@@ -264,6 +265,11 @@ function main()
                     risk_aversion_confidence_level_alpha = $(alpha);
                 ",
             )
+            # Kantorovich: select k scenarios and filter DuckDB before any transforms
+            if stochastic_method == :kantorovich
+                time_to_cluster = @elapsed apply_kantorovich_reduction!(connection, profiles_df, rp)
+            end
+
             # to use the ratio availability/demand
             if use_ratio == true # be careful: this works now that we have only one demand location, so we divide each availability and inflow by that only demand
                 DuckDB.query(
@@ -356,6 +362,12 @@ function main()
                                 ",
                     )
                 end
+            elseif stochastic_method == :kantorovich
+                layout = TC.ProfilesTableLayout(;
+                    year=:milestone_year,
+                    cols_to_groupby=[:milestone_year, :scenario],
+                )
+                TC.dummy_cluster!(connection; layout=layout)
             else
                 error("Unknown stochastic method: $stochastic_method")
             end
@@ -430,7 +442,9 @@ function main()
                     )
 
                     # to fix also level of the seasonal storage
-                    if fix_level_storage
+                    # kantorovich only has k selected scenarios; storage fixing is skipped
+                    # so the benchmark can freely re-optimize storage for all N scenarios
+                    if fix_level_storage && stochastic_method != :kantorovich
                         df_profiles = TIO.get_table(connection, "profiles")
                         scenarios = unique(df_profiles.scenario)
                         scenario_to_rep_period_map = Dict(i => val for (i, val) in enumerate(scenarios))

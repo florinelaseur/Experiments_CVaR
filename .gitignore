@@ -32,3 +32,8 @@ outputs/
 
 # Configuration filees for VS Code Julia extension
 .vscode/
+
+# AI stuff
+graphify-out/
+CLAUDE.md
+.claude/
