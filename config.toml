@@ -3,7 +3,7 @@
 [simulation]
 
 input_data = "base-input-data/RIDM-case-study" 
-number_of_scenarios = 2
+number_of_scenarios = 30
 run_benchmark = true
 #representative_periods = []
 representative_periods = [30,60,90]
@@ -13,6 +13,9 @@ solvers = ["Gurobi"]
 fix_level_storage = true
 risk_aversion_weight_lambda = 0.1
 risk_aversion_confidence_level = 0.95
+# Stochastic-dominance screening limits (optional; omit or set to 0 to disable)
+sd_max_runtime_sec = 120.0        # stop LP screening loop after this many seconds
+sd_solve_time_limit_sec = 30.0    # JuMP per-solve limit passed to Gurobi/HiGHS
 
 [clustering]
 use_ratio = false

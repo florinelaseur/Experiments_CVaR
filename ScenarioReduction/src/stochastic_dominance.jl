@@ -10,7 +10,9 @@ function stochastic_dominance(
     mean_shift::Bool=true,                       # centre samples on the feasibility frontier
     output_dir::String=joinpath(@__DIR__, "..", "outputs"),
     num_samples::Int=512,
-    number_of_samples_sequences::Int=5,   # = number of scramble seeds
+    number_of_samples_sequences::Int=1,   # = number of scramble seeds
+    solve_time_limit_sec::Union{Nothing,Real}=nothing,  # JuMP per-solve limit (Gurobi TimeLimit / HiGHS time_limit)
+    max_runtime_sec::Union{Nothing,Real}=nothing,         # wall-clock cap on the LP screening loop only
 )
     num_assets = length(INVESTABLE_ASSETS)
     for asset in INVESTABLE_ASSETS
@@ -127,20 +129,39 @@ function stochastic_dominance(
     JuMP.set_silent(model)
 
     configure_for_warmstart!(model; solver=solver)
+    applied_solve_time_limit = solve_time_limit_sec === nothing ? NaN : Float64(solve_time_limit_sec)
+    if solve_time_limit_sec !== nothing
+        set_solver_time_limit!(model; solver=solver, seconds=solve_time_limit_sec)
+        println("Per-solve time limit: $(solve_time_limit_sec)s")
+    end
 
     # === Screening loop: cheap adequacy pre-filter, then LP only on survivors ===
     diagnostics = DataFrame(;
         sequence=Int[], sample_id=Int[], passed_cut=Bool[],
         binding_scenario=Int[], lp_status=String[], objective=Float64[],
+        solve_elapsed_sec=Float64[], solve_time_limit_sec=Float64[],
+        terminated_by_time_limit=Bool[],
     )
     n_rejected = 0
     n_optimal = 0
     n_infeasible = 0
+    n_timed_out = 0
     presolve_disabled = false
     stop = false
+    screening_start = time()
+    deadline = max_runtime_sec === nothing ? nothing : screening_start + Float64(max_runtime_sec)
+    max_runtime_sec !== nothing &&
+        println("Screening wall-clock limit: $(max_runtime_sec)s")
+
     for sequence in 1:number_of_samples_sequences
         stop && break
         for (sample_id, sample) in enumerate(eachcol(samples[sequence]))
+            if deadline !== nothing && time() >= deadline
+                @warn "Stopping screening early: wall-clock limit $(max_runtime_sec)s reached"
+                stop = true
+                break
+            end
+
             x = Vector(sample)
 
             verdict = use_adequacy_cuts ? adequacy_verdict(x, cuts_list) :
@@ -158,8 +179,20 @@ function stochastic_dominance(
                 capacity_lookup,
             )
             elapsed_time = @elapsed status = solve_model(model; diagnose_infeasibility=false)
-            obj = status == JuMP.OPTIMAL ? JuMP.objective_value(model) : NaN
-            status == JuMP.OPTIMAL ? (n_optimal += 1) : (n_infeasible += 1)
+            obj = if status == JuMP.OPTIMAL
+                JuMP.objective_value(model)
+            elseif status == JuMP.TIME_LIMIT && JuMP.has_values(model)
+                JuMP.objective_value(model)
+            else
+                NaN
+            end
+            if status == JuMP.OPTIMAL
+                n_optimal += 1
+            elseif status == JuMP.TIME_LIMIT
+                n_timed_out += 1
+            else
+                n_infeasible += 1
+            end
             push!(diagnostics, (sequence, sample_id, true, verdict.binding_scenario, string(status), obj))
 
             if status == JuMP.OPTIMAL
@@ -177,9 +210,11 @@ function stochastic_dominance(
         end
     end
 
+    screening_elapsed = time() - screening_start
     CSV.write(joinpath(output_dir, "screening_diagnostics.csv"), diagnostics)
-    total = n_rejected + n_optimal + n_infeasible
-    println("Screening summary: LP-optimal=$n_optimal  LP-infeasible=$n_infeasible  in-loop-rejected=$n_rejected  (total LP attempts=$total)")
+    total = n_rejected + n_optimal + n_infeasible + n_timed_out
+    println("Screening summary: LP-optimal=$n_optimal  LP-infeasible=$n_infeasible  LP-time-limit=$n_timed_out  in-loop-rejected=$n_rejected  (total LP attempts=$total)")
+    println("  Screening elapsed: $(round(screening_elapsed; digits=1))s  stopped_early=$stop")
     if accept !== nothing
         println("  Adequacy rejection happens inside the sampler (see sampling_stats.csv); the in-loop pre-filter is a safety net and should report 0.")
     end
@@ -189,10 +224,26 @@ function stochastic_dominance(
         rejected=n_rejected,
         optimal=n_optimal,
         infeasible=n_infeasible,
+        timed_out=n_timed_out,
+        stopped_early=stop,
+        screening_elapsed=screening_elapsed,
         center=center,
         cuts=cuts_list,
         diagnostics=diagnostics,
     )
+end
+
+"""Set a per-`optimize!` time limit on `model` (seconds)."""
+function set_solver_time_limit!(model; solver::Symbol, seconds::Real)
+    seconds > 0 || error("solve time limit must be positive, got $seconds")
+    if solver == :Gurobi
+        JuMP.set_optimizer_attribute(model, "TimeLimit", Float64(seconds))
+    elseif solver == :HiGHS
+        JuMP.set_optimizer_attribute(model, "time_limit", Float64(seconds))
+    else
+        @warn "No time-limit mapping for solver :$solver; skipping"
+    end
+    return nothing
 end
 
 function configure_for_warmstart!(model; solver::Symbol=:Gurobi)

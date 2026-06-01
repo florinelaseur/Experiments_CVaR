@@ -167,6 +167,10 @@ function solve_model(model::JuMP.Model; diagnose_infeasibility=true)
     if status == JuMP.OPTIMAL
         return status
     end
+    if status == JuMP.TIME_LIMIT
+        @info "Model hit solver time limit" has_values=JuMP.has_values(model)
+        return status
+    end
     @warn "Model status: $status"
     if diagnose_infeasibility && status in (JuMP.INFEASIBLE, JuMP.INFEASIBLE_OR_UNBOUNDED)
         print_infeasibility_conflict!(model)
