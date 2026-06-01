@@ -146,10 +146,44 @@ seed** — `sobol_gaussian_reject_to_target` (Gaussian around μ*) or
 steer). So the solver always receives a full pool of "probable" candidates; the in-loop
 `passes_adequacy` check becomes a safety net (should report 0). `num_samples` (default 512)
 and the number of scramble seeds `number_of_samples_sequences` (default 5) are both
-configurable; **solver load = `num_samples × seeds`** LP solves. Outputs:
-`outputs/sampling_stats.csv` (per-seed draws + acceptance rate),
-`outputs/screening_diagnostics.csv` (`sequence, sample_id, passed_cut, binding_scenario,
-lp_status, objective`).
+configurable. Outputs: `outputs/sampling_stats.csv` (per-seed draws + acceptance rate).
+This sampling stage is **Phase A** of `stochastic_dominance` and is independent of how the
+kept samples are later evaluated (Phase B, §3.5).
+
+### 3.5 Phase B — per-scenario operational cost matrix
+`ScenarioReduction/src/stochastic_dominance.jl` + `src/single_scenario.jl`
+
+SD screening compares the *distribution of operational cost across scenarios* for each
+candidate investment, i.e. the matrix `C_i(z_k)` = cost of sample `k` under scenario `i`. A
+single **multi-scenario** solve only yields the probability-weighted sum, which cannot be
+decomposed back into the per-scenario costs. So Phase B replaces the old one-model loop with
+**N single-scenario solves**:
+
+- **Phase A (unchanged)** draws the cut-passing samples (§3.1–3.4).
+- **Phase B** loops over the selected scenarios. For each scenario it builds one
+  single-scenario, full-hourly operational model via
+  `build_single_scenario_model` (`src/single_scenario.jl`) — same low-level TEM pipeline
+  (`create_internal_tables!` → `compute_*_indices` → `prepare_profiles_structure` →
+  `create_model`) and `is_seasonal=false` setup the per-scenario generator and the decisive
+  test use — fixes **every** sample's investment on it (`fix_variables_from_sample`), solves,
+  and records the full model objective (`NaN` if not OPTIMAL) into that scenario's column.
+  The model + its DuckDB connection are then **freed before the next scenario is built**, so
+  only **one** operational model is ever in memory (not N). Solving all samples consecutively
+  on the same model also maximises dual-simplex warm-start reuse (`disable_presolve!` after the
+  first solve).
+
+**Solver load = `scenarios × num_samples × seeds`** single-scenario LPs (each far cheaper than
+the old multi-scenario LP). Outputs:
+- `outputs/screening_diagnostics.csv` — long format, one row per *(sequence, sample, scenario)*:
+  `sequence, sample_id, scenario, passed_cut, lp_status, objective, solve_elapsed_sec`.
+- `outputs/cost_matrix.csv` — `sample_id, sequence, scenario_<s>…`; each cell is the operational
+  objective for that sample/scenario (`NaN` if infeasible). This is the direct input to the SSD
+  pairwise check in the next pipeline step.
+
+The per-scenario `passes_adequacy` check inside Phase B is a safety net — reject-to-target
+already guarantees every kept sample passes every scenario's cuts. `stochastic_dominance`
+returns a NamedTuple `(scenarios, cost_matrix, cost, diagnostics, center, cuts, optimal,
+infeasible, rejected)`.
 
 ### 3.4 Verification (`ScenarioReduction/old_scripts/verify_adequacy_screening.jl`)
 Against ground-truth LP for scenarios [96,129]:
@@ -187,13 +221,15 @@ Against ground-truth LP for scenarios [96,129]:
 |---|---|
 | `src/adequacy_cuts.jl` | cut construction, dominance reduction, `passes_adequacy`, CSV writers (solver-free) |
 | `src/adequacy_center.jl` | `feasibility_center` LP (μ*) |
-| `src/stochastic_dominance.jl` | cuts + mean-shift + reject-to-target sampling + diagnostics wired into the loop |
+| `src/stochastic_dominance.jl` | Phase A (cuts + mean-shift + reject-to-target sampling) + Phase B (per-scenario evaluation, cost matrix) |
+| `src/single_scenario.jl` | `build_single_scenario_model` — one full-hourly single-scenario operational model (Phase B) |
 | `src/sampling.jl` | reject-to-target samplers (`sobol_gaussian_reject_to_target`, `scrambled_sobol_uniform_reject_to_target`); `:reject` `accept` predicate |
 | `test/test_adequacy_cuts.jl`, `test/test_sampling.jl` | unit tests (cuts soundness/dominance/units/centre; reject-to-target) |
 | `test_uniform_adequacy_sampling.jl` | uniform-vs-gaussian acceptance + uniform cut→LP precision |
 | `old_scripts/verify_adequacy_screening.jl` | ground-truth LP validation (soundness + yield) |
 | `old_scripts/{decisive_single_scenario_test,multiscenario_seasonal_test,quantify_infeasibility}.jl` | root-cause diagnostic harness (archived) |
-| `outputs/{adequacy_cuts,feasibility_center,screening_diagnostics,sampling_stats}.csv` | persisted artifacts |
+| `outputs/{adequacy_cuts,feasibility_center,sampling_stats}.csv` | Phase A artifacts |
+| `outputs/{screening_diagnostics,cost_matrix}.csv` | Phase B artifacts (per-scenario long diagnostics + cost matrix) |
 
 ### Run
 ```

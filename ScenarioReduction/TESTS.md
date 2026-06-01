@@ -59,9 +59,13 @@ Result (128 samples): scenario 96 feasible 25%, scenario 129 feasible 5.5%, join
 `bounds.mean` infeasible for both individually.
 
 ## C. End-to-end smoke (small SD-loop run)
-`stochastic_dominance(conn; sampling_mode=:uniform, num_samples=16, number_of_samples_sequences=2)`
-Result: per-seed acceptance 12.5% (16 kept / 128 draws), **in-loop-rejected = 0** (sampler
-delivers only cut-passing samples), 14/32 LP-optimal. Writes `outputs/sampling_stats.csv`.
+`stochastic_dominance(conn; sampling_mode=:uniform, num_samples=16, number_of_samples_sequences=2, input_data_path=INPUT_DATA_PATH)`
+Two-phase run: **Phase A** draws cut-passing samples (per-seed acceptance reported in
+`outputs/sampling_stats.csv`; sampler delivers only cut-passing samples). **Phase B** builds one
+single-scenario model at a time and solves every sample against it, writing
+`outputs/screening_diagnostics.csv` (long: one row per *sequence × sample × scenario*) and
+`outputs/cost_matrix.csv` (`sample_id, sequence, scenario_<s>…`; each cell the full objective,
+`NaN` if infeasible). `input_data_path` is required (re-read per single-scenario model).
 
 ## Key takeaways
 - The "everything INFEASIBLE" symptom is **genuine capacity-adequacy screening, not a bug**

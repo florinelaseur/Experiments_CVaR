@@ -167,18 +167,7 @@ function run_filter!(connection)
     bounds = load_investment_bounds()
     cov = investment_covariance()
     #cov = INV_COV
-    sim = CONFIG["simulation"]
-    max_runtime = get(sim, "sd_max_runtime_sec", nothing)
-    solve_limit = get(sim, "sd_solve_time_limit_sec", nothing)
-    max_runtime = max_runtime in (nothing, 0, 0.0) ? nothing : Float64(max_runtime)
-    solve_limit = solve_limit in (nothing, 0, 0.0) ? nothing : Float64(solve_limit)
-    stochastic_dominance(
-        connection;
-        bounds,
-        covariance=cov,
-        max_runtime_sec=max_runtime,
-        solve_time_limit_sec=solve_limit,
-    )
+    stochastic_dominance(connection; bounds, covariance=cov, input_data_path=INPUT_DATA_PATH)
     return bounds, cov
 end
 

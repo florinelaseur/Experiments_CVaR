@@ -1,0 +1,105 @@
+# Build one single-scenario operational model for SD per-scenario evaluation.
+#
+# Phase B of the stochastic-dominance screen evaluates each investment sample
+# against EVERY selected scenario separately (cost matrix C_i(z_k)). Rather than
+# one multi-scenario model, we build one single-scenario model at a time, solve
+# all samples against it, then free it — so only one model lives in memory.
+#
+# This mirrors the proven pattern in
+# old_scripts/decisive_single_scenario_test.jl (build_single_scenario_connection +
+# the model-build half of solve_with_fixed_investment) and the single-scenario
+# generator get_assets_investment_bounds.jl::solve_one_scenario, but uses the
+# low-level TEM pipeline (create_internal_tables! → compute_*_indices →
+# prepare_profiles_structure → create_model) so the `variables` container is
+# available for fix_variables_from_sample.
+#
+# Like src/utils.jl, this file references TEM/TC/TIO/DuckDB/JuMP from the
+# includer's scope (they resolve lazily at call time), and `configure_for_warmstart!`
+# from stochastic_dominance.jl (defined before this is ever called). So do NOT add
+# `import`/`using` for those here.
+
+using DataFrames: DataFrame, nrow
+
+"""
+    build_single_scenario_model(scenario_id, input_data_path,
+                                optimizer, optimizer_parameters; solver=:Gurobi)
+
+Build a fresh, full-hourly operational model restricted to a single scenario.
+
+Reads the input folder, keeps only `scenario_id`'s profile rows (renumbered to 1),
+sets a degenerate `stochastic_scenario` (one scenario, probability 1), runs the
+low-level TEM build pipeline, attaches the optimizer (silent, warm-start configured),
+and returns everything needed to fix investments and solve.
+
+Risk parameters are intentionally NOT set: TEM drops the entire CVaR term when
+`n_scenarios <= 1` (see TEM `objectives/conditional_value_at_risk_term.jl`), so
+`risk_aversion_*` are dead values here. With one scenario at probability 1.0 the
+objective is just that scenario's total cost — exactly the `C_i(z_k)` the cost matrix
+should hold.
+
+Returns a NamedTuple `(connection, model, variables, capacity_lookup, scenario)`.
+Close `connection` (and drop the model) when done to reclaim memory before building
+the next scenario's model.
+"""
+function build_single_scenario_model(
+    scenario_id::Integer,
+    input_data_path::AbstractString,
+    optimizer,
+    optimizer_parameters;
+    solver::Symbol=:Gurobi,
+)
+    conn = DuckDB.DBInterface.connect(DuckDB.DB)
+    TIO.read_csv_folder(conn, input_data_path)
+
+    # Keep only this scenario's profiles, renumber to 1 (single-scenario model).
+    # The folder's profiles-wide.csv already uses the renumbered 1..N ids that the
+    # adequacy cuts were built from, so no original-id mapping is needed.
+    profiles_wide = DataFrame(TIO.get_table(conn, "profiles_wide"))
+    scenario_profiles = filter(row -> row.scenario == scenario_id, profiles_wide)
+    nrow(scenario_profiles) > 0 || error("No profile rows for scenario $scenario_id")
+    scenario_profiles[!, :scenario] .= 1
+    DuckDB.query(conn, "DROP TABLE IF EXISTS profiles_wide")
+    DuckDB.register_table(conn, scenario_profiles, "profiles_wide")
+
+    DuckDB.query(
+        conn,
+        """
+        CREATE OR REPLACE TABLE stochastic_scenario AS
+        SELECT 1 AS scenario, 1.0 AS probability
+        """,
+    )
+
+    TC.transform_wide_to_long!(
+        conn,
+        "profiles_wide",
+        "profiles";
+        exclude_columns=["scenario", "milestone_year", "timestep"],
+    )
+    layout = TC.ProfilesTableLayout(;
+        year=:milestone_year,
+        cols_to_groupby=[:milestone_year, :scenario],
+    )
+    TC.dummy_cluster!(conn; layout=layout)
+    TEM.populate_with_defaults!(conn)
+    DuckDB.query(conn, "UPDATE asset SET is_seasonal = false")
+    TEM.create_internal_tables!(conn)
+
+    variables   = TEM.compute_variables_indices(conn)
+    constraints = TEM.compute_constraints_indices(conn)
+    profiles    = TEM.prepare_profiles_structure(conn)
+    model, _ = TEM.create_model(conn, variables, constraints, profiles)
+
+    JuMP.set_optimizer(model, optimizer)
+    JuMP.set_optimizer_attributes(model, [pair for pair in optimizer_parameters]...)
+    JuMP.set_silent(model)
+    configure_for_warmstart!(model; solver=solver)
+
+    capacity_lookup = build_capacity_lookup(conn)
+    return (
+        connection=conn,
+        model=model,
+        variables=variables,
+        capacity_lookup=capacity_lookup,
+        scenario=Int(scenario_id),
+    )
+end
