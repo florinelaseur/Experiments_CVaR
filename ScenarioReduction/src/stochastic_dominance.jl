@@ -11,6 +11,9 @@ function stochastic_dominance(
     output_dir::String=joinpath(@__DIR__, "..", "outputs"),
     num_samples::Int=512,
     number_of_samples_sequences::Int=5,   # = number of scramble seeds
+    input_data_path::AbstractString,      # base input folder; re-read per single-scenario model
+    max_runtime_sec::Union{Nothing,Real}=nothing,      # wall-clock budget for the per-scenario eval
+    solve_time_limit_sec::Union{Nothing,Real}=nothing, # per-LP solver time limit
 )
     num_assets = length(INVESTABLE_ASSETS)
     for asset in INVESTABLE_ASSETS
@@ -117,81 +120,131 @@ function stochastic_dominance(
         out
     end
 
-    # === Build model ONCE ===
-    # copy_conflict (IIS) requires a non-direct JuMP model; TEM.create_model uses direct_model=false by default.
-    time_to_create = @elapsed model, expressions = TEM.create_model(connection, variables, constraints, profiles)
-    println("Time to create model (one-time): $(time_to_create)")
+    # === Phase B: per-scenario operational evaluation ===
+    # SD screening needs the operational cost of each sample under EACH scenario
+    # (the matrix C_i(z_k)), not one probability-weighted objective. So build ONE
+    # single-scenario model at a time, solve every sample against it, record that
+    # scenario's cost column, then free it — only one operational model is ever in
+    # memory. No multi-scenario TEM.create_model is used for per-sample evaluation.
+    #
+    # Risk params are not threaded in: each model has a single scenario, for which
+    # TEM drops the CVaR term entirely (n_scenarios <= 1), so the recorded objective
+    # is just that scenario's total cost.
+    selected_scenarios = sort(unique(Int.(DataFrame(TIO.get_table(connection, "profiles_wide")).scenario)))
+    N = length(selected_scenarios)
+    @info "Per-scenario evaluation" scenarios=selected_scenarios num_models=N
 
-    JuMP.set_optimizer(model, optimizer)
-    JuMP.set_optimizer_attributes(model, [pair for pair in parameters]...)
-    JuMP.set_silent(model)
-
-    configure_for_warmstart!(model; solver=solver)
-
-    # === Screening loop: cheap adequacy pre-filter, then LP only on survivors ===
-    diagnostics = DataFrame(;
-        sequence=Int[], sample_id=Int[], passed_cut=Bool[],
-        binding_scenario=Int[], lp_status=String[], objective=Float64[],
-    )
-    n_rejected = 0
-    n_optimal = 0
-    n_infeasible = 0
-    presolve_disabled = false
-    stop = false
-    for sequence in 1:number_of_samples_sequences
-        stop && break
-        for (sample_id, sample) in enumerate(eachcol(samples[sequence]))
-            x = Vector(sample)
-
-            verdict = use_adequacy_cuts ? adequacy_verdict(x, cuts_list) :
-                      (passed=true, binding_scenario=0)
-            if !verdict.passed
-                n_rejected += 1
-                push!(diagnostics, (sequence, sample_id, false, verdict.binding_scenario, "REJECTED_ADEQUACY", NaN))
-                continue
-            end
-
-            time_to_fix = @elapsed fix_variables_from_sample(
-                variables,
-                :assets_investment,
-                x;
-                capacity_lookup,
-            )
-            elapsed_time = @elapsed status = solve_model(model; diagnose_infeasibility=false)
-            obj = status == JuMP.OPTIMAL ? JuMP.objective_value(model) : NaN
-            status == JuMP.OPTIMAL ? (n_optimal += 1) : (n_infeasible += 1)
-            push!(diagnostics, (sequence, sample_id, true, verdict.binding_scenario, string(status), obj))
-
-            if status == JuMP.OPTIMAL
-                println("seq=$sequence sample=$sample_id  fix=$(time_to_fix)  solve=$(elapsed_time)  obj=$(obj)  status=$status")
-            else
-                println("seq=$sequence sample=$sample_id  fix=$(time_to_fix)  solve=$(elapsed_time)  status=$status")
-            end
-
-            if !presolve_disabled
-                # After the first solve the basis is informative; presolve would
-                # discard it and prevent warm-starting subsequent re-solves.
-                disable_presolve!(model; solver=solver)
-                presolve_disabled = true
-            end
+    if solve_time_limit_sec !== nothing
+        if solver == :Gurobi
+            parameters["TimeLimit"] = Float64(solve_time_limit_sec)
+        elseif solver == :HiGHS
+            parameters["time_limit"] = Float64(solve_time_limit_sec)
         end
     end
 
-    CSV.write(joinpath(output_dir, "screening_diagnostics.csv"), diagnostics)
-    total = n_rejected + n_optimal + n_infeasible
-    println("Screening summary: LP-optimal=$n_optimal  LP-infeasible=$n_infeasible  in-loop-rejected=$n_rejected  (total LP attempts=$total)")
-    if accept !== nothing
-        println("  Adequacy rejection happens inside the sampler (see sampling_stats.csv); the in-loop pre-filter is a safety net and should report 0.")
+    # Stable row layout: one row per (sequence, sample), independent of scenario,
+    # so every scenario's column lines up in the cost matrix.
+    row_index  = [(seq, sid) for seq in 1:number_of_samples_sequences
+                             for sid in 1:size(samples[seq], 2)]
+    total_rows = length(row_index)
+    cost = fill(NaN, total_rows, N)
+
+    diagnostics = DataFrame(;
+        sequence=Int[], sample_id=Int[], scenario=Int[],
+        passed_cut=Bool[], lp_status=String[],
+        objective=Float64[], solve_elapsed_sec=Float64[],
+    )
+
+    t_start = time()
+    stop = false
+    for (i, s) in enumerate(selected_scenarios)
+        stop && break
+        @info "Building single-scenario model" scenario=s index="$i/$N"
+        time_to_build = @elapsed m = build_single_scenario_model(
+            s, input_data_path, optimizer, parameters; solver=solver,
+        )
+        println("Built single-scenario model for scenario $s ($i/$N): build=$(time_to_build)s")
+
+        presolve_disabled = false
+        row = 0
+        for sequence in 1:number_of_samples_sequences
+            stop && break
+            for (sample_id, sample) in enumerate(eachcol(samples[sequence]))
+                row += 1
+                x = Vector(sample)
+
+                # Per-scenario adequacy safety net (reject-to-target already guarantees
+                # every kept sample passes every scenario's cuts, so this should be a no-op).
+                passed = (use_adequacy_cuts && !isempty(cuts_list)) ?
+                         passes_adequacy(x, cuts_list[i]) : true
+                if !passed
+                    push!(diagnostics, (sequence, sample_id, s, false, "REJECTED_ADEQUACY", NaN, 0.0))
+                    continue
+                end
+
+                fix_variables_from_sample(
+                    m.variables, :assets_investment, x; capacity_lookup=m.capacity_lookup,
+                )
+                elapsed_time = @elapsed status = solve_model(m.model; diagnose_infeasibility=false)
+                obj = status == JuMP.OPTIMAL ? JuMP.objective_value(m.model) : NaN
+                cost[row, i] = obj
+                push!(diagnostics, (sequence, sample_id, s, true, string(status), obj, elapsed_time))
+
+                if !presolve_disabled
+                    # After the first solve the basis is informative; presolve would
+                    # discard it and prevent warm-starting the next sample on this model.
+                    disable_presolve!(m.model; solver=solver)
+                    presolve_disabled = true
+                end
+
+                if max_runtime_sec !== nothing && (time() - t_start) > max_runtime_sec
+                    @warn "max_runtime_sec=$max_runtime_sec exceeded; stopping after scenario $s (seq $sequence, sample $sample_id)"
+                    stop = true
+                    break
+                end
+            end
+        end
+
+        # Free this scenario's connection + model before building the next one.
+        try
+            DuckDB.DBInterface.close!(m.connection)
+        catch err
+            @debug "Could not close connection for scenario $s" err
+        end
+        m = nothing
+        GC.gc()
+        println("Finished scenario $s: $(count(!isnan, view(cost, :, i)))/$(total_rows) samples solved")
     end
-    println("  Solver load = num_samples × seeds = $num_samples × $number_of_samples_sequences = $(num_samples*number_of_samples_sequences) LP solves; lower the kwargs for quick runs.")
+
+    CSV.write(joinpath(output_dir, "screening_diagnostics.csv"), diagnostics)
+
+    # === Cost matrix: rows = (sequence, sample), columns = scenarios ===
+    cost_matrix = DataFrame(;
+        sample_id=[r[2] for r in row_index],
+        sequence=[r[1] for r in row_index],
+    )
+    for (i, s) in enumerate(selected_scenarios)
+        cost_matrix[!, Symbol("scenario_$(s)")] = cost[:, i]
+    end
+    CSV.write(joinpath(output_dir, "cost_matrix.csv"), cost_matrix)
+
+    n_rejected   = count(!, diagnostics.passed_cut)
+    n_optimal    = count(==("OPTIMAL"), diagnostics.lp_status)
+    n_infeasible = nrow(diagnostics) - n_rejected - n_optimal
+    println("Per-scenario screening summary: LP-optimal=$n_optimal  LP-non-optimal=$n_infeasible  cut-rejected=$n_rejected  (diagnostic rows=$(nrow(diagnostics)))")
+    println("  Solver load = scenarios × samples × seeds = $N × $num_samples × $number_of_samples_sequences = $(N*num_samples*number_of_samples_sequences) single-scenario LP solves.")
+    println("  cost_matrix.csv: $(nrow(cost_matrix)) samples × $N scenarios (NaN = infeasible / not evaluated).")
 
     return (
-        rejected=n_rejected,
-        optimal=n_optimal,
-        infeasible=n_infeasible,
+        scenarios=selected_scenarios,
+        cost_matrix=cost_matrix,
+        cost=cost,
+        diagnostics=diagnostics,
         center=center,
         cuts=cuts_list,
-        diagnostics=diagnostics,
+        optimal=n_optimal,
+        infeasible=n_infeasible,
+        rejected=n_rejected,
     )
 end
 

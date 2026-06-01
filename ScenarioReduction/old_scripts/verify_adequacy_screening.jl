@@ -131,6 +131,7 @@ function part_b(all_profiles_df, input_data_path, n_scenarios, solver_sym, selec
     out = joinpath(@__DIR__, "..", "outputs")
     result = stochastic_dominance(
         conn; solver=solver_sym, num_samples=8, number_of_samples_sequences=1, output_dir=out,
+        input_data_path=input_data_path,
     )
     println("  returned: rejected=$(result.rejected) optimal=$(result.optimal) infeasible=$(result.infeasible)")
     for f in ("adequacy_cuts.csv", "feasibility_center.csv", "screening_diagnostics.csv")

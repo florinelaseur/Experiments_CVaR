@@ -167,7 +167,7 @@ function run_filter!(connection)
     bounds = load_investment_bounds()
     cov = investment_covariance()
     #cov = INV_COV
-    stochastic_dominance(connection; bounds, covariance=cov)
+    stochastic_dominance(connection; bounds, covariance=cov, input_data_path=INPUT_DATA_PATH)
     return bounds, cov
 end
 
