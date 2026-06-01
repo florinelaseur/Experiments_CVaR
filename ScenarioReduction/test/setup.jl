@@ -32,6 +32,18 @@ end
            align_investment_sample_to_indices
 end
 
+@testmodule ScenarioDominanceSetup begin
+    using DataFrames: DataFrame, DataFrames
+
+    include(joinpath(@__DIR__, "..", "src", "scenario_dominance.jl"))
+
+    export DataFrame,
+           dominating_scenarios,
+           save_scenario_dominance_csv,
+           _compare_cost,
+           _column_dominates
+end
+
 @testmodule AdequacyCutsSetup begin
     using DataFrames: DataFrame, DataFrames, nrow
 

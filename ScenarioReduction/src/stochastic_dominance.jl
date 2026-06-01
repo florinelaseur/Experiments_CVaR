@@ -10,7 +10,7 @@ function stochastic_dominance(
     mean_shift::Bool=true,                       # centre samples on the feasibility frontier
     output_dir::String=joinpath(@__DIR__, "..", "outputs"),
     num_samples::Int=512,
-    number_of_samples_sequences::Int=5,   # = number of scramble seeds
+    number_of_samples_sequences::Int=1,   # = number of scramble seeds
     input_data_path::AbstractString,      # base input folder; re-read per single-scenario model
     max_runtime_sec::Union{Nothing,Real}=nothing,      # wall-clock budget for the per-scenario eval
     solve_time_limit_sec::Union{Nothing,Real}=nothing, # per-LP solver time limit
@@ -228,6 +228,21 @@ function stochastic_dominance(
     end
     CSV.write(joinpath(output_dir, "cost_matrix.csv"), cost_matrix)
 
+    scenario_dominance = dominating_scenarios(
+        cost_matrix;
+        scenarios=selected_scenarios,
+        num_scenarios=N,
+        num_samples=total_rows,
+    )
+    save_scenario_dominance_csv(
+        joinpath(output_dir, "scenario_dominance.csv"),
+        scenario_dominance.scenarios,
+        scenario_dominance.dominates,
+    )
+    n_dom_pairs = length(scenario_dominance.pairs)
+    n_undom = length(scenario_dominance.undominated)
+    println("Scenario dominance: $n_dom_pairs dominating pair(s); $n_undom undominated scenario(s) among $N")
+
     n_rejected   = count(!, diagnostics.passed_cut)
     n_optimal    = count(==("OPTIMAL"), diagnostics.lp_status)
     n_infeasible = nrow(diagnostics) - n_rejected - n_optimal
@@ -242,6 +257,7 @@ function stochastic_dominance(
         diagnostics=diagnostics,
         center=center,
         cuts=cuts_list,
+        scenario_dominance=scenario_dominance,
         optimal=n_optimal,
         infeasible=n_infeasible,
         rejected=n_rejected,

@@ -182,8 +182,22 @@ the old multi-scenario LP). Outputs:
 
 The per-scenario `passes_adequacy` check inside Phase B is a safety net — reject-to-target
 already guarantees every kept sample passes every scenario's cuts. `stochastic_dominance`
-returns a NamedTuple `(scenarios, cost_matrix, cost, diagnostics, center, cuts, optimal,
-infeasible, rejected)`.
+returns a NamedTuple `(scenarios, cost_matrix, cost, diagnostics, center, cuts,
+scenario_dominance, optimal, infeasible, rejected)`.
+
+### 3.3 Phase C — scenario dominance from the cost matrix
+
+After Phase B, `dominating_scenarios` (`src/scenario_dominance.jl`) compares **scenario columns**
+of `cost_matrix.csv` across all samples (rows):
+
+- Scenario **A** dominates **B** iff `cost(A,k) >= cost(B,k)` for every sample `k`, with strict
+  `>` for at least one `k`.
+- **`NaN` → `+Inf`** (worst outcome); two `NaN`s at the same sample compare equal (no strict
+  inequality from that row).
+
+Output: `outputs/scenario_dominance.csv` — long format `dominator, dominated` for each pair.
+Return field `scenario_dominance` includes `scenarios`, `dominates` (N×N Bool matrix),
+`pairs`, and `undominated` (scenario ids not dominated by any other).
 
 ### 3.4 Verification (`ScenarioReduction/old_scripts/verify_adequacy_screening.jl`)
 Against ground-truth LP for scenarios [96,129]:
@@ -221,15 +235,16 @@ Against ground-truth LP for scenarios [96,129]:
 |---|---|
 | `src/adequacy_cuts.jl` | cut construction, dominance reduction, `passes_adequacy`, CSV writers (solver-free) |
 | `src/adequacy_center.jl` | `feasibility_center` LP (μ*) |
-| `src/stochastic_dominance.jl` | Phase A (cuts + mean-shift + reject-to-target sampling) + Phase B (per-scenario evaluation, cost matrix) |
+| `src/scenario_dominance.jl` | `dominating_scenarios` — pairwise scenario dominance on the cost matrix (Phase C) |
+| `src/stochastic_dominance.jl` | Phase A (cuts + mean-shift + reject-to-target sampling) + Phase B (per-scenario evaluation, cost matrix) + Phase C call |
 | `src/single_scenario.jl` | `build_single_scenario_model` — one full-hourly single-scenario operational model (Phase B) |
 | `src/sampling.jl` | reject-to-target samplers (`sobol_gaussian_reject_to_target`, `scrambled_sobol_uniform_reject_to_target`); `:reject` `accept` predicate |
-| `test/test_adequacy_cuts.jl`, `test/test_sampling.jl` | unit tests (cuts soundness/dominance/units/centre; reject-to-target) |
+| `test/test_adequacy_cuts.jl`, `test/test_sampling.jl`, `test/test_scenario_dominance.jl` | unit tests (cuts; sampling; scenario dominance) |
 | `test_uniform_adequacy_sampling.jl` | uniform-vs-gaussian acceptance + uniform cut→LP precision |
 | `old_scripts/verify_adequacy_screening.jl` | ground-truth LP validation (soundness + yield) |
 | `old_scripts/{decisive_single_scenario_test,multiscenario_seasonal_test,quantify_infeasibility}.jl` | root-cause diagnostic harness (archived) |
 | `outputs/{adequacy_cuts,feasibility_center,sampling_stats}.csv` | Phase A artifacts |
-| `outputs/{screening_diagnostics,cost_matrix}.csv` | Phase B artifacts (per-scenario long diagnostics + cost matrix) |
+| `outputs/{screening_diagnostics,cost_matrix,scenario_dominance}.csv` | Phase B–C artifacts |
 
 ### Run
 ```

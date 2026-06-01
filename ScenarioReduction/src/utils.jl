@@ -9,6 +9,7 @@ using QuasiMonteCarlo: QuasiMonteCarlo
 # pulling in JuMP/Tulipa/DuckDB.
 include(joinpath(@__DIR__, "sampling.jl"))
 include(joinpath(@__DIR__, "investment_mapping.jl"))
+include(joinpath(@__DIR__, "scenario_dominance.jl"))
 include(joinpath(@__DIR__, "adequacy_cuts.jl"))
 include(joinpath(@__DIR__, "adequacy_center.jl"))  # JuMP-macro LP; needs JuMP in scope
 include(joinpath(@__DIR__, "single_scenario.jl"))  # build_single_scenario_model; needs TEM/TC in scope
