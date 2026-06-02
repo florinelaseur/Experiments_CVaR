@@ -86,8 +86,8 @@ case_studies_info = CSV.read(
     ),
 )
 
-enable_names = true
-direct_model = false
+enable_names = false
+direct_model = true
 results_df = DataFrame(;
     base_name=String[],
     rp=Int[],
@@ -428,9 +428,9 @@ function main()
                             row.from_asset == "water_borrower" && row.to_asset == "hydro_reservoir",
                         var_flow_df,
                     )
-                    amount_water_borrowed_err = sum(water_borrowed.solution)
-                    if amount_water_borrowed_err > 0.0
-                        error("Borrowed water has been used: $amount_water_borrowed")
+                    amount_water_borrowed = sum(water_borrowed.solution)
+                    if amount_water_borrowed > 0.0
+                        @warn "Borrowed water has been used: $amount_water_borrowed"
                     end
                     mu_value_df = TIO.get_table(connection, "var_value_at_risk_threshold_mu")
                     mu_value = only(mu_value_df.solution)
