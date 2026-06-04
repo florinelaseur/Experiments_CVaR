@@ -33,7 +33,8 @@ using DataFrames
 using Random
 using LinearAlgebra: dot
 
-Random.seed!(19990907)
+seed = parse(Int, get(ENV, "EXPERIMENT_SEED", "19990907"))
+Random.seed!(seed)
 
 @info "Including helper functions"
 include("utils/functions.jl")
@@ -232,18 +233,18 @@ function approximate_costs_via_duals(energy_problem_j, conn_j, profiles_df, j_sc
 
     for (tbl, dual_col) in cons_tables
         exists = only(DuckDB.query(conn_j,
-            "SELECT COUNT(*) FROM duckdb_tables() WHERE table_name = \'$tbl\'") |> DataFrame)[1]
+            "SELECT COUNT(*) FROM duckdb_tables() WHERE table_name = '$tbl'") |> DataFrame)[1]
         exists == 0 && continue
 
         has_dual = nrow(DuckDB.query(conn_j,
             "SELECT column_name FROM duckdb_columns()
-             WHERE table_name = \'$tbl\' AND column_name = \'$dual_col\'") |> DataFrame) > 0
+             WHERE table_name = '$tbl' AND column_name = '$dual_col'") |> DataFrame) > 0
         has_dual || continue
 
         rows = DuckDB.query(conn_j,
             "SELECT asset, rep_period, time_block_start, $dual_col AS dual
              FROM $tbl
-             WHERE asset IN ($(join(["\'" * a * "\'" for a in stochastic_assets], ", ")))
+             WHERE asset IN ($(join(["'" * a * "'" for a in stochastic_assets], ", ")))
                AND $dual_col IS NOT NULL") |> DataFrame
         append!(all_duals_df, rows)
     end
@@ -335,22 +336,26 @@ function identify_effective_scenarios(costs_df, alpha)
     return effective_df, var_threshold
 end
 
-# Helper function to compute finetuned scenario probabilities (Algorithm 1 of Nijhoff)
-# For the mixed objective function (1-lambda) * E[cost] + lambda * CVaR_alpha, we use the following:
-# - Tail scenarios: w = 1, because they contribute to both the expectation and CVaR term
-# - Non-tail scenarios: w = (1-lambda), since they only contribute to the expectation term
-# The finetuned probability is calculated as p_hat_s = (p_s / w_s) / sum_{s' in effective scenario set} (p_s' / w_s')
-function compute_finetuned_probabilities(merged_df, all_costs_df, lambda, alpha, var_threshold)
-    n_total   = nrow(all_costs_df)
-    base_prob = 1.0 / n_total
-
+# Step 5: Assign finetuned probabilities based on tail membership.
+# Tail scenarios (cost >= VaR_alpha) share total probability mass (1-alpha) equally and k non-tail representatives (k = size_of_j - num_effective) share total probability alpha equally
+function compute_finetuned_probabilities(merged_df, all_costs_df, alpha, var_threshold)
     # Recompute tail membership from raw costs and the VaR threshold
     in_tail = merged_df.operational_cost .>= var_threshold
 
-    # Calculate the weights, so 1 for tail scenarios and (1-lambda) for the non-tail scenarios. Then normalize the probabilities
-    w = ifelse.(in_tail, 1.0, 1.0 - lambda)
-    unweighted = base_prob ./ w
-    finetuned_probs = unweighted ./ sum(unweighted)
+    n_tail = count(in_tail)
+    n_nontail = count(.!in_tail)
+
+    if n_tail == 0
+        @warn "compute_finetuned_probabilities: no tail scenarios found"
+    end
+    if n_nontail == 0
+        @warn "compute_finetuned_probabilities: no non-tail scenarios found"
+    end
+
+    tail_prob = n_tail > 0 ? (1.0 - alpha) / n_tail : 0.0
+    nontail_prob = n_nontail > 0 ? alpha / n_nontail : 0.0
+
+    finetuned_probs = ifelse.(in_tail, tail_prob, nontail_prob)
 
     result_df = copy(merged_df)
     result_df[!, :in_tail] = in_tail
@@ -404,23 +409,34 @@ function run_rasra()
             )
         end
 
-        # Step 4: Identify effective (tail) and ineffective (non-tail) scenarios (Algorithm 2 from Arpon)
-        @info "Step 4 – Identifying effective scenarios via raw cost VaR threshold"
+        # Step 4: Identify effective (tail) scenarios from all N, and select k (k = size_of_j - num_effective) representative non-tail scenarios from all N.
+        # Representatives are chosen evenly spaced in the sorted non-tail because in this case they all have equal probabilities
+        @info "Step 4 – Identifying effective scenarios and selecting representative non-tail from all N"
         t4 = @elapsed begin
             effective_df, var_threshold = identify_effective_scenarios(costs_df, alpha)
             num_effective = nrow(effective_df)
-            j_nontail_ids = filter(s -> s ∉ effective_df.scenario, j_scenario_ids)
-            j_nontail_df = filter(r -> r.scenario in j_nontail_ids, costs_df)
-            num_ineffective = nrow(j_nontail_df)
-            merged_df = vcat(effective_df, j_nontail_df)
+
+            all_nontail_df = filter(r -> r.scenario ∉ effective_df.scenario, costs_df)
+            sorted_nontail = sort(all_nontail_df, :operational_cost)
+            n_nontail_all = nrow(sorted_nontail)
+            k = max(1, size_of_j - num_effective)
+
+            # Pick k indices evenly spread across 1:n_nontail_all
+            # Each representative stands for an equal share of the non-tail distribution.
+            rep_indices = [round(Int, (i - 0.5) * n_nontail_all / k) + 1 for i in 1:k]
+            rep_indices = clamp.(rep_indices, 1, n_nontail_all)
+            representative_nontail_df = sorted_nontail[rep_indices, :]
+            num_ineffective = nrow(representative_nontail_df)
+
+            merged_df = vcat(effective_df, representative_nontail_df)
             num_reduced = nrow(merged_df)
         end
 
-        # Step 5: Assign finetuned probabilities (Algorithm 1 from Nijhoff)
+        # Step 5: Assign finetuned probabilities
         @info "Step 5 – Computing finetuned probabilities for $num_effective tail and $num_ineffective non-tail scenarios"
         t5 = @elapsed begin
             reduced_with_probs = compute_finetuned_probabilities(
-                merged_df, costs_df, lambda, alpha, var_threshold,
+                merged_df, costs_df, alpha, var_threshold,
             )
 
             # Build the reduced profile and probability tables for Tulipa
@@ -517,7 +533,7 @@ function run_rasra()
         @info "RASRA done — solver: $solver | effective scenarios: $num_effective | reduced scenarios: $num_reduced | objective: $(energy_problem_reduced.objective_value)"
     end
 
-    rasra_results_path = "outputs/results_rasra_N$(number_of_scenarios).csv"
+    rasra_results_path = "outputs/results_rasra_N$(number_of_scenarios)_seed$(seed).csv"
     results_df |> CSV.write(rasra_results_path; writeheader=true)
     @info "Results written to $rasra_results_path"
 
