@@ -23,7 +23,8 @@ using TOML: TOML
 using Plots
 using Random
 
-Random.seed!(19990907)
+seed = parse(Int, get(ENV, "EXPERIMENT_SEED", "19990907"))
+Random.seed!(seed)
 
 using DataFrames
 
@@ -559,7 +560,7 @@ function main()
         end
     end
 
-    results_df |> CSV.write("outputs/results_N$(number_of_scenarios).csv"; writeheader=true)
+    results_df |> CSV.write("outputs/results_N$(number_of_scenarios)_seed$(seed).csv"; writeheader=true)
 
     return nothing
 end
