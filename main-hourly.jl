@@ -381,14 +381,14 @@ function main()
             end
             TEM.populate_with_defaults!(connection)
 
-            time_to_read = @elapsed energy_problem_full = TEM.EnergyProblem(connection)
+            time_to_read = @elapsed energy_problem = TEM.EnergyProblem(connection)
 
             for solver in solvers
                 optimizer, parameters = get_solver_parameters(solver)
 
                 @info "Creating the model for the case study: $case_name"
                 time_to_create = @elapsed TEM.create_model!(
-                    energy_problem_full;
+                    energy_problem;
                     optimizer=optimizer,
                     optimizer_parameters=parameters,
                     model_file_name="",
@@ -399,12 +399,12 @@ function main()
                 mkpath(output_folder)
 
                 @info "Solving the model and saving the solution for the case study: $case_name with $solver"
-                time_to_solve = @elapsed TEM.solve_model!(energy_problem_full)
-                time_to_save = @elapsed TEM.save_solution!(energy_problem_full)
-                TEM.export_solution_to_csv_files(output_folder, energy_problem_full)
-                df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem_full, output_folder)
+                time_to_solve = @elapsed TEM.solve_model!(energy_problem)
+                time_to_save = @elapsed TEM.save_solution!(energy_problem)
+                TEM.export_solution_to_csv_files(output_folder, energy_problem)
+                df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem, output_folder)
 
-                plot_cost_per_scenario(df_cost_per_scenario, output_folder)
+                plot_operational_cost_per_scenario(df_cost_per_scenario, output_folder)
 
                 var_flow_df = TIO.get_table(connection, "var_flow")
                 water_borrowed = filter(

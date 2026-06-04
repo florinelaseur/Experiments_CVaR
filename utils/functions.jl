@@ -538,14 +538,45 @@ function export_base_cost(energy_problem, output_folder)
     return df
 end
 
+# function export_operational_cost_per_scenario(energy_problem, output_folder)
+#     costs_per_scenario = energy_problem.expressions[:flows_operational_cost_per_scenario] +
+#                          energy_problem.expressions[:vintage_flows_operational_cost_per_scenario] +
+#                          energy_problem.expressions[:units_on_operational_cost_per_scenario]
+#     df = costs_per_scenario.indices |> DataFrame
+#     costs = JuMP.value.(costs_per_scenario.expressions[:cost])
+#     df[!, :operational_cost] = costs
+#     CSV.write(joinpath(output_folder, "operational_cost_per_scenario.csv"), df)
+#     return df
+# end
+
 function export_operational_cost_per_scenario(energy_problem, output_folder)
-    costs_per_scenario = energy_problem.expressions[:flows_operational_cost_per_scenario] +
-                         energy_problem.expressions[:vintage_flows_operational_cost_per_scenario] +
-                         energy_problem.expressions[:units_on_operational_cost_per_scenario]
-    df = costs_per_scenario.indices |> DataFrame
-    costs = JuMP.value.(costs_per_scenario.expressions[:cost])
-    df[!, :operational_cost] = costs
-    CSV.write(joinpath(output_folder, "operational_cost_per_scenario.csv"), df)
+    expr = energy_problem.expressions[:scenario_tail_excess]
+
+    df = expr.indices |> DataFrame
+
+    flows_cost =
+        energy_problem.expressions[:flows_operational_cost_per_scenario].expressions[:cost]
+
+    vintage_flows_cost =
+        energy_problem.expressions[:vintage_flows_operational_cost_per_scenario].expressions[:cost]
+
+    units_on_cost =
+        energy_problem.expressions[:units_on_operational_cost_per_scenario].expressions[:cost]
+
+    operational_costs = JuMP.value.(
+        flows_cost .+
+        vintage_flows_cost .+
+        units_on_cost
+    )
+
+    df[!, :operational_cost] = operational_costs
+
+    CSV.write(
+        joinpath(output_folder, "operational_cost_per_scenario.csv"),
+        df;
+        writeheader=true,
+    )
+
     return df
 end
 
@@ -1084,4 +1115,55 @@ function plot_comparison_copy(output_folder, number_of_scenarios)
     )
 
     savefig(p_lole, joinpath(plots_folder, "lole_comparison.png"))
+end
+
+function revenue_per_timestep(balance_df::DataFrame, flow_df::DataFrame, energy_problem, output_folder)
+    join_cols = [
+        :milestone_year,
+        :rep_period,
+        :time_block_start,
+        :time_block_end,
+        :to_asset,
+    ]
+
+    prices = select(
+        balance_df,
+        :asset => :to_asset,
+        :milestone_year,
+        :rep_period,
+        :time_block_start,
+        :time_block_end,
+        :dual_balance_consumer => :price,
+    )
+
+    flows = select(
+        flow_df,
+        :from_asset,
+        :to_asset,
+        :milestone_year,
+        :rep_period,
+        :time_block_start,
+        :time_block_end,
+        :solution => :capacity,
+    )
+
+    joined = innerjoin(flows, prices, on=join_cols)
+
+    joined[!, :revenue_component] = joined.price .* joined.capacity
+
+    recovery_df = combine(
+        groupby(joined, [
+            :milestone_year,
+            :rep_period,
+            :time_block_start,
+            :time_block_end,
+        ]),
+        :revenue_component => sum => :revenue,
+    )
+
+    operational_cost_df = export_operational_cost_per_scenario(energy_problem, output_folder)
+
+
+
+    return recovery_df, joined
 end

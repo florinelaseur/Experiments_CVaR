@@ -2,7 +2,8 @@
 
 [simulation]
 
-input_data = "base-input-data/RIDM-case-study" 
+input_data = "base-input-data/RIDM-case-study"
+input_data_CC = "base-input-data/RIDM-case-study-CC"
 number_of_scenarios = 5
 run_benchmark = false
 representative_periods = [24]
