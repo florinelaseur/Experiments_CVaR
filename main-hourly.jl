@@ -177,9 +177,13 @@ function main()
             TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
 
 
-            df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem_benchmark, output_folder)
-            plot_operational_cost_per_scenario(df_cost_per_scenario, output_folder)
+            #df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem_benchmark, output_folder)
+            #plot_operational_cost_per_scenario(df_cost_per_scenario, output_folder)
 
+            balance_df = CSV.read(joinpath(output_folder, "cons_balance_consumer.csv"), DataFrame)
+            flow_df = CSV.read(joinpath(output_folder, "var_flow.csv"), DataFrame)
+
+            recovery_analysis(balance_df::DataFrame, flow_df::DataFrame, energy_problem_benchmark, output_folder)
 
             mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
             mu_value = if nrow(mu_value_df) == 0

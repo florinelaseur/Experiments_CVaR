@@ -549,6 +549,15 @@ end
 #     return df
 # end
 
+function export_investment_cost(energy_problem, output_folder)
+    expr = energy_problem.expressions[:scenario_tail_excess]
+    investment_cost = only(unique(JuMP.value.(expr.expressions[:base_cost])))
+    df = DataFrame(investment_cost=[investment_cost])
+    CSV.write(joinpath(output_folder, "investment_cost.csv"), df; writeheader=true,)
+    return df
+end
+
+
 function export_operational_cost_per_scenario(energy_problem, output_folder)
     expr = energy_problem.expressions[:scenario_tail_excess]
 
@@ -1117,7 +1126,7 @@ function plot_comparison_copy(output_folder, number_of_scenarios)
     savefig(p_lole, joinpath(plots_folder, "lole_comparison.png"))
 end
 
-function revenue_per_timestep(balance_df::DataFrame, flow_df::DataFrame, energy_problem, output_folder)
+function recovery_analysis(balance_df::DataFrame, flow_df::DataFrame, energy_problem, output_folder)
     join_cols = [
         :milestone_year,
         :rep_period,
@@ -1162,7 +1171,59 @@ function revenue_per_timestep(balance_df::DataFrame, flow_df::DataFrame, energy_
     )
 
     operational_cost_df = export_operational_cost_per_scenario(energy_problem, output_folder)
+    total_operational_cost = sum(operational_cost_df.operational_cost)
+    total_revenue = sum(recovery_df.revenue)
+    net_revenue_df = DataFrame(
+        net_revenue=[total_revenue - total_operational_cost]
+    )
+    CSV.write(
+        joinpath(output_folder, "net_revenue.csv"),
+        net_revenue_df;
+        writeheader=true,
+    )
 
+    investment_cost_df = export_investment_cost(energy_problem, output_folder)
+    investment_cost = only(investment_cost_df.investment_cost)
+    net_revenue = only(net_revenue_df.net_revenue)
+    profit = net_revenue - investment_cost
+    profit_df = DataFrame(profit=[profit])
+
+    CSV.write(
+        joinpath(output_folder, "profit.csv"),
+        profit_df;
+        writeheader=true,
+    )
+
+    kpi_names = [
+        "Revenue",
+        "Operational cost",
+        "Investment cost",
+        "Net revenue",
+        "Profit",
+    ]
+
+    kpi_values = [
+        total_revenue,
+        total_operational_cost,
+        investment_cost,
+        net_revenue,
+        profit,
+    ]
+
+    bar_colors = fill(:blue, length(kpi_values))
+    bar_colors[end] = profit < 0 ? :red : :green
+
+    p = bar(
+        kpi_names,
+        kpi_values;
+        color=bar_colors,
+        legend=false,
+        ylabel="Value",
+        title="Recovery analysis",
+        xrotation=30,
+    )
+
+    savefig(p, joinpath(output_folder, "recovery_analysis_bars.png"))
 
 
     return recovery_df, joined
