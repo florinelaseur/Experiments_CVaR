@@ -32,6 +32,19 @@ end
            align_investment_sample_to_indices
 end
 
+@testmodule InvestmentFixSetup begin
+    using JuMP: JuMP
+    using DataFrames: DataFrame, DataFrames
+
+    include(joinpath(@__DIR__, "..", "src", "investment_mapping.jl"))
+    include(joinpath(@__DIR__, "..", "src", "utils.jl"))
+
+    export JuMP,
+           INVESTABLE_ASSETS,
+           DataFrame,
+           fix_variables_from_sample
+end
+
 @testmodule ScenarioDominanceSetup begin
     using DataFrames: DataFrame, DataFrames
 
@@ -39,9 +52,32 @@ end
 
     export DataFrame,
            dominating_scenarios,
+           dominator_scenarios,
            save_scenario_dominance_csv,
            _compare_cost,
            _column_dominates
+end
+
+@testmodule CvarDiagnosticsSetup begin
+    using DataFrames: DataFrame, DataFrames
+
+    # cvar_diagnostics.jl's pure `build_tail_diagnostics` needs only DataFrames.
+    # `export_cvar_tail_diagnostics` references JuMP/TIO/CSV/table_exists, which are
+    # NOT called here, so they resolve lazily and the include is solver-free.
+    include(joinpath(@__DIR__, "..", "src", "cvar_diagnostics.jl"))
+
+    export DataFrame, build_tail_diagnostics
+end
+
+@testmodule ExportSelectionSetup begin
+    using DataFrames: DataFrame, DataFrames
+
+    # solve_scenarios.jl only needs DataFrames at include time; TEM/TC/TIO/DuckDB/CSV
+    # are referenced lazily inside functions we do NOT call here. The pure
+    # `select_export_tables` uses only string operations.
+    include(joinpath(@__DIR__, "..", "src", "solve_scenarios.jl"))
+
+    export select_export_tables, format_selected_scenarios
 end
 
 @testmodule AdequacyCutsSetup begin
@@ -59,4 +95,22 @@ end
            build_adequacy_cuts, passes_adequacy, adequacy_verdict,
            feasibility_center_max_optima,
            _nondominated_indices, _cut_coeff_row
+end
+
+@testmodule ConflictLogSetup begin
+    using JuMP: JuMP
+    using HiGHS: HiGHS
+    using JSON: JSON
+
+    include(joinpath(@__DIR__, "..", "..", "utils", "infeasibility_conflict.jl"))
+    include(joinpath(@__DIR__, "..", "src", "investment_mapping.jl"))
+    include(joinpath(@__DIR__, "..", "src", "conflict_log.jl"))
+
+    export JuMP,
+           HiGHS,
+           INVESTABLE_ASSETS,
+           collect_infeasibility_conflict,
+           append_infeasibility_conflict_record!,
+           sample_vector_by_asset,
+           JSON
 end

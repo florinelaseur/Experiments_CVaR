@@ -13,9 +13,11 @@ selected scenarios. Every Sobol sample, `bounds.mean`, and even a scenario's "ow
 came back INFEASIBLE. We chased this to ground; here is what turned out to be true.
 
 ### 1.1 What was NOT the bug
-- **Variable mapping / units** — already fixed and re-confirmed. Investments reach the
-  correct `assets_investment` variables in correct model units via the indices-based
-  alignment (`ScenarioReduction/src/investment_mapping.jl`). 48/48 unit tests pass.
+- **Variable mapping / units** — investments are fixed only via indices-based alignment
+  (`align_investment_sample_to_container` in `ScenarioReduction/src/investment_mapping.jl`
+  + `fix_variables_from_sample` in `utils.jl`). Blind positional `zip(sample_mw, container)`
+  is not supported for `:assets_investment`. Default run validates fixing before screening
+  (`ScenarioReduction/config.toml`: `run.verify_mapping = true`).
 - **`is_seasonal`** — *refuted*. The SD loop omits the `UPDATE asset SET is_seasonal =
   false` that the per-scenario generator, `main.jl` benchmark, and `run_solve!` all run.
   Toggling it changes **nothing**: single- and multi-scenario solves are identical in
@@ -199,7 +201,27 @@ Output: `outputs/scenario_dominance.csv` — long format `dominator, dominated` 
 Return field `scenario_dominance` includes `scenarios`, `dominates` (N×N Bool matrix),
 `pairs`, and `undominated` (scenario ids not dominated by any other).
 
-### 3.4 Verification (`ScenarioReduction/old_scripts/verify_adequacy_screening.jl`)
+### 3.4 Post-screening full solve (`solve_scenarios` / `solve_scenario_sets.jl`)
+
+`solve_scenarios(scenario_ids, input_data_path)` in `src/solve_scenarios.jl` runs the
+multi-scenario stochastic TEM solve. Only scenario selection differs from `main.jl`
+(filter `profiles-wide.csv` instead of `get_scenario_set`).
+
+`clustering_mode`: `:dummy` (full hourly, default) or `:cluster` (`TC.cluster!` with
+`representative_periods`). Returns `(scenario_ids, objective_value, termination_status)`.
+
+**Runner script:** `old_scripts/solve_scenario_sets.jl` — edit `SELECTED_SCENARIOS` at the top
+(default undominated `[25, 26, 27, 28]`), runs selected list then all scenarios. Backs up and
+restores `profiles-wide.csv` between runs (each solve overwrites the input folder).
+
+```bash
+julia --project=. ScenarioReduction/old_scripts/solve_scenario_sets.jl
+```
+
+Config in script: `CLUSTERING_MODE`, `RUN_SELECTED`, `RUN_ALL`. Output:
+`outputs/solve_scenario_sets.csv`.
+
+### 3.5 Verification (`ScenarioReduction/old_scripts/verify_adequacy_screening.jl`)
 Against ground-truth LP for scenarios [96,129]:
 
 | centre | cut-pass | LP-feasible yield | false rejections |
@@ -230,26 +252,67 @@ Against ground-truth LP for scenarios [96,129]:
 
 ---
 
-## 5. File map
+## 5. Infeasibility conflict JSONL (optional)
+
+When debugging non-`OPTIMAL` per-scenario LPs during Phase B, enable IIS logging on
+`stochastic_dominance`:
+
+```julia
+stochastic_dominance(connection; record_conflicts=true, conflict_log_path=joinpath(output_dir, "infeasibility_conflicts.jsonl"))
+```
+
+Each non-optimal solve appends **one JSONL line** to the same file (create/truncate the
+file yourself before a fresh run if you want a clean log). Records have four main fields:
+`scenario`, `sample` (MW per `INVESTABLE_ASSETS`), `model_status`
+(`termination_status`, `primal_status`), and `conflict` (IIS constraint/bound lists when
+infeasible; `null` for e.g. time limit). Context: `source`, `sequence`, `sample_id` (join
+to `screening_diagnostics.csv`).
+
+**Cost:** `record_conflicts=true` runs `JuMP.compute_conflict!` on every infeasible
+sample — use on small runs, not full 512×N screening by default.
+
+Example line:
+
+```json
+{"scenario":129,"sample":{"ccgt":12.1,"ocgt":0.0},"model_status":{"termination_status":"INFEASIBLE","primal_status":"NO_SOLUTION"},"conflict":{"counts":{"n_constraints":83,"n_bounds":18},"constraints":[...]},"source":"stochastic_dominance","sequence":1,"sample_id":42}
+```
+
+Implementation: `utils/infeasibility_conflict.jl` (`collect_infeasibility_conflict`), `src/conflict_log.jl`.
+
+---
+
+## 6. File map
 | File | Role |
 |---|---|
 | `src/adequacy_cuts.jl` | cut construction, dominance reduction, `passes_adequacy`, CSV writers (solver-free) |
 | `src/adequacy_center.jl` | `feasibility_center` LP (μ*) |
 | `src/scenario_dominance.jl` | `dominating_scenarios` — pairwise scenario dominance on the cost matrix (Phase C) |
+| `src/conflict_log.jl` | `append_infeasibility_conflict_record!` — JSONL IIS log when `record_conflicts=true` |
 | `src/stochastic_dominance.jl` | Phase A (cuts + mean-shift + reject-to-target sampling) + Phase B (per-scenario evaluation, cost matrix) + Phase C call |
 | `src/single_scenario.jl` | `build_single_scenario_model` — one full-hourly single-scenario operational model (Phase B) |
+| `src/solve_scenarios.jl` | `solve_scenarios` — full stochastic solve on passed scenario indices (post-SD) |
 | `src/sampling.jl` | reject-to-target samplers (`sobol_gaussian_reject_to_target`, `scrambled_sobol_uniform_reject_to_target`); `:reject` `accept` predicate |
 | `test/test_adequacy_cuts.jl`, `test/test_sampling.jl`, `test/test_scenario_dominance.jl` | unit tests (cuts; sampling; scenario dominance) |
 | `test_uniform_adequacy_sampling.jl` | uniform-vs-gaussian acceptance + uniform cut→LP precision |
 | `old_scripts/verify_adequacy_screening.jl` | ground-truth LP validation (soundness + yield) |
 | `old_scripts/{decisive_single_scenario_test,multiscenario_seasonal_test,quantify_infeasibility}.jl` | root-cause diagnostic harness (archived) |
+| `old_scripts/solve_scenario_sets.jl` | full stochastic solve: selected scenarios then all (config at top of file) |
 | `outputs/{adequacy_cuts,feasibility_center,sampling_stats}.csv` | Phase A artifacts |
-| `outputs/{screening_diagnostics,cost_matrix,scenario_dominance}.csv` | Phase B–C artifacts |
+| `outputs/{screening_diagnostics,cost_matrix,scenario_dominance,solve_scenario_sets}.csv` | Phase B–C + post-SD solve artifacts |
+| `outputs/infeasibility_conflicts.jsonl` | optional IIS log (`record_conflicts=true`) |
 
 ### Run
 ```
+# test_stochastic_dominance.jl: load_config → prepare data → (default) value-fix validation
+# → stochastic_dominance screening. Set run.verify_mapping=false to skip the smoke test.
 julia --project=. ScenarioReduction/test_stochastic_dominance.jl               # full SD screen
 julia --project=. ScenarioReduction/test_uniform_adequacy_sampling.jl          # uniform vs gaussian acceptance + precision
+julia --project=. ScenarioReduction/old_scripts/analyze_scenario_dominance.jl   # dominance from cost_matrix (archived)
+julia --project=. ScenarioReduction/old_scripts/solve_scenario_sets.jl          # full solve selected + all scenarios
 julia --project=. ScenarioReduction/old_scripts/verify_adequacy_screening.jl   # soundness + yield (archived)
 julia --project=ScenarioReduction/test ScenarioReduction/test/runtests.jl      # unit tests
 ```
+
+
+Optimal objective  2.358204882e+07
+

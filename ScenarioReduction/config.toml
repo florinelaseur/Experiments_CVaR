@@ -1,0 +1,64 @@
+# ScenarioReduction experiment configuration (see src/config.jl: load_config).
+
+[paths]
+# Relative to repo root
+input_data = "base-input-data/RIDM-case-study"
+profiles_wide_source = "create-scenarios/profiles-wide-all-scenarios.csv"
+# Relative to ScenarioReduction/
+output_dir = "outputs/night"
+conflict_log = "infeasibility_conflicts.jsonl"
+
+[simulation]
+number_of_scenarios = 30
+risk_aversion_weight_lambda = 0.1
+risk_aversion_confidence_level = 0.90
+solvers = ["Gurobi"]
+random_seed = 19990907
+
+[run]
+filter = true
+solve = false
+verify_mapping = true
+verify_mapping_tol = 1.0e-8
+
+[stochastic_dominance]
+solver = "Gurobi"
+sampling_mode = "uniform"
+num_samples = 128
+number_of_samples_sequences = 1
+use_adequacy_cuts = true
+mean_shift = false
+gaussian_shrinkage = 0.2
+gaussian_nonneg_mode = "clip"
+record_conflicts = true
+# Set to 0 to disable (passes nothing to stochastic_dominance)
+max_runtime_sec = 6000.0
+solve_time_limit_sec = 600.0
+
+[solve]
+representative_periods = 30
+hours_per_period = 24
+clustering_method = "convex_hull"
+clustering_distance = "Euclidean"
+weight_type = "dirac"
+clustering_learning_rate = 0.001
+clustering_niters = 2000
+weight_learning_rate = 0.001
+weight_niters = 2000
+# Pass-through to TEM.create_model!(...; enable_names=...).
+use_names = false
+
+[project]
+tulipa_energy_model_rev = "227a80f7907e2c7178edb0697874cfb6666ad644"
+
+[experiment]
+# Repeatable multi-run experiment driver (run_experiment! in test_stochastic_dominance.jl).
+# When enabled, the __main__ block runs the experiment instead of the single run!().
+enabled = true
+name = "trialBoris"
+# Base output folder, relative to ScenarioReduction/. Per-run folders are <output_dir>/<name>/runK/.
+output_dir = "outputs/experiments"
+num_runs = 2
+base_seed = 19990907
+# Number of input scenarios sampled before screening (per run). Overrides simulation.number_of_scenarios.
+num_input_scenarios = 3

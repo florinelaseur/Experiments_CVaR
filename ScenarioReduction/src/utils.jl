@@ -9,10 +9,14 @@ using QuasiMonteCarlo: QuasiMonteCarlo
 # pulling in JuMP/Tulipa/DuckDB.
 include(joinpath(@__DIR__, "sampling.jl"))
 include(joinpath(@__DIR__, "investment_mapping.jl"))
+include(joinpath(@__DIR__, "..", "..", "utils", "infeasibility_conflict.jl"))  # collect/print IIS; needs JuMP in scope
+include(joinpath(@__DIR__, "conflict_log.jl"))
 include(joinpath(@__DIR__, "scenario_dominance.jl"))
 include(joinpath(@__DIR__, "adequacy_cuts.jl"))
 include(joinpath(@__DIR__, "adequacy_center.jl"))  # JuMP-macro LP; needs JuMP in scope
 include(joinpath(@__DIR__, "single_scenario.jl"))  # build_single_scenario_model; needs TEM/TC in scope
+include(joinpath(@__DIR__, "solve_scenarios.jl"))  # solve_scenarios; needs TEM/TC/Distances in scope
+include(joinpath(@__DIR__, "cvar_diagnostics.jl"))  # tail diagnostics; needs JuMP/TIO/CSV in scope
 
 struct AssetInvestmentBounds
     max::Float64
@@ -281,7 +285,13 @@ function fix_variables_from_sample(
     capacity_lookup=nothing,
     assets=INVESTABLE_ASSETS,
 )
-    if var_symbol == :assets_investment && capacity_lookup !== nothing
+    if var_symbol == :assets_investment
+        capacity_lookup === nothing &&
+            error(
+                "`capacity_lookup` is required for :assets_investment; " *
+                "samples must be aligned via variables[:assets_investment].indices " *
+                "(see align_investment_sample_to_container)",
+            )
         val_to_fix = align_investment_sample_to_container(
             variables,
             val_to_fix;

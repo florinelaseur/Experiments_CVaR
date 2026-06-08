@@ -32,3 +32,5 @@ outputs/
 
 # Configuration filees for VS Code Julia extension
 .vscode/
+
+.claude/

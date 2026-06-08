@@ -170,6 +170,30 @@ function _dominating_scenarios_matrix(C::Matrix{Float64}, scenario_ids::Vector{I
     )
 end
 
+"""
+    dominator_scenarios(result)
+    dominator_scenarios(pairs::DataFrame)
+
+Return the sorted unique scenario ids that dominate at least one other scenario
+(the "most expensive" set). Accepts either a `dominating_scenarios(...)` result
+NamedTuple (uses `.pairs`) or a `scenario_dominance.csv`-style DataFrame with a
+`:dominator` column. Returns an empty `Vector{Int}` when there are no dominance
+pairs.
+"""
+function dominator_scenarios(pairs::DataFrame)
+    hasproperty(pairs, :dominator) ||
+        error("pairs DataFrame must have a :dominator column")
+    isempty(pairs) && return Int[]
+    return sort(unique(Int.(pairs.dominator)))
+end
+
+function dominator_scenarios(result)
+    hasproperty(result, :pairs) ||
+        error("dominator_scenarios expects a result with a `pairs` field or a DataFrame")
+    isempty(result.pairs) && return Int[]
+    return sort(unique(Int[Int(p[1]) for p in result.pairs]))
+end
+
 """Write dominating pairs to CSV (`dominator`, `dominated`). References `CSV` from includer scope."""
 function save_scenario_dominance_csv(path::String, scenarios, dominates)
     df = DataFrame(dominator=Int[], dominated=Int[])

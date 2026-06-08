@@ -103,3 +103,66 @@ function build_single_scenario_model(
         scenario=Int(scenario_id),
     )
 end
+
+# ─────────────────────────────────────────────────────────────────────
+# LP warm-start theory — why dual simplex + no presolve
+# ─────────────────────────────────────────────────────────────────────
+#
+# The operational subproblem (investments fixed) is a standard LP:
+#
+#   PRIMAL                          DUAL
+#   min  cᵀx                       max  bᵀy
+#   s.t. Ax = b     (constraints)  s.t. Aᵀy + s = c   (reduced costs)
+#        l ≤ x ≤ u  (bounds)            s ≥ 0 for x_i at lower bound
+#                                       s ≤ 0 for x_i at upper bound
+#                                       s free for basic x_i
+#
+# A "basis" B is a partition of variables into basic / non-basic.
+# A basis is:
+#   • primal feasible  ⟺  Ax = b  and  l ≤ x ≤ u   (constraints + bounds met)
+#   • dual feasible    ⟺  reduced costs s = c − Aᵀy  have correct signs
+#                         (i.e., no non-basic variable can improve the objective)
+#   • optimal          ⟺  both
+#
+# When we call JuMP.fix(assets_investment[i], new_val), we change the
+# BOUNDS l_i, u_i (and effectively the RHS b via the fixed columns).
+#
+# Effect on the current basis:
+#   • Dual feasibility:  s = c − Aᵀy  does NOT depend on bounds/RHS.
+#     → The basis stays DUAL FEASIBLE after bound changes.
+#   • Primal feasibility: Ax = b and l ≤ x ≤ u may be violated.
+#     → The basis is generally PRIMAL INFEASIBLE.
+#
+# PRIMAL simplex starts from a primal-feasible basis and pivots to
+# restore optimality (dual feasibility). After bound changes the basis
+# is dual-feasible but primal-infeasible → wrong starting point.
+#
+# DUAL simplex starts from a dual-feasible basis and pivots to restore
+# primal feasibility. After bound changes the basis is exactly this
+# → ideal starting point. Only the few violated bound constraints need
+# to be repaired — typically very few pivots.
+#
+# PRESOLVE transforms the model into a smaller equivalent form. This
+# destroys the basis mapping (variables are eliminated / substituted),
+# so the warm-start basis cannot be reused. We disable it after the
+# first solve to preserve the basis across re-solves.
+#
+# Net effect: first solve is a cold start (presolve ON, any method).
+# Every subsequent re-solve is a warm-started dual simplex — only a
+# handful of pivots to repair the 7 changed investment bounds, vs.
+# tens of thousands of variables in the full model.
+# ─────────────────────────────────────────────────────────────────────
+
+
+
+function configure_for_warmstart!(model; solver::Symbol=:Gurobi)
+    # Use simplex, not interior-point — simplex maintains a basis reusable across re-solves.
+    # Dual simplex: after fix() changes bounds, the current basis stays dual-feasible.
+    if solver == :Gurobi
+        JuMP.set_optimizer_attribute(model, "Method", 1)  # dual simplex
+    elseif solver == :HiGHS
+        JuMP.set_optimizer_attribute(model, "solver", "simplex")
+        JuMP.set_optimizer_attribute(model, "simplex_strategy", 1)  # dual simplex
+    end
+    return nothing
+end

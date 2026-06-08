@@ -3,7 +3,7 @@
 [simulation]
 
 input_data = "base-input-data/RIDM-case-study" 
-number_of_scenarios = 30
+number_of_scenarios = 20
 run_benchmark = true
 #representative_periods = []
 representative_periods = [30,60,90]

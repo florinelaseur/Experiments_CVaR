@@ -1,31 +1,113 @@
 # Per-scenario capacity-adequacy cuts for SD screening.
 #
-# Motivation: the SD loop fixes ONE investment and solves the operational problem
-# against the selected scenarios. Most mean-centered samples are infeasible purely
-# because firm+VRE capacity cannot meet demand at peak-demand / low-renewable hours.
-# That failure mode is a NECESSARY linear condition we can check in microseconds,
-# so we use it to (a) reject doomed samples before the expensive LP and (b) shift
-# the sampling centre onto the feasible frontier.
+# ═══════════════════════════════════════════════════════════════════════
+# PART 1 — ADEQUACY CUTS (sound reject filter)
+# ═══════════════════════════════════════════════════════════════════════
 #
-# Derivation (MW-space). The model's hourly e_demand balance is an EQUALITY
-#   Σ_g flow(g→e_demand) (− optional loads) == peak_demand · demand_h.
-# Each inflow is capped by its capacity constraint flow(g→) ≤ availability_{g,h}·x_g
-# (thermal availability = 1). Summing the per-source upper bounds gives an upper
-# bound on deliverable supply. Dropping the optional electrolyzer/charging loads
-# only shrinks the required side. Hence:
-#   supply_ub_h(x) = x_ccgt + x_ocgt + a_solar·x_solar + a_won·x_wind
-#                  + a_woff·x_wind_offshore + x_battery + HYDRO_CAP + ENS_CAP
-#   required_h     = PEAK_DEMAND · demand_h
-# If supply_ub_h(x) < required_h for ANY hour, x is PROVABLY infeasible (the most
-# optimistic supply can't meet the least optimistic demand). This is a sound
-# one-sided filter: it never rejects a truly feasible portfolio, only LP-screens
-# the survivors.
+# Purpose: reject investment samples that are PROVABLY infeasible before
+# the expensive fix → LP-solve cycle. One linear inequality per hour per
+# scenario; evaluation is O(hours × assets) — microseconds.
 #
-# This file depends only on DataFrames + base so it can be included in the
-# solver-free unit-test environment. `feasibility_center` (a tiny LP) and the
-# CSV writers reference `JuMP`/`CSV` from the includer's scope (exactly like
-# src/utils.jl references TIO/JuMP/DuckDB without importing them) — so DO NOT add
-# `using JuMP`/`using CSV` here, or the test include would fail.
+# Derivation. The RIDM Tulipa model enforces, at every hour h:
+#
+#   (1) Electricity consumer balance (consumer.jl:42-47, sense "=="):
+#       Σ_g flow(g → e_demand, h) − Σ_b flow(e_demand → b, h) = 1.5 · d(h)
+#       where d(h) is the demand profile value (MW, range 17k–36k).
+#       Outgoing flows from e_demand: e_demand→battery (charging),
+#       e_demand→electrolizer.
+#
+#   (2) Capacity limits (capacity.jl:265-290), one per source:
+#       flow(g → e_demand, h) ≤ avail_g(h) · cap_g · units_g
+#       Thermal (ccgt, ocgt): avail = 1.0 (no availability profile).
+#       VRE (solar, wind, wind_offshore): avail ∈ [0,1] from profile.
+#
+# Summing the capacity upper bounds over all sources gives an upper bound
+# on the total inflow to e_demand. The outgoing loads (battery charging,
+# electrolyzer) are non-negative, so dropping them only RELAXES the
+# balance — making the inequality LOOSER:
+#
+#   Σ_g avail_g(h) · cap_g · units_g  +  HYDRO_CAP  +  ENS_CAP  ≥  1.5 · d(h)
+#
+# Equivalently, moving the fixed-capacity non-investable assets (hydro,
+# ens) to the RHS so the LHS depends only on the sampled investment x:
+#
+#   Σ_a∈investable  avail_a(h) · cap_a · x_a  ≥  1.5·d(h) − HYDRO_CAP − ENS_CAP
+#
+# Asset coefficients in the LHS (from asset.csv):
+#   ccgt:          1.0 × 0.8 × x_ccgt         (firm, cap/unit = 0.8)
+#   ocgt:          1.0 × 0.1 × x_ocgt         (firm, cap/unit = 0.1)
+#   solar:         avail(h) × 0.5 × x_solar   (VRE profile)
+#   wind:          avail(h) × 0.4 × x_wind    (VRE profile)
+#   wind_offshore: avail(h) × 0.4 × x_woff    (VRE profile)
+#   electrolizer:  0                           (load, not supply — see below)
+#   battery:       1 × 0.05 × x_battery       (see caveat below)
+#
+# RHS fixed credits (from asset-milestone.csv, initial_units = 1):
+#   HYDRO_CAP = 0.1 × 1 = 0.1 MW    (hydro_reservoir, non-investable)
+#   ENS_CAP   = 2.0 × 1 = 2.0 MW    (ens VoLL slack, non-investable)
+#
+# Why electrolizer coefficient = 0:
+#   The electrolyzer is a conversion asset (conversion.jl:17-21):
+#     0.65 · (flow(e_demand→elec) + flow(woff→elec)) = flow(elec→h2d)
+#   It only CONSUMES electricity, never produces it (flow ≥ 0 bounds
+#   prevent reversal). The optimizer can always shut it off and let
+#   smr_ccs (fixed 0.5 MW >> h2_demand 0.1 MW) cover hydrogen demand
+#   at high cost. So the electrolyzer is neither supply nor forced load.
+#
+# Why battery coefficient = 1 (loose but sound):
+#   The LP enforces inter-temporal storage balance (storage.jl:57-98):
+#     level_t = level_{t-1} + 0.95·charge_t − discharge_t/0.95
+#   plus power limits (charge/discharge ≤ 0.05 × units) and energy
+#   limits (level ≤ E/P × cap × units = 2.0 × 0.05 × units). Crediting
+#   battery as firm (coefficient 1) ignores this coupling — a multi-hour
+#   deficit cannot be bridged if the battery wasn't charged beforehand.
+#   This makes the cut LOOSER, preserving soundness (never rejects a
+#   feasible portfolio) at the cost of precision: ~54% of cut-passing
+#   samples still fail the full LP, primarily due to this.
+#
+# H₂ demand is NOT in these cuts:
+#   smr_ccs (fixed 0.5 MW, non-investable) always covers h2_demand
+#   (constant 0.1 MW). H₂ cannot cause infeasibility — only cost.
+#   No separate H₂ adequacy cut is needed.
+#
+# Soundness: if supply_ub(x, h) < 1.5·d(h) for ANY hour h, x is
+# provably infeasible. The cut never rejects a truly feasible portfolio.
+# Validated empirically: 0 false rejections across all tests.
+# (See wiki/synthesis/adequacy-cut-screening-tests.md)
+#
+# ═══════════════════════════════════════════════════════════════════════
+# PART 2 — MEAN-SHIFTING (feasibility centre)
+# ═══════════════════════════════════════════════════════════════════════
+#
+# Purpose: shift the sampling distribution's centre from bounds.mean
+# (which is typically infeasible) onto the feasible frontier, so that
+# more samples pass the adequacy cuts and reach the LP.
+#
+# The problem: the naïve centre (element-wise mean of per-scenario
+# optima) is INFEASIBLE for ~94% of scenario pairs — it averages over
+# investment portfolios optimized for DIFFERENT weather years, producing
+# a compromise that is adequate for neither.
+#
+# The fix: solve a small LP (feasibility_center) that finds the closest
+# point to bounds.mean that passes ALL adequacy cuts. This is μ* — the
+# shifted centre. Empirically, μ* ≈ bounds.mean + ~7594 MW extra ccgt.
+#
+# Effect on yield:
+#   bounds.mean centre → 6.2% LP-feasible
+#   μ* centre          → 31.2% LP-feasible  (~5× improvement)
+#
+# The reject-to-target sampler then draws from N(μ*, Σ) or Sobol on
+# [0, ub], accepting only samples that pass the adequacy cuts, until
+# the target pool size is reached.
+#
+# ═══════════════════════════════════════════════════════════════════════
+#
+# This file depends only on DataFrames + base so it can be included in
+# the solver-free unit-test environment. `feasibility_center` (a tiny
+# LP) and the CSV writers reference `JuMP`/`CSV` from the includer's
+# scope (exactly like src/utils.jl references TIO/JuMP/DuckDB without
+# importing them) — so DO NOT add `using JuMP`/`using CSV` here, or
+# the test include would fail.
 
 using DataFrames: DataFrame, nrow, eachrow
 
@@ -56,10 +138,10 @@ end
 
 # LHS coefficient row in INVESTABLE_ASSETS order
 # [ccgt, ocgt, solar, wind, wind_offshore, electrolizer, battery].
-# Thermal & battery deliver up to their full invested MW (coeff 1); VRE is scaled
+# Thermal & battery deliver up to their full invested MW (coeff 1); VRE is scaled - battery can only deliver 5 percent of its capacity 
 # by availability; electrolyzer is a load (does not supply e_demand) → coeff 0.
 function _cut_coeff_row(a_solar::Float64, a_won::Float64, a_woff::Float64)
-    return Float64[1.0, 1.0, a_solar, a_won, a_woff, 0.0, 1.0]
+    return Float64[1.0, 1.0, a_solar, a_won, a_woff, 0.0, 0.05]
 end
 
 # Return indices of the non-dominated ("demanding") hours. Hour h is dominated by
@@ -179,7 +261,7 @@ function feasibility_center_max_optima(
     return Float64[maximum(rows[!, Symbol(a)]) for a in assets]
 end
 
-"""Read adequacy parameters from the input tables on `connection` (references TIO/DuckDB)."""
+"""Read adequacy parameters from the input tables on `connection` (references TIO/DuckDB). Adequacy params are energy not served, peak demand and hydro capacity."""
 function read_adequacy_params(connection)
     asset = DataFrame(TIO.get_table(connection, "asset"))
     capof(name) = Float64(only(asset[string.(asset.asset) .== name, :capacity]))

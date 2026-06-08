@@ -15,7 +15,7 @@ using TestItems: @testitem
     # One hour → one (non-dominated) cut.
     @test size(cuts.A) == (1, length(INVESTABLE_ASSETS))
     # Order: [ccgt, ocgt, solar, wind, wind_offshore, electrolizer, battery].
-    @test cuts.A[1, :] == [1.0, 1.0, 0.2, 0.3, 0.4, 0.0, 1.0]
+    @test cuts.A[1, :] == [1.0, 1.0, 0.2, 0.3, 0.4, 0.0, 0.05]
     # rhs = peak_demand·demand − hydro_cap − ens_cap.
     @test cuts.b[1] ≈ 1.5 * 1000.0 - 0.1 - 2.0
     @test cuts.timesteps == [5]

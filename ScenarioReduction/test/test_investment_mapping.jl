@@ -56,3 +56,24 @@ end
 @testitem "sample_vector_by_asset length guard" setup = [InvestmentMappingSetup] tags = [:mapping, :unit] begin
     @test_throws ErrorException sample_vector_by_asset([1.0, 2.0])
 end
+
+@testitem "fix_variables_from_sample requires capacity_lookup for assets_investment" setup = [
+    InvestmentFixSetup,
+] tags = [:mapping, :unit] begin
+    model = JuMP.Model()
+    container = [JuMP.@variable(model, base_name = "inv_$i") for i in 1:length(INVESTABLE_ASSETS)]
+    variables = Dict(
+        :assets_investment => (
+            indices = DataFrame(;
+                asset = copy(INVESTABLE_ASSETS),
+                milestone_year = fill(2030, length(INVESTABLE_ASSETS)),
+            ),
+            container = container,
+        ),
+    )
+    @test_throws ErrorException fix_variables_from_sample(
+        variables,
+        :assets_investment,
+        zeros(length(INVESTABLE_ASSETS)),
+    )
+end

@@ -9,11 +9,13 @@ function stochastic_dominance(
     use_adequacy_cuts::Bool=true,               # cheap pre-filter + feasibility mean-shift
     mean_shift::Bool=true,                       # centre samples on the feasibility frontier
     output_dir::String=joinpath(@__DIR__, "..", "outputs"),
-    num_samples::Int=512,
+    num_samples::Int=128,
     number_of_samples_sequences::Int=1,   # = number of scramble seeds
     input_data_path::AbstractString,      # base input folder; re-read per single-scenario model
     max_runtime_sec::Union{Nothing,Real}=nothing,      # wall-clock budget for the per-scenario eval
     solve_time_limit_sec::Union{Nothing,Real}=nothing, # per-LP solver time limit
+    record_conflicts::Bool=true,                     # append IIS JSONL for non-OPTIMAL solves
+    conflict_log_path::String=joinpath(output_dir, "infeasibility_conflicts.jsonl"),
 )
     num_assets = length(INVESTABLE_ASSETS)
     for asset in INVESTABLE_ASSETS
@@ -38,13 +40,6 @@ function stochastic_dominance(
     profiles    = TEM.prepare_profiles_structure(connection)
 
     capacity_lookup = build_capacity_lookup(connection)
-    mapping_audit = audit_investment_mapping(
-        variables;
-        capacity_lookup,
-    )
-    if !mapping_audit.permutation_ok
-        @warn "Naive sample-to-container zip would mis-assign investments; using indices-based alignment"
-    end
 
     optimizer, parameters = get_solver_parameters(solver)
 
@@ -54,12 +49,14 @@ function stochastic_dominance(
     cuts_list = AdequacyCuts[]
     if use_adequacy_cuts
         profiles_wide_df = DataFrame(TIO.get_table(connection, "profiles_wide"))
-        params = read_adequacy_params(connection)
+        params = read_adequacy_params(connection) # Adequacy params are energy not served, peak demand and hydro capacity
         selected_scenarios = sort(unique(Int.(profiles_wide_df.scenario)))
-        cuts_list = [build_adequacy_cuts(profiles_wide_df, s, params) for s in selected_scenarios]
+        cuts_list = [build_adequacy_cuts(profiles_wide_df, s, params) for s in selected_scenarios] # PEr scenario most demanding hoursare selected
         save_adequacy_cuts_csv(joinpath(output_dir, "adequacy_cuts.csv"), cuts_list)
         println("Adequacy cuts: scenarios=$selected_scenarios  demanding-hours per scenario=$( [length(c.b) for c in cuts_list] )  (peak_demand=$(params.peak_demand))")
-
+        
+        # If using gaussian sampling snter itself is maybe not feasible so an LP is solved to minimally move it
+        # REcomndation use uniform sampling instead
         if mean_shift
             res = feasibility_center(
                 cuts_list, bounds.mean, ub;
@@ -186,6 +183,15 @@ function stochastic_dominance(
                     m.variables, :assets_investment, x; capacity_lookup=m.capacity_lookup,
                 )
                 elapsed_time = @elapsed status = solve_model(m.model; diagnose_infeasibility=false)
+                if record_conflicts && status != JuMP.OPTIMAL
+                    append_infeasibility_conflict_record!(
+                        conflict_log_path, m.model;
+                        scenario=s,
+                        sample_mw=x,
+                        sequence=sequence,
+                        sample_id=sample_id,
+                    )
+                end
                 obj = status == JuMP.OPTIMAL ? JuMP.objective_value(m.model) : NaN
                 cost[row, i] = obj
                 push!(diagnostics, (sequence, sample_id, s, true, string(status), obj, elapsed_time))
@@ -264,6 +270,15 @@ function stochastic_dominance(
     )
 end
 
+function disable_presolve!(model; solver::Symbol=:Gurobi)
+    if solver == :Gurobi
+        JuMP.set_optimizer_attribute(model, "Presolve", 0)
+    elseif solver == :HiGHS
+        JuMP.set_optimizer_attribute(model, "presolve", "off")
+    end
+    return nothing
+end
+
 """Set a per-`optimize!` time limit on `model` (seconds)."""
 function set_solver_time_limit!(model; solver::Symbol, seconds::Real)
     seconds > 0 || error("solve time limit must be positive, got $seconds")
@@ -277,23 +292,33 @@ function set_solver_time_limit!(model; solver::Symbol, seconds::Real)
     return nothing
 end
 
-function configure_for_warmstart!(model; solver::Symbol=:Gurobi)
-    # Use simplex, not interior-point — simplex maintains a basis reusable across re-solves.
-    # Dual simplex: after fix() changes bounds, the current basis stays dual-feasible.
-    if solver == :Gurobi
-        JuMP.set_optimizer_attribute(model, "Method", 1)  # dual simplex
-    elseif solver == :HiGHS
-        JuMP.set_optimizer_attribute(model, "solver", "simplex")
-        JuMP.set_optimizer_attribute(model, "simplex_strategy", 1)  # dual simplex
-    end
-    return nothing
-end
+include(joinpath(@__DIR__, "config.jl"))
 
-function disable_presolve!(model; solver::Symbol=:Gurobi)
-    if solver == :Gurobi
-        JuMP.set_optimizer_attribute(model, "Presolve", 0)
-    elseif solver == :HiGHS
-        JuMP.set_optimizer_attribute(model, "presolve", "off")
-    end
-    return nothing
+function stochastic_dominance(
+    connection,
+    cfg::ScenarioReductionConfig;
+    bounds::InvestmentBounds=load_investment_bounds(),
+    covariance::InvestmentCovariance=investment_covariance(),
+    kwargs...,
+)
+    return stochastic_dominance(
+        connection;
+        bounds=bounds,
+        covariance=covariance,
+        sampling_mode=cfg.sampling_mode,
+        gaussian_shrinkage=cfg.gaussian_shrinkage,
+        gaussian_nonneg_mode=cfg.gaussian_nonneg_mode,
+        solver=cfg.sd_solver,
+        use_adequacy_cuts=cfg.use_adequacy_cuts,
+        mean_shift=cfg.mean_shift,
+        output_dir=cfg.output_dir,
+        num_samples=cfg.num_samples,
+        number_of_samples_sequences=cfg.number_of_samples_sequences,
+        input_data_path=cfg.input_data_path,
+        max_runtime_sec=cfg.max_runtime_sec,
+        solve_time_limit_sec=cfg.solve_time_limit_sec,
+        record_conflicts=cfg.record_conflicts,
+        conflict_log_path=cfg.conflict_log_path,
+        kwargs...,
+    )
 end
