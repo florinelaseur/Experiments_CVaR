@@ -52,10 +52,16 @@ end
 
     export DataFrame,
            dominating_scenarios,
+           fsd_dominating_scenarios,
+           ssd_dominating_scenarios,
            dominator_scenarios,
            save_scenario_dominance_csv,
+           undominated_scenarios,
            _compare_cost,
-           _column_dominates
+           _column_dominates,
+           _finite_cost_domain,
+           _empirical_cdf_matrix,
+           _integrated_cdf_matrix
 end
 
 @testmodule CvarDiagnosticsSetup begin

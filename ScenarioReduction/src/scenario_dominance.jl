@@ -170,6 +170,314 @@ function _dominating_scenarios_matrix(C::Matrix{Float64}, scenario_ids::Vector{I
     )
 end
 
+# =====================================================================
+# Distributional (FSD / SSD) scenario dominance
+# =====================================================================
+#
+# CONVENTION (cost-minimization). This differs from the pointwise
+# `dominating_scenarios` helper above. Each scenario column of the cost matrix
+# is treated as an empirical distribution over the K sampled investments. For
+# the FSD/SSD methods below:
+#
+#     dominates[i,j] == true  means  scenarios[i] stochastically dominates
+#                                    scenarios[j].
+#
+# i.e. scenario j is the worse / riskier / more expensive scenario, and
+# scenario i (cheaper across the board) can be preferred. A scenario whose CDF
+# is everywhere higher puts more probability mass on lower costs.
+#
+# NaN handling: any scenario whose column contains a NaN (infeasible /
+# unevaluated sample) is TAGGED and excluded from ordering entirely — it never
+# dominates and is never dominated, is reported in `nan_scenarios`, and a
+# warning is emitted. (Inf is still merely excluded from the finite domain and
+# behaves as a worst-case +Inf.)
+
+"""
+Validate cost-matrix dims against optional `scenarios` / `num_scenarios` /
+`num_samples` kwargs and return `(C::Matrix{Float64}, scenario_ids::Vector{Int})`.
+Shared by the FSD/SSD entry points; mirrors `dominating_scenarios` validation.
+"""
+function _normalize_cost_input(
+    cost::DataFrame;
+    scenarios=nothing,
+    num_scenarios=nothing,
+    num_samples=nothing,
+)
+    C, scenario_ids = _extract_cost_matrix(cost)
+    if scenarios !== nothing
+        collect(scenarios) == scenario_ids ||
+            error("scenarios kwarg $(collect(scenarios)) does not match columns $scenario_ids")
+    end
+    if num_scenarios !== nothing && length(scenario_ids) != num_scenarios
+        error("num_scenarios=$num_scenarios but got $(length(scenario_ids)) scenario columns")
+    end
+    if num_samples !== nothing && size(C, 1) != num_samples
+        error("num_samples=$num_samples but cost has $(size(C, 1)) rows")
+    end
+    return C, scenario_ids
+end
+
+function _normalize_cost_input(
+    cost::AbstractMatrix{<:Real};
+    scenarios=nothing,
+    num_scenarios=nothing,
+    num_samples=nothing,
+)
+    C = Matrix{Float64}(cost)
+    n_samples, n_scenarios = size(C)
+    scenario_ids = if scenarios === nothing
+        collect(1:n_scenarios)
+    else
+        sid = collect(Int.(scenarios))
+        length(sid) == n_scenarios ||
+            error("scenarios length $(length(sid)) != matrix columns $n_scenarios")
+        sid
+    end
+    if num_scenarios !== nothing && n_scenarios != num_scenarios
+        error("num_scenarios=$num_scenarios but matrix has $n_scenarios columns")
+    end
+    if num_samples !== nothing && n_samples != num_samples
+        error("num_samples=$num_samples but matrix has $n_samples rows")
+    end
+    return C, scenario_ids
+end
+
+"""
+    _finite_cost_domain(C) -> Vector{Float64}
+
+Shared, sorted, deduplicated set of every finite cost value in the whole matrix.
+Evaluating all CDFs at exactly these points means no interpolation is needed —
+every CDF step aligns with a domain point.
+"""
+function _finite_cost_domain(C::AbstractMatrix{Float64})
+    return sort(unique(filter(isfinite, vec(C))))
+end
+
+"""
+    _tag_nan_scenarios(C, scenario_ids) -> Vector{Bool}
+
+Per-scenario mask: `true` where a scenario's cost column contains any `NaN`.
+A `NaN` marks an infeasible / unevaluated sample, so the scenario's empirical
+distribution is incomplete and it is excluded from FSD/SSD ordering entirely
+(it can neither dominate nor be dominated). Emits an `@warn` listing the tagged
+scenarios. Only `NaN` triggers tagging; `Inf` keeps its existing treatment
+(filtered from the finite domain, i.e. behaves as a worst-case +Inf).
+"""
+function _tag_nan_scenarios(C::AbstractMatrix{Float64}, scenario_ids::Vector{Int})
+    mask = Bool[any(isnan, view(C, :, s)) for s in 1:size(C, 2)]
+    if any(mask)
+        tagged = Int[scenario_ids[s] for s in eachindex(scenario_ids) if mask[s]]
+        @warn "NaN cost values encountered; scenarios excluded from FSD/SSD ordering" nan_scenarios = tagged
+    end
+    return mask
+end
+
+"""
+    _empirical_cdf_matrix(C, domain) -> M×S Matrix{Float64}
+
+`F[m, s] = count(C[k, s] <= domain[m]) / K`, the empirical CDF of scenario `s`
+evaluated at every domain point. Each scenario's column is sorted once and the
+count at each threshold is found with `searchsortedlast` (O(M + K) via the
+sorted scan). Non-finite costs sort to the end and are never counted at or below
+a finite threshold, so they correctly behave as +Inf.
+"""
+function _empirical_cdf_matrix(C::AbstractMatrix{Float64}, domain::Vector{Float64})
+    K, S = size(C)
+    M = length(domain)
+    F = Matrix{Float64}(undef, M, S)
+    invK = K > 0 ? 1.0 / K : 0.0
+    for s in 1:S
+        sorted = sort(C[:, s])
+        for m in 1:M
+            F[m, s] = searchsortedlast(sorted, domain[m]) * invK
+        end
+    end
+    return F
+end
+
+"""
+    _integrated_cdf_matrix(F, domain) -> M×S Matrix{Float64}
+
+Running left-Riemann integral of each scenario's step CDF:
+
+    G[1, s]  = 0
+    G[m, s]  = G[m-1, s] + F[m-1, s] * (domain[m] - domain[m-1])
+
+A non-decreasing, piecewise-linear function. O(M) per scenario.
+"""
+function _integrated_cdf_matrix(F::AbstractMatrix{Float64}, domain::Vector{Float64})
+    M, S = size(F)
+    G = zeros(Float64, M, S)
+    for s in 1:S
+        acc = 0.0
+        for m in 2:M
+            acc += F[m - 1, s] * (domain[m] - domain[m - 1])
+            G[m, s] = acc
+        end
+    end
+    return G
+end
+
+"""
+    _curve_dominance(curves, scenario_ids, nan_mask) -> NamedTuple
+
+All-pairs dominance from an M×S matrix of comparison curves (CDFs for FSD,
+integrated CDFs for SSD). Scenario `i` dominates `j` iff `curves[m,i] >=
+curves[m,j]` for every `m`, with strict `>` at least once. Short-circuits on the
+first violation.
+
+Scenarios flagged in `nan_mask` are excluded from all comparisons: a tagged
+scenario never dominates and is never dominated (every pair touching it is
+skipped), so it always lands in `undominated` and is reported in
+`nan_scenarios`.
+
+Returns `(scenarios, dominates, pairs, undominated, nan_scenarios)`.
+"""
+function _curve_dominance(
+    curves::AbstractMatrix{Float64},
+    scenario_ids::Vector{Int},
+    nan_mask::AbstractVector{Bool},
+)
+    M, S = size(curves)
+    dominates = falses(S, S)
+    pairs = Tuple{Int, Int}[]
+    for i in 1:S
+        nan_mask[i] && continue            # NaN scenario never dominates
+        for j in 1:S
+            (i == j || nan_mask[j]) && continue  # never dominated -> skip pair
+            ge_all = true
+            strict = false
+            for m in 1:M
+                a = curves[m, i]
+                b = curves[m, j]
+                if a < b
+                    ge_all = false
+                    break
+                elseif a > b
+                    strict = true
+                end
+            end
+            if ge_all && strict
+                dominates[i, j] = true
+                push!(pairs, (scenario_ids[i], scenario_ids[j]))
+            end
+        end
+    end
+    undominated = undominated_scenarios(scenario_ids, dominates)
+    nan_scenarios = sort(Int[scenario_ids[k] for k in 1:S if nan_mask[k]])
+    return (
+        scenarios=scenario_ids,
+        dominates=dominates,
+        pairs=pairs,
+        undominated=undominated,
+        nan_scenarios=nan_scenarios,
+    )
+end
+
+"""
+    fsd_dominating_scenarios(cost; scenarios=nothing, num_scenarios=nothing, num_samples=nothing)
+
+First-order stochastic dominance (FSD) over scenarios, treating each scenario
+column of `cost` (rows = investment samples, columns = scenarios) as an
+empirical cost distribution.
+
+Scenario `i` **FSD-dominates** `j` iff its empirical CDF is `>=` that of `j` at
+every shared domain point, with strict `>` somewhere. Higher CDF everywhere
+means more probability mass on low costs — scenario `i` is cheaper across the
+board and `j` is the worse / riskier scenario.
+
+`cost` may be a `cost_matrix`-style `DataFrame` (`scenario_<id>` columns,
+ignoring `sample_id` / `sequence`) or a numeric matrix. Pure: no file I/O.
+
+Any scenario whose column contains a `NaN` (infeasible / unevaluated sample) is
+tagged and excluded from ordering entirely: it never dominates and is never
+dominated. Such scenarios are reported in `nan_scenarios` and (being undominated
+by construction) also appear in `undominated`; a warning is emitted. This
+supersedes the older "NaN as +Inf" convention, which now applies only to the
+legacy pointwise `dominating_scenarios`.
+
+Returns `(scenarios, dominates, pairs, undominated, nan_scenarios)` where
+`dominates[i,j]` means `scenarios[i]` dominates `scenarios[j]`.
+"""
+function fsd_dominating_scenarios(
+    cost::DataFrame;
+    scenarios=nothing,
+    num_scenarios=nothing,
+    num_samples=nothing,
+)
+    C, scenario_ids = _normalize_cost_input(
+        cost; scenarios=scenarios, num_scenarios=num_scenarios, num_samples=num_samples,
+    )
+    nan_mask = _tag_nan_scenarios(C, scenario_ids)
+    domain = _finite_cost_domain(C)
+    F = _empirical_cdf_matrix(C, domain)
+    return _curve_dominance(F, scenario_ids, nan_mask)
+end
+
+function fsd_dominating_scenarios(
+    cost::AbstractMatrix{<:Real};
+    scenarios=nothing,
+    num_scenarios=nothing,
+    num_samples=nothing,
+)
+    C, scenario_ids = _normalize_cost_input(
+        cost; scenarios=scenarios, num_scenarios=num_scenarios, num_samples=num_samples,
+    )
+    nan_mask = _tag_nan_scenarios(C, scenario_ids)
+    domain = _finite_cost_domain(C)
+    F = _empirical_cdf_matrix(C, domain)
+    return _curve_dominance(F, scenario_ids, nan_mask)
+end
+
+"""
+    ssd_dominating_scenarios(cost; scenarios=nothing, num_scenarios=nothing, num_samples=nothing)
+
+Second-order stochastic dominance (SSD) over scenarios. SSD relaxes FSD by
+allowing the CDFs to cross, as long as the accumulated CDF area (integral) of
+the dominating scenario is never overcome.
+
+Scenario `i` **SSD-dominates** `j` iff the integrated CDF of `i` is `>=` that of
+`j` at every shared domain point, with strict `>` somewhere. More accumulated
+area on the cheap (left) side means more probability mass at low costs; `j` has
+the heavier (more expensive) tail that every risk-averse agent dislikes. SSD is
+equivalent to CVaR dominance at every confidence level.
+
+Every FSD pair is also an SSD pair (FSD ⊂ SSD). Same arguments / return shape as
+`fsd_dominating_scenarios`, including the `nan_scenarios` field: scenarios whose
+column contains a `NaN` are tagged and excluded from ordering. Pure: no file I/O.
+"""
+function ssd_dominating_scenarios(
+    cost::DataFrame;
+    scenarios=nothing,
+    num_scenarios=nothing,
+    num_samples=nothing,
+)
+    C, scenario_ids = _normalize_cost_input(
+        cost; scenarios=scenarios, num_scenarios=num_scenarios, num_samples=num_samples,
+    )
+    nan_mask = _tag_nan_scenarios(C, scenario_ids)
+    domain = _finite_cost_domain(C)
+    F = _empirical_cdf_matrix(C, domain)
+    G = _integrated_cdf_matrix(F, domain)
+    return _curve_dominance(G, scenario_ids, nan_mask)
+end
+
+function ssd_dominating_scenarios(
+    cost::AbstractMatrix{<:Real};
+    scenarios=nothing,
+    num_scenarios=nothing,
+    num_samples=nothing,
+)
+    C, scenario_ids = _normalize_cost_input(
+        cost; scenarios=scenarios, num_scenarios=num_scenarios, num_samples=num_samples,
+    )
+    nan_mask = _tag_nan_scenarios(C, scenario_ids)
+    domain = _finite_cost_domain(C)
+    F = _empirical_cdf_matrix(C, domain)
+    G = _integrated_cdf_matrix(F, domain)
+    return _curve_dominance(G, scenario_ids, nan_mask)
+end
+
 """
     dominator_scenarios(result)
     dominator_scenarios(pairs::DataFrame)
