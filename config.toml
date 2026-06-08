@@ -5,7 +5,7 @@
 input_data = "base-input-data/RIDM-case-study"
 input_data_CC = "base-input-data/RIDM-case-study-CC"
 number_of_scenarios = 5
-run_benchmark = true
+run_benchmark = false
 representative_periods = [24]
 #representative_periods = [30,60,90]
 #representative_periods = [30,60,90,120,180,240,360,365]

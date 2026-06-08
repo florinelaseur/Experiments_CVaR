@@ -104,7 +104,9 @@ results_df = DataFrame(;
     objective_value_resolve_full=Float64[],
     termination_status_resolve_full=String[],
     num_loss_of_load_e_demand=Int[],
+    lole_e_demand=Float64[],
     num_loss_of_load_h2_demand=Int[],
+    lole_h2_demand=Float64[],
     water_borrowed=Float64[],
     value_at_risk_threshold_mu_full=Float64[],
     scenario_set=String[],
@@ -180,8 +182,8 @@ function main()
             TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
 
 
-            df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem_benchmark, output_folder)
-            plot_operational_cost_per_scenario(df_cost_per_scenario, output_folder)
+            df_cost_per_scenario = export_total_cost_per_scenario(energy_problem_benchmark, output_folder)
+            plot_cost_per_scenario(df_cost_per_scenario, output_folder)
 
 
             mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
@@ -405,16 +407,19 @@ function main()
                 time_to_solve = @elapsed TEM.solve_model!(energy_problem_full)
                 time_to_save = @elapsed TEM.save_solution!(energy_problem_full)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem_full)
-                df_cost_per_scenario = export_total_cost_per_scenario(energy_problem_full, output_folder)
+
                 mu_value_df = TIO.get_table(connection_full, "var_value_at_risk_threshold_mu")
                 mu_value = if nrow(mu_value_df) == 0
                     NaN
                 else
                     only(mu_value_df.solution)
+                end
+                if !isnan(mu_value)
                     @info "mu_value of Benchmark (24 periods per scenario on full scenario set) is defined"
                     @show mu_value
                 end
 
+                df_cost_per_scenario = export_total_cost_per_scenario(energy_problem_full, output_folder)
                 plot_cost_per_scenario(df_cost_per_scenario, output_folder, mu_value_df)
 
                 var_flow_df = TIO.get_table(connection_full, "var_flow")
@@ -428,7 +433,9 @@ function main()
                 )
                 # count steps with loss of load
                 n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
+                lole_e_demand = n_lol_ens / number_of_scenarios
                 n_lol_smr_cca = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
+                lole_h2_demand = n_lol_smr_cca / number_of_scenarios
 
                 # count how much water_borrowed
                 amount_water_borrowed_b = sum(water_borrowed.solution)
@@ -458,8 +465,10 @@ function main()
                     time_to_resolve_full=0.0,
                     objective_value_resolve_full=0.0,
                     termination_status_resolve_full="",
-                    num_loss_of_load_e_demand=0.0,
-                    num_loss_of_load_h2_demand=0.0,
+                    num_loss_of_load_e_demand=n_lol_ens,
+                    lole_e_demand=lole_e_demand,
+                    num_loss_of_load_h2_demand=n_lol_smr_cca,
+                    lole_h2_demand=lole_h2_demand,
                     water_borrowed=amount_water_borrowed_b,
                     value_at_risk_threshold_mu_full=mu_value,
                     scenario_set="full",
@@ -469,7 +478,7 @@ function main()
                 @info "Contribution C (CC): Scenario selection"
 
                 #insert scenario selection and create and solve energy_problem_red
-                output_folder = joinpath(@__DIR__, "outputs", case_name, "scenario selection for CC", string(solver))
+                output_folder = joinpath(@__DIR__, "outputs", case_name, "scenario selection for CC")
                 mkpath(output_folder)
 
                 CSV.write(
@@ -727,16 +736,20 @@ function main()
                 time_to_solve = @elapsed TEM.solve_model!(energy_problem_red)
                 time_to_save = @elapsed TEM.save_solution!(energy_problem_red)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem_red)
-                df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem_red, output_folder)
+
                 mu_value_df = TIO.get_table(connection, "var_value_at_risk_threshold_mu")
                 mu_value_red = if nrow(mu_value_df) == 0
                     NaN
                 else
                     only(mu_value_df.solution)
-                    @info "mu_value of 24 periods per scenario on reduced scenario set is defined"
-                    @show mu_value_red
                 end
 
+                if !isnan(mu_value)
+                    @info "mu_value of CC (24 periods per scenario on reduced scenario set) is defined"
+                    @show mu_value
+                end
+
+                df_cost_per_scenario = export_total_cost_per_scenario(energy_problem_red, output_folder)
                 plot_cost_per_scenario(df_cost_per_scenario, output_folder, mu_value_df)
 
                 var_flow_df = TIO.get_table(connection, "var_flow")
@@ -756,7 +769,7 @@ function main()
 
 
                 #if run_benchmark
-                @info "Fixing variables in the benchmark case study: $case_name with $solver"
+                @info "Fixing variables in the benchmark case study: RP on full set with $solver"
                 fix_variables_from_solution!(
                     energy_problem_full,
                     energy_problem_red,
@@ -789,7 +802,7 @@ function main()
                     )
                 end
 
-                @info "Resolving the benchmark case study: $case_name with $solver"
+                @info "Resolving the benchmark case study: RP on full set with $solver"
                 time_to_resolve_full = @elapsed TEM.solve_model!(energy_problem_full)
 
                 if energy_problem_full.termination_status == JuMP.INFEASIBLE
@@ -816,7 +829,9 @@ function main()
 
                 # count steps with loss of load
                 n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
+                lole_e_demand = n_lol_ens / number_of_scenarios
                 n_lol_smr_cca = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
+                lole_h2_demand = n_lol_smr_cca / number_of_scenarios
 
                 # count how much water_borrowed
                 amount_water_borrowed = sum(water_borrowed.solution)
@@ -827,13 +842,19 @@ function main()
                     NaN
                 else
                     only(mu_value_df.solution)
-                    @info "mu_value of 24 periods per scenario on full scenario set with fixed investments of reduced set is defined"
-                    @show mu_value_full
+                end
+
+                if !isnan(mu_value)
+                    @info "mu_value of Resolve Benchmark (24 periods per scenario on full scenario set) is defined"
+                    @show mu_value
                 end
 
                 output_folder = joinpath(@__DIR__, "outputs", "fixed", case_name, string(solver))
                 mkpath(output_folder)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem_full)
+
+                df_cost_per_scenario = export_total_cost_per_scenario(energy_problem_full, output_folder)
+                plot_cost_per_scenario(df_cost_per_scenario, output_folder, mu_value_df)
 
                 new_results_row = (
                     base_name=case_name,
@@ -855,8 +876,10 @@ function main()
                     time_to_resolve_full=time_to_resolve_full,
                     objective_value_resolve_full=energy_problem_full.objective_value,
                     termination_status_resolve_full=string(energy_problem_full.termination_status,),
-                    num_loss_of_load_e_demand=0.0,
-                    num_loss_of_load_h2_demand=0.0,
+                    num_loss_of_load_e_demand=n_lol_ens,
+                    lole_e_demand=lole_e_demand,
+                    num_loss_of_load_h2_demand=n_lol_smr_cca,
+                    lole_h2_demand=lole_h2_demand,
                     water_borrowed=amount_water_borrowed_b,
                     value_at_risk_threshold_mu_full=mu_value_full,
                     scenario_set="reduced",

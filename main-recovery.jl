@@ -180,10 +180,9 @@ function main()
             #df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem_benchmark, output_folder)
             #plot_operational_cost_per_scenario(df_cost_per_scenario, output_folder)
 
-            balance_df = CSV.read(joinpath(output_folder, "cons_balance_consumer.csv"), DataFrame)
-            flow_df = CSV.read(joinpath(output_folder, "var_flow.csv"), DataFrame)
+            rep_periods_mapping = TIO.get_table(connection_benchmark, "rep_periods_mapping")
 
-            recovery_analysis(balance_df::DataFrame, flow_df::DataFrame, energy_problem_benchmark, output_folder)
+            recovery_analysis(input_data_path, rep_periods_mapping, energy_problem_benchmark, output_folder)
 
             mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
             mu_value = if nrow(mu_value_df) == 0
@@ -387,6 +386,7 @@ function main()
 
             time_to_read = @elapsed energy_problem = TEM.EnergyProblem(connection)
 
+
             for solver in solvers
                 optimizer, parameters = get_solver_parameters(solver)
 
@@ -406,9 +406,9 @@ function main()
                 time_to_solve = @elapsed TEM.solve_model!(energy_problem)
                 time_to_save = @elapsed TEM.save_solution!(energy_problem)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem)
-                df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem, output_folder)
+                # df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem, output_folder)
 
-                plot_operational_cost_per_scenario(df_cost_per_scenario, output_folder)
+                # plot_operational_cost_per_scenario(df_cost_per_scenario, output_folder)
 
                 var_flow_df = TIO.get_table(connection, "var_flow")
                 water_borrowed = filter(
@@ -426,6 +426,12 @@ function main()
                 else
                     only(mu_value_df.solution)
                 end
+
+                TEM.export_solution_to_csv_files(output_folder, energy_problem)
+
+                rep_periods_mapping = TIO.get_table(connection, "rep_periods_mapping")
+
+                recovery_analysis(input_data_path, rep_periods_mapping::DataFrame, energy_problem, output_folder)
 
                 if run_benchmark
                     @info "Fixing variables in the benchmark case study: $case_name with $solver"
@@ -504,6 +510,8 @@ function main()
                     output_folder = joinpath(@__DIR__, "outputs", "fixed", case_name, string(solver))
                     mkpath(output_folder)
                     TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
+
+                    recovery_analysis(input_data_path, rep_periods_mapping, energy_problem_benchmark, output_folder)
 
                     new_results_row = (
                         base_name=base_name,

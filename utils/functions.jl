@@ -1126,7 +1126,29 @@ function plot_comparison_copy(output_folder, number_of_scenarios)
     savefig(p_lole, joinpath(plots_folder, "lole_comparison.png"))
 end
 
-function recovery_analysis(balance_df::DataFrame, flow_df::DataFrame, energy_problem, output_folder)
+function recovery_analysis(input_data_path::String, rep_periods_mapping::DataFrame, energy_problem, output_folder)
+    balance_df = CSV.read(joinpath(output_folder, "cons_balance_consumer.csv"), DataFrame)
+    flow_df = CSV.read(joinpath(output_folder, "var_flow.csv"), DataFrame)
+    stochastic_scenario = CSV.read(
+        joinpath(input_data_path, "stochastic-scenario.csv"),
+        DataFrame,
+    )
+
+    rep_weights = combine(
+        groupby(rep_periods_mapping, [
+            :scenario,
+            :milestone_year,
+            :rep_period,
+        ]),
+        :weight => sum => :weight,
+    )
+
+    rep_weights = leftjoin(
+        rep_weights,
+        rename(stochastic_scenario, :probability => :scenario_probability),
+        on=:scenario,
+    )
+
     join_cols = [
         :milestone_year,
         :rep_period,
@@ -1158,23 +1180,37 @@ function recovery_analysis(balance_df::DataFrame, flow_df::DataFrame, energy_pro
 
     joined = innerjoin(flows, prices, on=join_cols)
 
-    joined[!, :revenue_component] = joined.price .* joined.capacity
+    joined = leftjoin(joined, rep_weights, on=[:milestone_year, :rep_period],)
+
+    joined[!, :revenue_component] = joined.price .* joined.capacity .* joined.weight .* joined.scenario_probability
 
     recovery_df = combine(
         groupby(joined, [
+            :scenario,
             :milestone_year,
             :rep_period,
             :time_block_start,
             :time_block_end,
         ]),
+        :weight => first => :weight,
+        :scenario_probability => first => :scenario_probability,
         :revenue_component => sum => :revenue,
     )
 
     operational_cost_df = export_operational_cost_per_scenario(energy_problem, output_folder)
-    total_operational_cost = sum(operational_cost_df.operational_cost)
+
+    operational_cost_df = leftjoin(
+        operational_cost_df,
+        rename(stochastic_scenario, :probability => :scenario_probability),
+        on=:scenario,
+    )
+
+    total_operational_cost = sum(operational_cost_df.operational_cost .* operational_cost_df.scenario_probability)
     total_revenue = sum(recovery_df.revenue)
     net_revenue_df = DataFrame(
-        net_revenue=[total_revenue - total_operational_cost]
+        revenue=[total_revenue],
+        operational_cost=[total_operational_cost],
+        net_revenue=[total_revenue - total_operational_cost],
     )
     CSV.write(
         joinpath(output_folder, "net_revenue.csv"),
@@ -1224,7 +1260,6 @@ function recovery_analysis(balance_df::DataFrame, flow_df::DataFrame, energy_pro
     )
 
     savefig(p, joinpath(output_folder, "recovery_analysis_bars.png"))
-
 
     return recovery_df, joined
 end
