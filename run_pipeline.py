@@ -36,7 +36,7 @@ def run_experiment(n_scenarios: int, target_k: int, seed: int, base_out_dir: Pat
     # Open a subprocess, streaming output to both the console and a log file simultaneously
     with open(log_file_path, "w") as log_file:
         process = subprocess.Popen(
-            ["julia", "--gcthreads=auto", "main.jl"],
+            ["julia", "main.jl"],
             env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
