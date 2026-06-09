@@ -78,9 +78,9 @@ def main():
     print("=" * 60)
 
     # Calculate combinations and trigger runs
-    for n in scenario_pools:
-        k = n // 2  # As per methodology: target scenarios = exactly half of initial pool
-        for seed in seeds:
+    for seed in seeds:
+        for n in scenario_pools:
+            k = n // 2  # As per methodology: target scenarios = exactly half of initial pool
             run_experiment(n_scenarios=n, target_k=k, seed=seed, base_out_dir=base_out_dir)
             
     print("🎉 All experiments completed successfully!")
