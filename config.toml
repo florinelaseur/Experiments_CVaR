@@ -3,7 +3,7 @@
 [simulation]
 
 input_data = "base-input-data/RIDM-case-study" 
-number_of_scenarios = 30
+number_of_scenarios = 50
 run_benchmark = true
 #representative_periods = [10]
 #representative_periods = [90]
@@ -12,8 +12,8 @@ representative_periods = [365]
 solvers = ["Gurobi"]
 #solvers = ["HiGHS", "Gurobi"]
 fix_level_storage = false
-risk_aversion_weight_lambda = 0.1
-risk_aversion_confidence_level = 0.95
+risk_aversion_weight_lambda = 0.3
+risk_aversion_confidence_level = 0.7
 
 [clustering]
 use_ratio = false

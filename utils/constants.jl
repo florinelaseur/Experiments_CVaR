@@ -33,8 +33,7 @@ const LEGEND_METHOD_MAP = Dict(
     "conical_hull" => "Conical hull",
 )
 
-const IPDSR_THREADS = 8
+const IPDSR_THREADS = 2
 const IPDSR_TIME_LIMIT = 60.0
 const IPDSR_MIP_GAP = 0.01
 const IPDSR_MAX_ITER = 20
-const N_TARGET_SCENARIOS = 5

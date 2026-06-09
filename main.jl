@@ -25,7 +25,8 @@ using Plots
 using Random
 using DataFrames
 
-Random.seed!(19990907)
+seed = parse(Int, get(ENV, "EXPERIMENT_SEED", "19990907"))
+Random.seed!(seed)
 
 using DataFrames
 
@@ -53,7 +54,10 @@ representative_periods = config["simulation"]["representative_periods"]
 solvers = [Symbol(el) for el in config["simulation"]["solvers"]]
 lambda = config["simulation"]["risk_aversion_weight_lambda"]
 alpha = config["simulation"]["risk_aversion_confidence_level"]
-number_of_scenarios = config["simulation"]["number_of_scenarios"]
+number_of_scenarios = parse(Int, get(ENV, "NUMBER_OF_SCENARIOS", string(config["simulation"]["number_of_scenarios"])))
+target_scenarios = parse(Int, get(ENV, "TARGET_SCENARIOS", string(number_of_scenarios ÷ 2)))
+output_base_dir = get(ENV, "OUTPUT_DIR", joinpath(@__DIR__, "outputs"))
+
 run_benchmark = config["simulation"]["run_benchmark"]
 
 profiles_path = joinpath(@__DIR__, "create-scenarios", "profiles-wide-all-scenarios.csv")
@@ -176,7 +180,7 @@ function main()
                 direct_model=direct_model,
             )
 
-            output_folder = joinpath(@__DIR__, "outputs", base_name, string(solver))
+            output_folder = joinpath(output_base_dir, base_name, string(solver))
             mkpath(output_folder)
 
             @info "Solving the model and saving the solution for the base case study (0_HourlyBenchmark) with $solver"
@@ -409,9 +413,10 @@ function main()
                         optimizer_parameters=parameters,
                         model_file_name="",
                         enable_names=enable_names,
+                        direct_model=true,
                     )
 
-                    output_folder = joinpath(@__DIR__, "outputs", case_name, string(solver))
+                    output_folder = joinpath(output_base_dir, base_name, string(solver))
                     mkpath(output_folder)
 
                     @info "Solving the model and saving the solution for the case study: $case_name with $solver"
@@ -518,7 +523,7 @@ function main()
                             end
                             
                             TEM.save_solution!(energy_problem_benchmark)
-                            output_folder_fixed = joinpath(@__DIR__, "outputs", "fixed", case_name, string(solver))
+                            output_folder_fixed = joinpath(output_base_dir, "fixed", case_name, string(solver))
                             mkpath(output_folder_fixed)
                             TEM.export_solution_to_csv_files(output_folder_fixed, energy_problem_benchmark)
                             
@@ -537,10 +542,9 @@ function main()
                         N_prime = min(length(F_costs), max(20, rp + 5)) 
                         F_agg, gamma_agg, original_mapping = aggregate_objectives(F_costs, gamma, N_prime)
                         
-                        target_scenarios = N_TARGET_SCENARIOS
                         @info "Solving IPDSR MIP to reduce to K = $target_scenarios scenarios..."
                         selected_agg_idx, new_weights = solve_ipdsr_mip(F_agg, gamma_agg, target_scenarios, lambda, alpha)
-
+                        
                         if isempty(selected_agg_idx)
                             @warn "IPDSR failed to find scenarios. Saving current best and aborting."
                             push!(results_df, new_results_row)
@@ -553,7 +557,7 @@ function main()
                         if selected_original_scenarios == last_selected_scenarios && length(new_weights) == length(last_weights) && isapprox(new_weights, last_weights, atol=1e-4)
                             @info "✅ FIXED-POINT CONVERGENCE ACHIEVED! Scenarios and weights stabilized at Iteration $iter."
                             TEM.save_solution!(energy_problem_benchmark)
-                            output_folder_fixed = joinpath(@__DIR__, "outputs", "fixed", case_name, string(solver))
+                            output_folder_fixed = joinpath(output_base_dir, "fixed", case_name, string(solver))
                             mkpath(output_folder_fixed)
                             TEM.export_solution_to_csv_files(output_folder_fixed, energy_problem_benchmark)
                             
@@ -600,12 +604,15 @@ function main()
                 if ipdsr_converged || iter == IPDSR_MAX_ITER
                     break
                 end
+
+                energy_problem = nothing
+                GC.gc()
                 
             end # This ends the 'while iter < IPDSR_MAX_ITER' loop
         end
     end
 
-    results_df |> CSV.write("outputs/results.csv"; writeheader=true)
+    results_df |> CSV.write(joinpath(output_base_dir, "results.csv"); writeheader=true)
 
     return nothing
 end

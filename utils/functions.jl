@@ -11,9 +11,11 @@ function get_solver_parameters(optimizer::Symbol)
     elseif optimizer == :Gurobi
         return Gurobi.Optimizer, Dict(
             "OutputFlag" => 1,
-            "Method" => 2,         # Forces the concurrent solver to stick to the Barrier method
-            "Crossover" => 0,      # Disables the single-threaded, RAM-heavy crossover phase
-            "NodefileStart" => 0.5 # Tells Gurobi to write to your NVMe drive if RAM exceeds 50%
+            "Method" => 1,
+            "Crossover" => 0,       
+            "NodefileStart" => 0.1,
+            "Threads" => 2,
+            "Presolve" => 1,
         )
     else
         return HiGHS.Optimizer, Dict()
