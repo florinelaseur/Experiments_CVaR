@@ -359,3 +359,58 @@ end
     bad = DataFrame(; dominator=[1])
     @test_throws ErrorException undominated_scenarios(bad, [1, 2])
 end
+
+# --- dominance_analysis master dispatch -----------------------------------
+
+@testitem "dominance_analysis matches each method and normalizes the result" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
+    # col3 uniformly most expensive, col1 cheapest: all three relations agree.
+    C = Float64[1.0 4.0 7.0; 2.0 5.0 8.0; 3.0 6.0 9.0]
+    for (method, fn) in (
+        (:pointwise, dominating_scenarios),
+        (:fsd, fsd_dominating_scenarios),
+        (:ssd, ssd_dominating_scenarios),
+    )
+        direct = fn(C)
+        res = dominance_analysis(C; method=method)
+        @test res.scenarios == direct.scenarios
+        @test res.dominates == direct.dominates
+        @test res.pairs == direct.pairs
+        @test res.undominated == direct.undominated
+        @test res.method == method
+        @test res.nan_scenarios == Int[]
+        @test res.undominated == [3]
+    end
+end
+
+@testitem "dominance_analysis nan_scenarios normalization" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
+    # Scenario 3 has a NaN cost: FSD/SSD exclude it from the ordering (tagged +
+    # reported undominated); pointwise maps NaN -> +Inf and tags nothing.
+    C = Float64[1.0 4.0 NaN; 2.0 5.0 3.0]
+    pw = dominance_analysis(C; method=:pointwise)
+    @test pw.nan_scenarios == Int[]
+    for method in (:fsd, :ssd)
+        res = dominance_analysis(C; method=method)
+        @test res.nan_scenarios == [3]
+        @test 3 in res.undominated
+    end
+end
+
+@testitem "dominance_analysis unknown method errors" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
+    C = Float64[1.0 2.0; 3.0 4.0]
+    @test_throws ErrorException dominance_analysis(C; method=:bogus)
+end
+
+@testitem "dominance_analysis DataFrame input" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
+    df = DataFrame(;
+        sample_id=[1, 2],
+        sequence=[1, 1],
+        scenario_5=[10.0, 12.0],
+        scenario_3=[8.0, 9.0],
+    )
+    res = dominance_analysis(df; method=:pointwise)
+    direct = dominating_scenarios(df)
+    @test res.scenarios == [3, 5]
+    @test res.dominates == direct.dominates
+    @test res.undominated == direct.undominated
+    @test res.method == :pointwise
+end

@@ -9,7 +9,7 @@ using QuasiMonteCarlo: QuasiMonteCarlo
 # pulling in JuMP/Tulipa/DuckDB.
 include(joinpath(@__DIR__, "sampling.jl"))
 include(joinpath(@__DIR__, "investment_mapping.jl"))
-include(joinpath(@__DIR__, "..", "..", "utils", "infeasibility_conflict.jl"))  # collect/print IIS; needs JuMP in scope
+include(joinpath(@__DIR__, "..", "utils", "infeasibility_conflict.jl"))  # collect/print IIS; needs JuMP in scope
 include(joinpath(@__DIR__, "conflict_log.jl"))
 include(joinpath(@__DIR__, "scenario_dominance.jl"))
 include(joinpath(@__DIR__, "adequacy_cuts.jl"))
@@ -206,6 +206,23 @@ end
 function build_capacity_lookup(connection)
     asset_df = DataFrame(TIO.get_table(connection, "asset"))
     return Dict(string(a) => Float64(c) for (a, c) in zip(asset_df.asset, asset_df.capacity))
+end
+
+# Read a stored investment (var_assets_investment.csv) as an MW vector in INVESTABLE_ASSETS
+# order: MW[a] = solution[a] × capacity[a]. Returns nothing if the file/assets are missing.
+function read_investment_mw(solver_folder)
+    p = joinpath(solver_folder, "var_assets_investment.csv")
+    isfile(p) || return nothing
+    df = CSV.read(p, DataFrame)
+    (hasproperty(df, :asset) && hasproperty(df, :solution) && hasproperty(df, :capacity)) || return nothing
+    sol = Dict(string(r.asset) => Float64(r.solution) for r in eachrow(df))
+    cap = Dict(string(r.asset) => Float64(r.capacity) for r in eachrow(df))
+    mw = Float64[]
+    for a in INVESTABLE_ASSETS
+        (haskey(sol, a) && haskey(cap, a)) || return nothing
+        push!(mw, sol[a] * cap[a])
+    end
+    return mw
 end
 
 function audit_investment_mapping(

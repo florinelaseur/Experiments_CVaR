@@ -59,7 +59,7 @@ Result (128 samples): scenario 96 feasible 25%, scenario 129 feasible 5.5%, join
 `bounds.mean` infeasible for both individually.
 
 ## C. End-to-end smoke (small SD-loop run)
-`stochastic_dominance(conn; sampling_mode=:uniform, num_samples=16, number_of_samples_sequences=2, input_data_path=INPUT_DATA_PATH)`
+`dominance_screening(conn; sampling_mode=:uniform, num_samples=16, number_of_samples_sequences=2, input_data_path=INPUT_DATA_PATH)`
 Two-phase run: **Phase A** draws cut-passing samples (per-seed acceptance reported in
 `outputs/sampling_stats.csv`; sampler delivers only cut-passing samples). **Phase B** builds one
 single-scenario model at a time and solves every sample against it, writing

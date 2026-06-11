@@ -139,7 +139,7 @@ can serve the scenarios (the scenario set / `ub` is the real constraint). Persis
 scenarios' optima, `feasibility_center_max_optima`.)
 
 ### 3.3 Reject-to-target sampling in the loop
-`ScenarioReduction/src/stochastic_dominance.jl` + `src/sampling.jl`
+`ScenarioReduction/src/dominance.jl` + `src/sampling.jl`
 
 With cuts on, the loop builds the accept predicate `x -> adequacy_verdict(x, cuts).passed`
 and the sampler **keeps drawing until `num_samples` cut-passing samples are produced per
@@ -149,11 +149,11 @@ steer). So the solver always receives a full pool of "probable" candidates; the 
 `passes_adequacy` check becomes a safety net (should report 0). `num_samples` (default 512)
 and the number of scramble seeds `number_of_samples_sequences` (default 5) are both
 configurable. Outputs: `outputs/sampling_stats.csv` (per-seed draws + acceptance rate).
-This sampling stage is **Phase A** of `stochastic_dominance` and is independent of how the
+This sampling stage is **Phase A** of `dominance_screening` and is independent of how the
 kept samples are later evaluated (Phase B, §3.5).
 
 ### 3.5 Phase B — per-scenario operational cost matrix
-`ScenarioReduction/src/stochastic_dominance.jl` + `src/single_scenario.jl`
+`ScenarioReduction/src/dominance.jl` + `src/single_scenario.jl`
 
 SD screening compares the *distribution of operational cost across scenarios* for each
 candidate investment, i.e. the matrix `C_i(z_k)` = cost of sample `k` under scenario `i`. A
@@ -183,14 +183,16 @@ the old multi-scenario LP). Outputs:
   pairwise check in the next pipeline step.
 
 The per-scenario `passes_adequacy` check inside Phase B is a safety net — reject-to-target
-already guarantees every kept sample passes every scenario's cuts. `stochastic_dominance`
+already guarantees every kept sample passes every scenario's cuts. `dominance_screening`
 returns a NamedTuple `(scenarios, cost_matrix, cost, diagnostics, center, cuts,
-scenario_dominance, optimal, infeasible, rejected)`.
+scenario_dominance, dominance_method, optimal, infeasible, rejected)`.
 
 ### 3.3 Phase C — scenario dominance from the cost matrix
 
-After Phase B, `dominating_scenarios` (`src/scenario_dominance.jl`) compares **scenario columns**
-of `cost_matrix.csv` across all samples (rows):
+After Phase B, `dominance_analysis` (`src/scenario_dominance.jl`) runs the configured
+dominance relation — `dominance_method` of `:pointwise` (`dominating_scenarios`), `:fsd`,
+or `:ssd` (`[dominance] dominance_method` in `config.toml`) — on the **scenario columns**
+of `cost_matrix.csv` across all samples (rows). Pointwise:
 
 - Scenario **A** dominates **B** iff `cost(A,k) >= cost(B,k)` for every sample `k`, with strict
   `>` for at least one `k`.
@@ -199,7 +201,9 @@ of `cost_matrix.csv` across all samples (rows):
 
 Output: `outputs/scenario_dominance.csv` — long format `dominator, dominated` for each pair.
 Return field `scenario_dominance` includes `scenarios`, `dominates` (N×N Bool matrix),
-`pairs`, and `undominated` (scenario ids not dominated by any other).
+`pairs`, `undominated` (scenario ids not dominated by any other), `nan_scenarios`
+(FSD/SSD only: scenarios excluded from the ordering due to NaN costs; always empty for
+pointwise), and `method`.
 
 ### 3.4 Post-screening full solve (`solve_scenarios` / `solve_scenario_sets.jl`)
 
@@ -255,10 +259,10 @@ Against ground-truth LP for scenarios [96,129]:
 ## 5. Infeasibility conflict JSONL (optional)
 
 When debugging non-`OPTIMAL` per-scenario LPs during Phase B, enable IIS logging on
-`stochastic_dominance`:
+`dominance_screening`:
 
 ```julia
-stochastic_dominance(connection; record_conflicts=true, conflict_log_path=joinpath(output_dir, "infeasibility_conflicts.jsonl"))
+dominance_screening(connection; record_conflicts=true, conflict_log_path=joinpath(output_dir, "infeasibility_conflicts.jsonl"))
 ```
 
 Each non-optimal solve appends **one JSONL line** to the same file (create/truncate the
@@ -274,7 +278,7 @@ sample — use on small runs, not full 512×N screening by default.
 Example line:
 
 ```json
-{"scenario":129,"sample":{"ccgt":12.1,"ocgt":0.0},"model_status":{"termination_status":"INFEASIBLE","primal_status":"NO_SOLUTION"},"conflict":{"counts":{"n_constraints":83,"n_bounds":18},"constraints":[...]},"source":"stochastic_dominance","sequence":1,"sample_id":42}
+{"scenario":129,"sample":{"ccgt":12.1,"ocgt":0.0},"model_status":{"termination_status":"INFEASIBLE","primal_status":"NO_SOLUTION"},"conflict":{"counts":{"n_constraints":83,"n_bounds":18},"constraints":[...]},"source":"dominance_screening","sequence":1,"sample_id":42}
 ```
 
 Implementation: `utils/infeasibility_conflict.jl` (`collect_infeasibility_conflict`), `src/conflict_log.jl`.
@@ -286,9 +290,10 @@ Implementation: `utils/infeasibility_conflict.jl` (`collect_infeasibility_confli
 |---|---|
 | `src/adequacy_cuts.jl` | cut construction, dominance reduction, `passes_adequacy`, CSV writers (solver-free) |
 | `src/adequacy_center.jl` | `feasibility_center` LP (μ*) |
-| `src/scenario_dominance.jl` | `dominating_scenarios` — pairwise scenario dominance on the cost matrix (Phase C) |
+| `src/scenario_dominance.jl` | `dominance_analysis` master dispatch over `dominating_scenarios`/`fsd_…`/`ssd_…` + `pick_n_scenarios` peeling (Phase C) |
 | `src/conflict_log.jl` | `append_infeasibility_conflict_record!` — JSONL IIS log when `record_conflicts=true` |
-| `src/stochastic_dominance.jl` | Phase A (cuts + mean-shift + reject-to-target sampling) + Phase B (per-scenario evaluation, cost matrix) + Phase C call |
+| `src/dominance.jl` | `dominance_screening`: Phase A (cuts + mean-shift + reject-to-target sampling) + Phase B (per-scenario evaluation, cost matrix) + Phase C call (`dominance_method`) |
+| `src/experiment_common.jl` | `prepare_scenario_input!` + `setup_connection`, shared by the experiment drivers |
 | `src/single_scenario.jl` | `build_single_scenario_model` — one full-hourly single-scenario operational model (Phase B) |
 | `src/solve_scenarios.jl` | `solve_scenarios` — full stochastic solve on passed scenario indices (post-SD) |
 | `src/sampling.jl` | reject-to-target samplers (`sobol_gaussian_reject_to_target`, `scrambled_sobol_uniform_reject_to_target`); `:reject` `accept` predicate |
@@ -304,8 +309,9 @@ Implementation: `utils/infeasibility_conflict.jl` (`collect_infeasibility_confli
 ### Run
 ```
 # test_stochastic_dominance.jl: load_config → prepare data → (default) value-fix validation
-# → stochastic_dominance screening. Set run.verify_mapping=false to skip the smoke test.
+# → dominance_screening. Set run.verify_mapping=false to skip the smoke test.
 julia --project=. ScenarioReduction/test_stochastic_dominance.jl               # full SD screen
+julia --project=. ScenarioReduction/test_dominance_kantorovich.jl              # hybrid dominance + Kantorovich experiment ([hybrid_experiment])
 julia --project=. ScenarioReduction/test_uniform_adequacy_sampling.jl          # uniform vs gaussian acceptance + precision
 julia --project=. ScenarioReduction/old_scripts/analyze_scenario_dominance.jl   # dominance from cost_matrix (archived)
 julia --project=. ScenarioReduction/old_scripts/solve_scenario_sets.jl          # full solve selected + all scenarios

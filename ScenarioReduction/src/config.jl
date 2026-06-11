@@ -27,6 +27,8 @@ struct ScenarioReductionConfig
     record_conflicts::Bool
     max_runtime_sec::Union{Nothing,Float64}
     solve_time_limit_sec::Union{Nothing,Float64}
+    dominance_method::Symbol
+    dominance_pick_k::Int
     representative_periods::Int
     hours_per_period::Int
     clustering_method::Symbol
@@ -46,6 +48,15 @@ struct ScenarioReductionConfig
     experiment_num_input_scenarios::Int
     experiment_run_ground_truth::Bool
     experiment_run_selected_scenarios::Bool
+    hybrid_enabled::Bool
+    hybrid_name::String
+    hybrid_base_dir::String
+    hybrid_num_runs::Int
+    hybrid_base_seed::Int
+    hybrid_num_input_scenarios::Int
+    hybrid_kantorovich_pick_n::Int
+    hybrid_run_full_benchmark::Bool
+    hybrid_run_fixed_full::Bool
 end
 
 function _optional_positive_seconds(x)::Union{Nothing,Float64}
@@ -69,15 +80,31 @@ function load_config(;
     paths = cfg["paths"]
     sim = cfg["simulation"]
     run = cfg["run"]
-    sd = cfg["stochastic_dominance"]
+    # [dominance] is the current section name; [stochastic_dominance] is the legacy alias.
+    sd = if haskey(cfg, "dominance")
+        cfg["dominance"]
+    elseif haskey(cfg, "stochastic_dominance")
+        cfg["stochastic_dominance"]
+    else
+        error("config.toml: missing [dominance] section (legacy alias: [stochastic_dominance])")
+    end
     solve = cfg["solve"]
     project = get(cfg, "project", Dict{String,Any}())
     experiment = get(cfg, "experiment", Dict{String,Any}())
+    hybrid = get(cfg, "hybrid_experiment", Dict{String,Any}())
+
+    dominance_method = Symbol(get(sd, "dominance_method", "pointwise"))
+    dominance_method in (:pointwise, :fsd, :ssd) ||
+        error("config.toml: dominance_method must be \"pointwise\", \"fsd\", or \"ssd\"; got \"$dominance_method\"")
 
     output_dir = joinpath(script_dir, paths["output_dir"])
 
     experiment_base_dir = joinpath(
         script_dir, get(experiment, "output_dir", "outputs/experiments"),
+    )
+
+    hybrid_base_dir = joinpath(
+        script_dir, get(hybrid, "output_dir", "outputs/experiments"),
     )
 
     return ScenarioReductionConfig(
@@ -107,6 +134,8 @@ function load_config(;
         Bool(sd["record_conflicts"]),
         _optional_positive_seconds(sd["max_runtime_sec"]),
         _optional_positive_seconds(sd["solve_time_limit_sec"]),
+        dominance_method,
+        Int(get(sd, "dominance_pick_k", 2)),
         Int(solve["representative_periods"]),
         Int(solve["hours_per_period"]),
         Symbol(solve["clustering_method"]),
@@ -126,6 +155,15 @@ function load_config(;
         Int(get(experiment, "num_input_scenarios", Int(sim["number_of_scenarios"]))),
         Bool(get(experiment, "run_ground_truth", true)),
         Bool(get(experiment, "run_selected_scenarios", true)),
+        Bool(get(hybrid, "enabled", false)),
+        String(get(hybrid, "name", "dom_kant")),
+        hybrid_base_dir,
+        Int(get(hybrid, "num_runs", 1)),
+        Int(get(hybrid, "base_seed", Int(sim["random_seed"]))),
+        Int(get(hybrid, "num_input_scenarios", Int(sim["number_of_scenarios"]))),
+        Int(get(hybrid, "kantorovich_pick_n", 2)),
+        Bool(get(hybrid, "run_full_benchmark", true)),
+        Bool(get(hybrid, "run_fixed_full", true)),
     )
 end
 
@@ -173,7 +211,7 @@ function save_config_toml(cfg::ScenarioReductionConfig, path::AbstractString)
             "verify_mapping" => cfg.run_verify_mapping,
             "verify_mapping_tol" => cfg.verify_mapping_tol,
         ),
-        "stochastic_dominance" => Dict(
+        "dominance" => Dict(
             "solver" => string(cfg.sd_solver),
             "sampling_mode" => string(cfg.sampling_mode),
             "num_samples" => cfg.num_samples,
@@ -185,6 +223,8 @@ function save_config_toml(cfg::ScenarioReductionConfig, path::AbstractString)
             "record_conflicts" => cfg.record_conflicts,
             "max_runtime_sec" => cfg.max_runtime_sec === nothing ? 0.0 : cfg.max_runtime_sec,
             "solve_time_limit_sec" => cfg.solve_time_limit_sec === nothing ? 0.0 : cfg.solve_time_limit_sec,
+            "dominance_method" => string(cfg.dominance_method),
+            "dominance_pick_k" => cfg.dominance_pick_k,
         ),
         "solve" => Dict(
             "representative_periods" => cfg.representative_periods,
@@ -207,6 +247,17 @@ function save_config_toml(cfg::ScenarioReductionConfig, path::AbstractString)
             "num_input_scenarios" => cfg.experiment_num_input_scenarios,
             "run_ground_truth" => cfg.experiment_run_ground_truth,
             "run_selected_scenarios" => cfg.experiment_run_selected_scenarios,
+        ),
+        "hybrid_experiment" => Dict(
+            "enabled" => cfg.hybrid_enabled,
+            "name" => cfg.hybrid_name,
+            "output_dir" => cfg.hybrid_base_dir,
+            "num_runs" => cfg.hybrid_num_runs,
+            "base_seed" => cfg.hybrid_base_seed,
+            "num_input_scenarios" => cfg.hybrid_num_input_scenarios,
+            "kantorovich_pick_n" => cfg.hybrid_kantorovich_pick_n,
+            "run_full_benchmark" => cfg.hybrid_run_full_benchmark,
+            "run_fixed_full" => cfg.hybrid_run_fixed_full,
         ),
     )
     open(path, "w") do io

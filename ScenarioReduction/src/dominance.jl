@@ -1,4 +1,4 @@
-function stochastic_dominance(
+function dominance_screening(
     connection;
     bounds::InvestmentBounds=load_investment_bounds(),
     covariance::InvestmentCovariance=investment_covariance(),
@@ -16,6 +16,7 @@ function stochastic_dominance(
     solve_time_limit_sec::Union{Nothing,Real}=nothing, # per-LP solver time limit
     record_conflicts::Bool=true,                     # append IIS JSONL for non-OPTIMAL solves
     conflict_log_path::String=joinpath(output_dir, "infeasibility_conflicts.jsonl"),
+    dominance_method::Symbol=:pointwise,             # Phase C relation: :pointwise | :fsd | :ssd
 )
     num_assets = length(INVESTABLE_ASSETS)
     for asset in INVESTABLE_ASSETS
@@ -234,12 +235,17 @@ function stochastic_dominance(
     end
     CSV.write(joinpath(output_dir, "cost_matrix.csv"), cost_matrix)
 
-    scenario_dominance = dominating_scenarios(
+    scenario_dominance = dominance_analysis(
         cost_matrix;
+        method=dominance_method,
         scenarios=selected_scenarios,
         num_scenarios=N,
         num_samples=total_rows,
     )
+    if !isempty(scenario_dominance.nan_scenarios)
+        @warn "Dominance ($dominance_method): scenarios with NaN costs are excluded from the ordering and reported undominated" nan_scenarios =
+            scenario_dominance.nan_scenarios
+    end
     save_scenario_dominance_csv(
         joinpath(output_dir, "scenario_dominance.csv"),
         scenario_dominance.scenarios,
@@ -247,7 +253,7 @@ function stochastic_dominance(
     )
     n_dom_pairs = length(scenario_dominance.pairs)
     n_undom = length(scenario_dominance.undominated)
-    println("Scenario dominance: $n_dom_pairs dominating pair(s); $n_undom undominated scenario(s) among $N")
+    println("Scenario dominance ($dominance_method): $n_dom_pairs dominating pair(s); $n_undom undominated scenario(s) among $N")
 
     n_rejected   = count(!, diagnostics.passed_cut)
     n_optimal    = count(==("OPTIMAL"), diagnostics.lp_status)
@@ -264,6 +270,7 @@ function stochastic_dominance(
         center=center,
         cuts=cuts_list,
         scenario_dominance=scenario_dominance,
+        dominance_method=dominance_method,
         optimal=n_optimal,
         infeasible=n_infeasible,
         rejected=n_rejected,
@@ -294,14 +301,14 @@ end
 
 include(joinpath(@__DIR__, "config.jl"))
 
-function stochastic_dominance(
+function dominance_screening(
     connection,
     cfg::ScenarioReductionConfig;
     bounds::InvestmentBounds=load_investment_bounds(),
     covariance::InvestmentCovariance=investment_covariance(),
     kwargs...,
 )
-    return stochastic_dominance(
+    return dominance_screening(
         connection;
         bounds=bounds,
         covariance=covariance,
@@ -319,6 +326,7 @@ function stochastic_dominance(
         solve_time_limit_sec=cfg.solve_time_limit_sec,
         record_conflicts=cfg.record_conflicts,
         conflict_log_path=cfg.conflict_log_path,
+        dominance_method=cfg.dominance_method,
         kwargs...,
     )
 end

@@ -21,7 +21,9 @@ solve = false
 verify_mapping = true
 verify_mapping_tol = 1.0e-8
 
-[stochastic_dominance]
+# Dominance screening + scenario picking (legacy section name [stochastic_dominance]
+# is still accepted by load_config).
+[dominance]
 solver = "Gurobi"
 sampling_mode = "uniform"
 num_samples = 512
@@ -31,9 +33,14 @@ mean_shift = false
 gaussian_shrinkage = 0.2
 gaussian_nonneg_mode = "clip"
 record_conflicts = true
-# Set to 0 to disable (passes nothing to stochastic_dominance)
+# Set to 0 to disable (passes nothing to dominance_screening)
 max_runtime_sec = 600000.0
 solve_time_limit_sec = 600000.0
+# Dominance relation for the screening graph AND pick_n_scenarios peeling,
+# shared by all dominance scripts: "pointwise" | "fsd" | "ssd".
+dominance_method = "pointwise"
+# How many scenarios the dominance peel contributes (hybrid experiment, etc.).
+dominance_pick_k = 2
 
 [solve]
 representative_periods = 30
@@ -64,4 +71,22 @@ base_seed = 19990906
 num_input_scenarios = 20
 # Post-screening full-resolution solves (run_experiment! only). Screening always runs.
 run_ground_truth = false          # all sampled scenarios → run<K>/full_resolution_all/
-run_selected_scenarios = false      # pointwise-undominated subset → run<K>/full_resolution_undominated/
+run_selected_scenarios = false      # undominated subset (dominance.dominance_method) → run<K>/full_resolution_undominated/
+
+[hybrid_experiment]
+# Hybrid dominance + Kantorovich reduction driver (run_hybrid_experiment! in
+# test_dominance_kantorovich.jl). Picks dominance.dominance_pick_k scenarios by
+# dominance peeling plus kantorovich_pick_n disjoint scenarios by Kantorovich
+# forward selection, solves the reduced set, then evaluates out-of-sample on the
+# full set (investments fixed from the reduced solve vs. an unconstrained benchmark).
+enabled = false
+name = "dom_kant"
+# Base output folder, relative to ScenarioReduction/. Per-run folders are <output_dir>/<name>/runK/.
+output_dir = "outputs/experiments"
+num_runs = 1
+base_seed = 19990906
+num_input_scenarios = 20
+# Scenarios picked by Kantorovich from the complement of the dominance picks.
+kantorovich_pick_n = 2
+run_full_benchmark = true         # full N-scenario solve, no fixed investments → run<K>/full_benchmark/
+run_fixed_full = true             # full N-scenario solve, investments fixed from reduced solve → run<K>/full_fixed/

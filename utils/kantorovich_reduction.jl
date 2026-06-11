@@ -120,17 +120,39 @@ function kantorovich_forward_select(
     return selected, new_probs
 end
 
-# Performs Kantorovich forward selection and mutates DuckDB in-place.
-# Must be called BEFORE use_ratio UPDATE and TC.transform_wide_to_long!.
-function apply_kantorovich_reduction!(connection, profiles_df::DataFrame, k::Int)
-    mat, scenarios = build_scenario_matrix(profiles_df)
+# Pure Kantorovich forward selection on the scenarios of profiles_df, excluding
+# `exclude` from the candidate pool first (selection AND probability redistribution
+# happen within the remaining pool, uniformly weighted). Returns
+# (selected scenario ids in selection order, redistributed probabilities).
+# Does NOT touch any DuckDB connection — callers decide what to do with the picks.
+function select_kantorovich_scenarios(
+    profiles_df::DataFrame,
+    k::Int;
+    exclude::AbstractVector{<:Integer}=Int[],
+)
+    k == 0 && return (Int[], Float64[])
+    exclude_set = Set(Int.(exclude))
+    pool_df = filter(row -> row.scenario ∉ exclude_set, profiles_df)
+    isempty(pool_df) &&
+        error("select_kantorovich_scenarios: no scenarios left after excluding $(sort(collect(exclude_set)))")
+
+    mat, scenarios = build_scenario_matrix(pool_df)
     n = length(scenarios)
+    k <= n ||
+        error("select_kantorovich_scenarios: k=$k exceeds the $(n) eligible scenarios")
     probs = fill(1.0 / n, n)
 
     C = compute_cost_matrix(mat)
 
     selected_idx, new_probs = kantorovich_forward_select(probs, C, k)
-    selected_ids = scenarios[selected_idx]
+    return (scenarios[selected_idx], new_probs)
+end
+
+# Performs Kantorovich forward selection and mutates DuckDB in-place.
+# Must be called BEFORE use_ratio UPDATE and TC.transform_wide_to_long!.
+function apply_kantorovich_reduction!(connection, profiles_df::DataFrame, k::Int)
+    k >= 1 || error("apply_kantorovich_reduction!: k must be >= 1, got $k")
+    selected_ids, new_probs = select_kantorovich_scenarios(profiles_df, k)
 
     @info "Kantorovich: selected scenarios $selected_ids with probs $new_probs (sum=$(sum(new_probs)))"
 

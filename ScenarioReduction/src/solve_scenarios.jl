@@ -344,7 +344,8 @@ end
 
 """
     solve_full_resolution!(scenario_ids, input_data_path, output_dir; label,
-                           solvers=[:Gurobi], lambda=0.1, alpha=0.95)
+                           solvers=[:Gurobi], lambda=0.1, alpha=0.95,
+                           fix_investment_mw=nothing)
 
 Solve the multi-scenario stochastic TEM model on `scenario_ids` at full temporal
 resolution (`TC.dummy_cluster!`). For each solver, exports a lean set of solution
@@ -353,6 +354,14 @@ CSVs (via `export_selected_solution_tables`, skipping `var_flow`,
 `results.csv` (via `export_solution_stats`), `operational_cost_per_scenario.csv`,
 and `tail_scenarios.csv` (via `export_cvar_tail_diagnostics`) into
 `<output_dir>/<solver>/`.
+
+`fix_investment_mw` (MW per asset, `INVESTABLE_ASSETS` order, e.g. from
+`read_investment_mw`) fixes `assets_investment` after model creation — used for
+out-of-sample evaluation of a stored investment. The battery's energy is slaved to
+its power and seasonal storages aren't investable, so this fully pins the
+investment. A fixed-investment solve can be INFEASIBLE: any non-OPTIMAL solve is
+recorded in `results.csv` (objective `NaN`) without solution exports instead of
+erroring.
 
 Returns `(selected=..., results=DataFrame)` where `results` has one row per solver.
 """
@@ -365,6 +374,7 @@ function solve_full_resolution!(
     lambda::Real=0.1,
     alpha::Real=0.95,
     use_names::Bool=false,
+    fix_investment_mw::Union{Nothing,AbstractVector{<:Real}}=nothing,
 )
     selected = prepare_scenario_subset!(scenario_ids, input_data_path)
 
@@ -414,6 +424,9 @@ function solve_full_resolution!(
         TEM.populate_with_defaults!(connection)
         DuckDB.query(connection, "UPDATE asset SET is_seasonal = false")
 
+        capacity_lookup =
+            fix_investment_mw === nothing ? nothing : build_capacity_lookup(connection)
+
         for solver in solvers
             optimizer, parameters = get_solver_parameters(solver)
 
@@ -427,34 +440,74 @@ function solve_full_resolution!(
                 enable_names=use_names,
             )
 
+            if fix_investment_mw !== nothing
+                @info "Fixing assets_investment (MW per asset)" label=label solver=solver mw=fix_investment_mw
+                fix_variables_from_sample(
+                    energy_problem.variables,
+                    :assets_investment,
+                    Float64.(fix_investment_mw);
+                    capacity_lookup,
+                )
+            end
+
             output_folder = joinpath(output_dir, string(solver))
             mkpath(output_folder)
 
             time_to_solve = @elapsed TEM.solve_model!(energy_problem)
-            time_to_save = @elapsed begin
-                TEM.save_solution!(energy_problem)
-                # Lean export: skip the large var_flow / var_storage_level_rep_period
-                # tables and all cons_* except cons_scenario_tail_excess (never written).
-                export_selected_solution_tables(connection, output_folder)
+            if energy_problem.solved
+                time_to_save = @elapsed begin
+                    TEM.save_solution!(energy_problem)
+                    # Lean export: skip the large var_flow / var_storage_level_rep_period
+                    # tables and all cons_* except cons_scenario_tail_excess (never written).
+                    export_selected_solution_tables(connection, output_folder)
+                end
+
+                row = export_solution_stats(
+                    energy_problem,
+                    connection,
+                    output_folder;
+                    label=label,
+                    solver=solver,
+                    num_scenarios=length(selected),
+                    time_to_cluster=time_to_cluster,
+                    time_to_read=time_to_read,
+                    time_to_create=time_to_create,
+                    time_to_solve=time_to_solve,
+                    time_to_save=time_to_save,
+                )
+                push!(results, row)
+
+                export_operational_cost_per_scenario(energy_problem, output_folder)
+                export_cvar_tail_diagnostics(energy_problem, connection, output_folder)
+            else
+                # No solution to save/export (e.g. INFEASIBLE under fixed investments);
+                # results.csv still records the outcome and acts as the resume marker.
+                @warn "Solve did not reach OPTIMAL; recording status without solution exports" label =
+                    label solver = solver termination_status =
+                    string(energy_problem.termination_status)
+                row = (
+                    label=String(label),
+                    solver=solver,
+                    num_scenarios=Int(length(selected)),
+                    time_to_cluster=Float64(time_to_cluster),
+                    time_to_read=Float64(time_to_read),
+                    time_to_create=Float64(time_to_create),
+                    time_to_solve=Float64(time_to_solve),
+                    time_to_save=0.0,
+                    objective_value=NaN,
+                    termination_status=string(energy_problem.termination_status),
+                    num_constraints=JuMP.num_constraints(
+                        energy_problem.model; count_variable_in_set_constraints=false,
+                    ),
+                    num_variables=JuMP.num_variables(energy_problem.model),
+                    num_loss_of_load_e_demand=0,
+                    num_loss_of_load_h2_demand=0,
+                    water_borrowed=NaN,
+                    value_at_risk_threshold_mu=NaN,
+                )
+                push!(results, row)
+                CSV.write(joinpath(output_folder, "results.csv"), DataFrame([row]); writeheader=true)
             end
-
-            row = export_solution_stats(
-                energy_problem,
-                connection,
-                output_folder;
-                label=label,
-                solver=solver,
-                num_scenarios=length(selected),
-                time_to_cluster=time_to_cluster,
-                time_to_read=time_to_read,
-                time_to_create=time_to_create,
-                time_to_solve=time_to_solve,
-                time_to_save=time_to_save,
-            )
-            push!(results, row)
-
-            export_operational_cost_per_scenario(energy_problem, output_folder)
-            export_cvar_tail_diagnostics(energy_problem, connection, output_folder)
         end
     finally
         try

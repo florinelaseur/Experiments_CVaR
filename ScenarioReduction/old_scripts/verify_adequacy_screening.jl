@@ -31,7 +31,7 @@ using Random
 include(joinpath(@__DIR__, "..", "..", "utils", "functions.jl"))
 include(joinpath(@__DIR__, "..", "..", "utils", "constants.jl"))
 include(joinpath(@__DIR__, "..", "src", "utils.jl"))
-include(joinpath(@__DIR__, "..", "src", "stochastic_dominance.jl"))
+include(joinpath(@__DIR__, "..", "src", "dominance.jl"))
 
 const N_A = 64   # samples per centre in Part A
 
@@ -129,7 +129,7 @@ function part_b(all_profiles_df, input_data_path, n_scenarios, solver_sym, selec
     TC.transform_wide_to_long!(conn, "profiles_wide", "profiles"; exclude_columns=["scenario", "milestone_year", "timestep"])
 
     out = joinpath(@__DIR__, "..", "outputs")
-    result = stochastic_dominance(
+    result = dominance_screening(
         conn; solver=solver_sym, num_samples=8, number_of_samples_sequences=1, output_dir=out,
         input_data_path=input_data_path,
     )

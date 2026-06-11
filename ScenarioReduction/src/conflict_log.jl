@@ -39,7 +39,7 @@ function append_infeasibility_conflict_record!(
             "primal_status" => string(primal),
         ),
         "conflict" => conflict,
-        "source" => "stochastic_dominance",
+        "source" => "dominance_screening",
         "sequence" => sequence,
         "sample_id" => sample_id,
     )

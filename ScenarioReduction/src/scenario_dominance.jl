@@ -507,7 +507,42 @@ function _dominance_fn(method::Symbol)
     method == :pointwise && return dominating_scenarios
     method == :fsd && return fsd_dominating_scenarios
     method == :ssd && return ssd_dominating_scenarios
-    error("pick_n_scenarios: unknown method $method (use :pointwise, :fsd, or :ssd)")
+    error("unknown dominance method :$method (use :pointwise, :fsd, or :ssd)")
+end
+
+"""
+    dominance_analysis(cost; method=:pointwise, scenarios=nothing, num_scenarios=nothing, num_samples=nothing)
+
+Master dispatch over the dominance relations: runs `dominating_scenarios`
+(`:pointwise`), `fsd_dominating_scenarios` (`:fsd`), or `ssd_dominating_scenarios`
+(`:ssd`) on `cost` (a `cost_matrix.csv`-style DataFrame or a samples × scenarios
+matrix) and normalizes the result so every method returns the same shape:
+
+`(scenarios, dominates, pairs, undominated, nan_scenarios, method)`
+
+`nan_scenarios` lists scenarios excluded from the FSD/SSD ordering because they
+contain NaN costs; it is always empty for `:pointwise`, which treats NaN as `+Inf`
+instead of excluding. Used by the screening Phase C (`dominance_screening`) and
+available to experiment drivers alongside `pick_n_scenarios`.
+"""
+function dominance_analysis(
+    cost;
+    method::Symbol=:pointwise,
+    scenarios=nothing,
+    num_scenarios=nothing,
+    num_samples=nothing,
+)
+    fn = _dominance_fn(method)
+    res = fn(cost; scenarios=scenarios, num_scenarios=num_scenarios, num_samples=num_samples)
+    nan_scenarios = hasproperty(res, :nan_scenarios) ? res.nan_scenarios : Int[]
+    return (
+        scenarios=res.scenarios,
+        dominates=res.dominates,
+        pairs=res.pairs,
+        undominated=res.undominated,
+        nan_scenarios=nan_scenarios,
+        method=method,
+    )
 end
 
 function _subset_cost_matrix(C::Matrix{Float64}, all_ids::Vector{Int}, active::Vector{Int})

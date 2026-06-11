@@ -43,7 +43,7 @@ end
         @test rec["scenario"] == 129
         @test rec["sequence"] == 1
         @test rec["sample_id"] == 42
-        @test rec["source"] == "stochastic_dominance"
+        @test rec["source"] == "dominance_screening"
         @test rec["model_status"]["termination_status"] == "INFEASIBLE"
         @test haskey(rec, "sample")
         if rec["conflict"] !== nothing

@@ -54,6 +54,7 @@ end
            dominating_scenarios,
            fsd_dominating_scenarios,
            ssd_dominating_scenarios,
+           dominance_analysis,
            dominator_scenarios,
            save_scenario_dominance_csv,
            undominated_scenarios,
@@ -109,7 +110,7 @@ end
     using HiGHS: HiGHS
     using JSON: JSON
 
-    include(joinpath(@__DIR__, "..", "..", "utils", "infeasibility_conflict.jl"))
+    include(joinpath(@__DIR__, "..", "utils", "infeasibility_conflict.jl"))
     include(joinpath(@__DIR__, "..", "src", "investment_mapping.jl"))
     include(joinpath(@__DIR__, "..", "src", "conflict_log.jl"))
 

@@ -382,7 +382,7 @@ RIDM leaves `investment_limit` blank in
 investment (only the budget/feasibility caps it). `investment_group` is empty → no group limits.
 
 ### Fixing investments (the screening hook in this project)
-`main.jl` and `ScenarioReduction/src/stochastic_dominance.jl` **fix** `assets_investment` (and
+`main.jl` and `ScenarioReduction/src/dominance.jl` **fix** `assets_investment` (and
 `assets_investment_energy`) to candidate values and re-solve the *operational* problem
 (`fix_variables_from_solution!` / `fix_variables_from_sample`, dual-simplex warm-start). This is the
 "capacity-adequacy screening" referenced in the prior session — the investment variables become
@@ -493,7 +493,7 @@ flow_cost[s] = Σ_flows cost_coefficient * total_variable_cost * (block length) 
    `profiles.inter_period` are the in-memory profile dicts consumed by `_profile_aggregate`.
 
 ### `ScenarioReduction` (context)
-`stochastic_dominance.jl` builds the model **once** (with `dummy_cluster!`, single rep period),
+`dominance.jl` builds the model **once** (with `dummy_cluster!`, single rep period),
 then Sobol/Gaussian-samples investment vectors, **fixes `assets_investment`** to each sample, and
 re-solves with dual-simplex warm-start — a screening loop over investment candidates.
 

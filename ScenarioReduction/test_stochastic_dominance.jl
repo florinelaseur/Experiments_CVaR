@@ -32,7 +32,8 @@ using DataFrames
 include(joinpath(REPO_ROOT, "utils", "functions.jl"))
 include(joinpath(REPO_ROOT, "utils", "constants.jl"))
 include(joinpath(SCRIPT_DIR, "src", "utils.jl"))
-include(joinpath(SCRIPT_DIR, "src", "stochastic_dominance.jl"))
+include(joinpath(SCRIPT_DIR, "src", "dominance.jl"))
+include(joinpath(SCRIPT_DIR, "src", "experiment_common.jl"))
 
 # Covariance matrix derived from solving single scenario models to optimality.
 const INV_COV = [
@@ -45,54 +46,8 @@ const INV_COV = [
     407842.3222137223 -374638.69889195403 635237.786307628 7.997575021518203e6 79097.28020948995 -0.3741512568820247 3.7310673190848944e6
 ]
 
-# Prepare teh datat for the experiment. Mimics the main.jl script. 
-function prepare_scenario_input!(cfg::ScenarioReductionConfig)
-    all_profiles_df = CSV.read(cfg.profiles_wide_source, DataFrame)
-    profiles_df = get_scenario_set(all_profiles_df, cfg.number_of_scenarios)
-    # Original source ids picked for this seed, captured BEFORE renumbering to 1..N.
-    source_ids = sort(unique(profiles_df.scenario))
-    mapping = Dict(old => new for (new, old) in enumerate(source_ids))
-    profiles_df[!, :scenario] = [mapping[s] for s in profiles_df.scenario]
-
-    CSV.write(joinpath(cfg.input_data_path, "profiles-wide.csv"), profiles_df; writeheader=true)
-
-    df_stochastic_scenario = DataFrame(;
-        scenario=sort(unique(profiles_df.scenario)),
-        probability=fill(1.0 / cfg.number_of_scenarios, cfg.number_of_scenarios),
-    )
-    CSV.write(joinpath(cfg.input_data_path, "stochastic-scenario.csv"), df_stochastic_scenario; writeheader=true)
-
-    return source_ids
-end
-
-#connection and profiles preparation
-function setup_connection(cfg::ScenarioReductionConfig)
-    connection = DuckDB.DBInterface.connect(DuckDB.DB)
-    TIO.read_csv_folder(connection, cfg.input_data_path)
-
-    DuckDB.query(
-        connection,
-        """
-        UPDATE model_parameters
-        SET
-            risk_aversion_weight_lambda = $(cfg.lambda),
-            risk_aversion_confidence_level_alpha = $(cfg.alpha);
-        """,
-    )
-
-    TC.transform_wide_to_long!(
-        connection,
-        "profiles_wide",
-        "profiles";
-        exclude_columns=["scenario", "milestone_year", "timestep"],
-    )
-    layout = TC.ProfilesTableLayout(;
-        year=:milestone_year,
-        cols_to_groupby=[:milestone_year, :scenario],
-    )
-
-    return connection
-end
+# prepare_scenario_input! and setup_connection are shared with
+# test_dominance_kantorovich.jl — see src/experiment_common.jl.
 
 function prepare_stochastic_dominance_indices!(connection)
     layout = TC.ProfilesTableLayout(;
@@ -153,11 +108,11 @@ function verify_investment_fix_mapping!(connection, cfg::ScenarioReductionConfig
 end
 
 function run_filter!(connection, cfg::ScenarioReductionConfig)
-    @info "Running stochastic-dominance filtering"
+    @info "Running dominance screening" method = cfg.dominance_method
     bounds = load_investment_bounds()
     cov = investment_covariance()
     #cov = INV_COV
-    return stochastic_dominance(connection, cfg; bounds, covariance=cov)
+    return dominance_screening(connection, cfg; bounds, covariance=cov)
 end
 
 function run_solve!(connection, cfg::ScenarioReductionConfig)
@@ -295,8 +250,8 @@ end
 # run stochastic-dominance screening (artifacts under runK/screening/), then
 # optionally solve at full temporal resolution via TC.dummy_cluster!:
 #   experiment.run_ground_truth=true  → full sampled set ("all") under full_resolution_all/
-#   experiment.run_selected_scenarios=true → pointwise-undominated set under
-#     full_resolution_undominated/ (skipped when undominated equals the full set).
+#   experiment.run_selected_scenarios=true → undominated set (per dominance.dominance_method)
+#     under full_resolution_undominated/ (skipped when undominated equals the full set).
 # Screening always runs; set either flag false to skip that post-screening solve.
 function run_experiment!()
     cfg = load_config(script_dir=SCRIPT_DIR, repo_root=REPO_ROOT)

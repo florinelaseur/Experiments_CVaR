@@ -15,7 +15,7 @@
 #
 # Like src/utils.jl, this file references TEM/TC/TIO/DuckDB/JuMP from the
 # includer's scope (they resolve lazily at call time), and `configure_for_warmstart!`
-# from stochastic_dominance.jl (defined before this is ever called). So do NOT add
+# from dominance.jl (defined before this is ever called). So do NOT add
 # `import`/`using` for those here.
 
 using DataFrames: DataFrame, nrow
