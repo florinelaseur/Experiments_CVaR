@@ -1,9 +1,10 @@
 # Distributional (FSD / SSD) scenario dominance from a Phase-B cost_matrix.csv.
 #
 # Each scenario column of the cost matrix is treated as an empirical cost
-# distribution over the sampled investments. Dominance uses the cost-minimization
-# convention: D[i, j] = 1 means row scenario i stochastically dominates column
-# scenario j (j is the worse / riskier / more expensive scenario).
+# distribution over the sampled investments. Dominance uses the cost-maximization
+# convention (aligned with pointwise dominating_scenarios): D[i, j] = 1 means
+# row scenario i stochastically dominates column scenario j (i has more mass on
+# high costs; j is the cheaper scenario).
 #
 # Usage (from repo root):
 #   julia --project=. ScenarioReduction/old_scripts/analyze_distributional_dominance.jl path/to/folder fsd

@@ -85,29 +85,29 @@ end
 end
 
 # --- Distributional FSD / SSD dominance ----------------------------------
-# Convention: dominates[i,j] == true means scenario i is CHEAPER and
-# stochastically dominates the worse/riskier scenario j.
+# Convention (cost-maximization, aligned with pointwise dominating_scenarios):
+# dominates[i,j] == true means scenario i has more mass on high costs than j.
 
-@testitem "FSD clear dominance: uniformly cheaper scenario" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
-    # col1 = [1,2,3] (cheap), col2 = [4,5,6] (expensive): col1 below col2 everywhere
+@testitem "FSD clear dominance: uniformly more expensive scenario" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
+    # col1 = [1,2,3] (cheap), col2 = [4,5,6] (expensive): col2 above col1 everywhere
     C = Float64[1.0 4.0; 2.0 5.0; 3.0 6.0]
     fsd = fsd_dominating_scenarios(C; scenarios=[1, 2])
     ssd = ssd_dominating_scenarios(C; scenarios=[1, 2])
 
-    @test fsd.dominates[1, 2]
-    @test !fsd.dominates[2, 1]
-    @test fsd.pairs == [(1, 2)]
-    @test fsd.undominated == [1]
+    @test fsd.dominates[2, 1]
+    @test !fsd.dominates[1, 2]
+    @test fsd.pairs == [(2, 1)]
+    @test fsd.undominated == [2]
 
     # Clear FSD must also be detected by SSD.
-    @test ssd.dominates[1, 2]
-    @test !ssd.dominates[2, 1]
+    @test ssd.dominates[2, 1]
+    @test !ssd.dominates[1, 2]
 end
 
 @testitem "SSD detects crossing CDFs that FSD misses" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
-    # col1 = [1,4], col2 = [2,3]. CDFs cross (col1 has earlier low-cost mass at 1,
-    # col2 has no mass <2), so FSD finds nothing. col1's integrated CDF stays >=
-    # col2's everywhere, so SSD reports col1 dominates col2.
+    # col1 = [1,4], col2 = [2,3]. CDFs cross so FSD finds nothing. Under cost
+    # maximization, col2's integrated CDF stays <= col1's everywhere, so SSD
+    # reports col2 (more expensive / risk-relevant) dominates col1.
     C = Float64[1.0 2.0; 4.0 3.0]
     fsd = fsd_dominating_scenarios(C)
     ssd = ssd_dominating_scenarios(C)
@@ -115,10 +115,10 @@ end
     @test !any(fsd.dominates)
     @test isempty(fsd.pairs)
 
-    @test ssd.dominates[1, 2]
-    @test !ssd.dominates[2, 1]
-    @test ssd.pairs == [(1, 2)]
-    @test ssd.undominated == [1]
+    @test ssd.dominates[2, 1]
+    @test !ssd.dominates[1, 2]
+    @test ssd.pairs == [(2, 1)]
+    @test ssd.undominated == [2]
 end
 
 @testitem "identical columns: no FSD or SSD dominance" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
@@ -143,10 +143,10 @@ end
     )
     fsd = fsd_dominating_scenarios(df)
     @test fsd.scenarios == [3, 5]
-    @test fsd.dominates[2, 1]      # scenario 5 (cheap) dominates scenario 3
-    @test !fsd.dominates[1, 2]
-    @test fsd.pairs == [(5, 3)]
-    @test fsd.undominated == [5]
+    @test fsd.dominates[1, 2]      # scenario 3 (expensive) dominates scenario 5
+    @test !fsd.dominates[2, 1]
+    @test fsd.pairs == [(3, 5)]
+    @test fsd.undominated == [3]
 end
 
 @testitem "FSD ⊂ SSD: every FSD pair is also an SSD pair" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
@@ -183,7 +183,7 @@ end
 end
 
 @testitem "FSD/SSD keep finite ordering while skipping a NaN scenario" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
-    # scenarios 10,20 finite and clearly ordered (10 cheaper); 30 has a NaN.
+    # scenarios 10,20 finite and clearly ordered (10 cheaper, 20 expensive); 30 has a NaN.
     C = Float64[1.0 4.0 1.0; 2.0 5.0 NaN; 3.0 6.0 3.0]
     fsd = fsd_dominating_scenarios(C; scenarios=[10, 20, 30])
     ssd = ssd_dominating_scenarios(C; scenarios=[10, 20, 30])
@@ -191,10 +191,10 @@ end
     @test fsd.nan_scenarios == [30]
     @test ssd.nan_scenarios == [30]
 
-    # Finite pair is still ordered: 10 dominates 20.
-    @test fsd.dominates[1, 2]
-    @test !fsd.dominates[2, 1]
-    @test (10, 20) in fsd.pairs
+    # Finite pair is still ordered: 20 dominates 10.
+    @test fsd.dominates[2, 1]
+    @test !fsd.dominates[1, 2]
+    @test (20, 10) in fsd.pairs
 
     # No pair touches the NaN scenario (index 3 = scenario 30).
     @test !any(fsd.dominates[3, :]) && !any(fsd.dominates[:, 3])
@@ -243,14 +243,14 @@ end
 end
 
 @testitem "FSD transitive chain: full ordered pair set and single undominated" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
-    # col1 < col2 < col3 elementwise across the distribution.
+    # col1 < col2 < col3 elementwise across the distribution (10 < 20 < 30).
     C = Float64[1.0 4.0 7.0; 2.0 5.0 8.0; 3.0 6.0 9.0]
     fsd = fsd_dominating_scenarios(C; scenarios=[10, 20, 30])
-    @test Set(fsd.pairs) == Set([(10, 20), (10, 30), (20, 30)])
-    @test fsd.undominated == [10]
-    # Cheapest dominates both others; most expensive dominates nobody.
-    @test fsd.dominates[1, 2] && fsd.dominates[1, 3] && fsd.dominates[2, 3]
-    @test !any(fsd.dominates[3, :])
+    @test Set(fsd.pairs) == Set([(20, 10), (30, 10), (30, 20)])
+    @test fsd.undominated == [30]
+    # Most expensive dominates both others; cheapest is dominated by everyone.
+    @test fsd.dominates[2, 1] && fsd.dominates[3, 1] && fsd.dominates[3, 2]
+    @test !any(fsd.dominates[:, 3])
 end
 
 @testitem "SSD reports no dominance when integrated CDFs cross" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
@@ -276,6 +276,75 @@ end
     @test_throws ErrorException fsd_dominating_scenarios(df; scenarios=[5, 3])
     @test_throws ErrorException fsd_dominating_scenarios(df; num_scenarios=3)
     @test_throws ErrorException ssd_dominating_scenarios(df; num_samples=5)
+end
+
+# --- pick_n_scenarios: iterative dominance peeling -----------------------
+
+@testitem "pick_n_scenarios chain peel pointwise and FSD" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
+    C = Float64[1.0 4.0 7.0; 2.0 5.0 8.0; 3.0 6.0 9.0]
+    for method in (:pointwise, :fsd)
+        res = pick_n_scenarios(C; n=2, method=method, scenarios=[10, 20, 30])
+        @test res.picked == [30, 20]
+        @test res.satisfied
+        @test res.method == method
+        @test length(res.rounds) == 2
+        @test res.rounds[1].undominated == [30]
+        @test res.rounds[2].undominated == [20]
+        one_shot = method == :pointwise ? dominating_scenarios(C; scenarios=[10, 20, 30]) :
+            fsd_dominating_scenarios(C; scenarios=[10, 20, 30])
+        @test res.rounds[1].undominated == one_shot.undominated
+    end
+end
+
+@testitem "pick_n_scenarios exhausts pool before reaching n" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
+    C = Float64[1.0 4.0 7.0; 2.0 5.0 8.0; 3.0 6.0 9.0]
+    res = pick_n_scenarios(C; n=10, method=:pointwise, scenarios=[10, 20, 30])
+    @test res.picked == [30, 20, 10]
+    @test !res.satisfied
+    @test length(res.rounds) == 3
+end
+
+@testitem "pick_n_scenarios single round when all mutually undominated" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
+    C = Float64[1.0 2.0; 5.0 3.0]
+    res = pick_n_scenarios(C; n=1, method=:pointwise)
+    @test sort(res.picked) == [1, 2]
+    @test res.satisfied
+    @test length(res.rounds) == 1
+    @test sort(res.rounds[1].undominated) == [1, 2]
+end
+
+@testitem "pick_n_scenarios FSD n=1 clear dominance" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
+    C = Float64[1.0 4.0; 2.0 5.0; 3.0 6.0]
+    res = pick_n_scenarios(C; n=1, method=:fsd, scenarios=[1, 2])
+    @test res.picked == [2]
+    @test res.satisfied
+    @test fsd_dominating_scenarios(C; scenarios=[1, 2]).undominated == [2]
+end
+
+@testitem "pick_n_scenarios SSD crossing peel" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
+    C = Float64[1.0 2.0; 4.0 3.0]
+    res = pick_n_scenarios(C; n=1, method=:ssd)
+    @test res.picked == [2]
+    @test res.satisfied
+    @test ssd_dominating_scenarios(C).undominated == [2]
+end
+
+@testitem "pick_n_scenarios DataFrame input" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
+    df = DataFrame(;
+        sample_id=[1, 2, 3],
+        sequence=[1, 1, 1],
+        scenario_5=[1.0, 2.0, 3.0],
+        scenario_3=[4.0, 5.0, 6.0],
+    )
+    res = pick_n_scenarios(df; n=1, method=:pointwise)
+    @test res.picked == [3]
+    @test res.satisfied
+end
+
+@testitem "pick_n_scenarios validation errors" setup = [ScenarioDominanceSetup] tags = [:dominance, :unit] begin
+    C = Float64[1.0 2.0; 3.0 4.0]
+    @test_throws ErrorException pick_n_scenarios(C; n=0)
+    @test_throws ErrorException pick_n_scenarios(C; n=1, method=:bogus)
 end
 
 # --- undominated_scenarios from a pairs DataFrame ------------------------

@@ -292,12 +292,12 @@ end
 # Repeatable, multi-seed experiment driver.
 #
 # For each run: pick a fresh random scenario subset (seed = base_seed + run-1),
-# run stochastic-dominance screening (artifacts under runK/screening/), then solve
-# BOTH the full sampled set ("all", the per-sample source of truth) and the
-# undominated-scenario set ("undominated": scenarios that are NOT uniformly cheaper
-# than any other scenario, i.e. the tail/CVaR-relevant reduction) at full temporal
-# resolution via TC.dummy_cluster!. The undominated solve is skipped when it equals
-# the full set (no reduction, so it would just duplicate the "all" solve).
+# run stochastic-dominance screening (artifacts under runK/screening/), then
+# optionally solve at full temporal resolution via TC.dummy_cluster!:
+#   experiment.run_ground_truth=true  → full sampled set ("all") under full_resolution_all/
+#   experiment.run_selected_scenarios=true → pointwise-undominated set under
+#     full_resolution_undominated/ (skipped when undominated equals the full set).
+# Screening always runs; set either flag false to skip that post-screening solve.
 function run_experiment!()
     cfg = load_config(script_dir=SCRIPT_DIR, repo_root=REPO_ROOT)
 
@@ -382,21 +382,27 @@ function run_experiment!()
         all_scenarios = sort(Int.(sd.scenarios))
         @info "Screening result" run=run_idx scenarios=all_scenarios undominated=undominated
 
-        res_all = solve_full_resolution!(
-            sd.scenarios,
-            run_cfg.input_data_path,
-            joinpath(run_dir, "full_resolution_all");
-            label="all",
-            solvers=run_cfg.solvers,
-            lambda=run_cfg.lambda,
-            alpha=run_cfg.alpha,
-            use_names=run_cfg.use_names,
-        )
-        for row in eachrow(res_all.results)
-            push!(summary, (; run=run_idx, seed=seed, pairs(row)...))
+        if cfg.experiment_run_ground_truth
+            res_all = solve_full_resolution!(
+                sd.scenarios,
+                run_cfg.input_data_path,
+                joinpath(run_dir, "full_resolution_all");
+                label="all",
+                solvers=run_cfg.solvers,
+                lambda=run_cfg.lambda,
+                alpha=run_cfg.alpha,
+                use_names=run_cfg.use_names,
+            )
+            for row in eachrow(res_all.results)
+                push!(summary, (; run=run_idx, seed=seed, pairs(row)...))
+            end
+        else
+            @info "Run $run_idx: skipping ground-truth solve (experiment.run_ground_truth=false)"
         end
 
-        if isempty(undominated) || undominated == all_scenarios
+        if !cfg.experiment_run_selected_scenarios
+            @info "Run $run_idx: skipping selected-scenarios solve (experiment.run_selected_scenarios=false)"
+        elseif isempty(undominated) || undominated == all_scenarios
             @info "Run $run_idx: undominated set equals full set (no reduction); skipping redundant undominated solve" undominated =
                 undominated
         else

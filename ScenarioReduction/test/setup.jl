@@ -57,6 +57,7 @@ end
            dominator_scenarios,
            save_scenario_dominance_csv,
            undominated_scenarios,
+           pick_n_scenarios,
            _compare_cost,
            _column_dominates,
            _finite_cost_domain,

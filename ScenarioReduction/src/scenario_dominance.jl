@@ -174,7 +174,7 @@ end
 # Distributional (FSD / SSD) scenario dominance
 # =====================================================================
 #
-# CONVENTION (cost-minimization). This differs from the pointwise
+# CONVENTION (cost-maximization). Aligned with the pointwise
 # `dominating_scenarios` helper above. Each scenario column of the cost matrix
 # is treated as an empirical distribution over the K sampled investments. For
 # the FSD/SSD methods below:
@@ -182,9 +182,10 @@ end
 #     dominates[i,j] == true  means  scenarios[i] stochastically dominates
 #                                    scenarios[j].
 #
-# i.e. scenario j is the worse / riskier / more expensive scenario, and
-# scenario i (cheaper across the board) can be preferred. A scenario whose CDF
-# is everywhere higher puts more probability mass on lower costs.
+# i.e. scenario i has more probability mass on high costs than j; scenario j is
+# the cheaper / less risk-relevant one. Equivalently, i's empirical CDF is <= j's
+# at every shared threshold, with strict < somewhere (lower CDF = more mass above
+# each cost level).
 #
 # NaN handling: any scenario whose column contains a NaN (infeasible /
 # unevaluated sample) is TAGGED and excluded from ordering entirely — it never
@@ -322,9 +323,9 @@ end
     _curve_dominance(curves, scenario_ids, nan_mask) -> NamedTuple
 
 All-pairs dominance from an M×S matrix of comparison curves (CDFs for FSD,
-integrated CDFs for SSD). Scenario `i` dominates `j` iff `curves[m,i] >=
-curves[m,j]` for every `m`, with strict `>` at least once. Short-circuits on the
-first violation.
+integrated CDFs for SSD) under **cost maximization**. Scenario `i` dominates `j`
+iff `curves[m,i] <= curves[m,j]` for every `m`, with strict `<` at least once.
+Short-circuits on the first violation.
 
 Scenarios flagged in `nan_mask` are excluded from all comparisons: a tagged
 scenario never dominates and is never dominated (every pair touching it is
@@ -345,19 +346,19 @@ function _curve_dominance(
         nan_mask[i] && continue            # NaN scenario never dominates
         for j in 1:S
             (i == j || nan_mask[j]) && continue  # never dominated -> skip pair
-            ge_all = true
+            le_all = true
             strict = false
             for m in 1:M
                 a = curves[m, i]
                 b = curves[m, j]
-                if a < b
-                    ge_all = false
+                if a > b
+                    le_all = false
                     break
-                elseif a > b
+                elseif a < b
                     strict = true
                 end
             end
-            if ge_all && strict
+            if le_all && strict
                 dominates[i, j] = true
                 push!(pairs, (scenario_ids[i], scenario_ids[j]))
             end
@@ -381,10 +382,10 @@ First-order stochastic dominance (FSD) over scenarios, treating each scenario
 column of `cost` (rows = investment samples, columns = scenarios) as an
 empirical cost distribution.
 
-Scenario `i` **FSD-dominates** `j` iff its empirical CDF is `>=` that of `j` at
-every shared domain point, with strict `>` somewhere. Higher CDF everywhere
-means more probability mass on low costs — scenario `i` is cheaper across the
-board and `j` is the worse / riskier scenario.
+Scenario `i` **FSD-dominates** `j` iff its empirical CDF is `<=` that of `j` at
+every shared domain point, with strict `<` somewhere. Lower CDF everywhere
+means more probability mass on high costs — scenario `i` is more expensive /
+risk-relevant and `j` is the cheaper scenario.
 
 `cost` may be a `cost_matrix`-style `DataFrame` (`scenario_<id>` columns,
 ignoring `sample_id` / `sequence`) or a numeric matrix. Pure: no file I/O.
@@ -436,11 +437,11 @@ Second-order stochastic dominance (SSD) over scenarios. SSD relaxes FSD by
 allowing the CDFs to cross, as long as the accumulated CDF area (integral) of
 the dominating scenario is never overcome.
 
-Scenario `i` **SSD-dominates** `j` iff the integrated CDF of `i` is `>=` that of
-`j` at every shared domain point, with strict `>` somewhere. More accumulated
-area on the cheap (left) side means more probability mass at low costs; `j` has
-the heavier (more expensive) tail that every risk-averse agent dislikes. SSD is
-equivalent to CVaR dominance at every confidence level.
+Scenario `i` **SSD-dominates** `j` iff the integrated CDF of `i` is `<=` that of
+`j` at every shared domain point, with strict `<` somewhere. Less accumulated
+area on the cheap (left) side means more probability mass at high costs; `i` has
+the heavier (more expensive) tail. Under cost maximization, SSD is the
+second-order analogue of preferring higher-cost distributions.
 
 Every FSD pair is also an SSD pair (FSD ⊂ SSD). Same arguments / return shape as
 `fsd_dominating_scenarios`, including the `nan_scenarios` field: scenarios whose
@@ -500,6 +501,125 @@ function dominator_scenarios(result)
         error("dominator_scenarios expects a result with a `pairs` field or a DataFrame")
     isempty(result.pairs) && return Int[]
     return sort(unique(Int[Int(p[1]) for p in result.pairs]))
+end
+
+function _dominance_fn(method::Symbol)
+    method == :pointwise && return dominating_scenarios
+    method == :fsd && return fsd_dominating_scenarios
+    method == :ssd && return ssd_dominating_scenarios
+    error("pick_n_scenarios: unknown method $method (use :pointwise, :fsd, or :ssd)")
+end
+
+function _subset_cost_matrix(C::Matrix{Float64}, all_ids::Vector{Int}, active::Vector{Int})
+    idx = Int[findfirst(==(id), all_ids) for id in active]
+    any(isnothing, idx) &&
+        error("active scenario ids $active are not a subset of $all_ids")
+    return C[:, idx]
+end
+
+function _subset_cost_dataframe(cost::DataFrame, keep_ids::Vector{Int})
+    sorted = sort(collect(Int.(keep_ids)))
+    meta = Symbol[]
+    for col in propertynames(cost)
+        s = string(col)
+        match(r"^scenario_(\d+)$", s) === nothing && push!(meta, col)
+    end
+    cols = vcat(meta, [Symbol("scenario_$id") for id in sorted])
+    return cost[:, cols]
+end
+
+function _pick_n_scenarios_impl(
+    C::Matrix{Float64},
+    scenario_ids::Vector{Int};
+    n::Int,
+    method::Symbol=:pointwise,
+    num_samples=nothing,
+)
+    n < 1 && error("pick_n_scenarios: n must be >= 1, got $n")
+    fn = _dominance_fn(method)
+    active = copy(scenario_ids)
+    picked = Int[]
+    rounds = NamedTuple[]
+
+    while !isempty(active) && length(picked) < n
+        C_sub = _subset_cost_matrix(C, scenario_ids, active)
+        if num_samples === nothing
+            res = fn(C_sub; scenarios=active)
+        else
+            res = fn(C_sub; scenarios=active, num_samples=num_samples)
+        end
+        layer = sort(Int.(res.undominated))
+        push!(rounds, (undominated=layer, n_active=length(active)))
+        append!(picked, layer)
+        length(picked) >= n && break
+        layer_set = Set(layer)
+        layer_set == Set(active) && break
+        active = Int[id for id in active if id ∉ layer_set]
+    end
+
+    return (
+        picked=picked,
+        rounds=rounds,
+        satisfied=length(picked) >= n,
+        method=method,
+    )
+end
+
+"""
+    pick_n_scenarios(cost; n, method=:pointwise, scenarios=nothing, num_scenarios=nothing, num_samples=nothing)
+
+Iteratively peel **undominated** (maximal / expensive-tail) scenarios until at least
+`n` are collected or the pool is exhausted.
+
+Each round runs the chosen dominance method on the remaining scenarios:
+
+- `method=:pointwise` — `dominating_scenarios` (row-wise cost maximization)
+- `method=:fsd` — first-order stochastic dominance (cost maximization)
+- `method=:ssd` — second-order stochastic dominance (cost maximization)
+
+Peel order is expensive tiers first: round 1 picks scenarios nobody dominates among
+the full set; round 2 picks the top tier among what remains; and so on. The dominance
+graph is acyclic (strict partial order), so peeling terminates in at most `S` rounds
+for `S` scenarios.
+
+Returns `(picked, rounds, satisfied, method)`:
+
+- `picked` — accumulated scenario ids in peel order (may exceed `n` when the final
+  layer adds multiple mutually undominated scenarios; use `picked[1:n]` if exactly
+  `n` are needed)
+- `rounds` — per-round `(undominated=..., n_active=...)` records
+- `satisfied` — `true` iff `length(picked) >= n`
+- `method` — the dominance method used
+
+NaN scenarios follow each method's existing rules (FSD/SSD: tagged but still
+undominated and eligible for peeling; pointwise: `NaN` treated as `+Inf`).
+"""
+function pick_n_scenarios(
+    cost::DataFrame;
+    n::Int,
+    method::Symbol=:pointwise,
+    scenarios=nothing,
+    num_scenarios=nothing,
+    num_samples=nothing,
+)
+    C, scenario_ids = _normalize_cost_input(
+        cost; scenarios=scenarios, num_scenarios=num_scenarios, num_samples=num_samples,
+    )
+    return _pick_n_scenarios_impl(C, scenario_ids; n=n, method=method, num_samples=num_samples)
+end
+
+function pick_n_scenarios(
+    cost::AbstractMatrix{<:Real};
+    n::Int,
+    method::Symbol=:pointwise,
+    scenarios=nothing,
+    num_scenarios=nothing,
+    num_samples=nothing,
+)
+    C, scenario_ids = _normalize_cost_input(
+        cost; scenarios=scenarios, num_scenarios=num_scenarios, num_samples=num_samples,
+    )
+    return _pick_n_scenarios_impl(C, scenario_ids; n=n, method=method, num_samples=num_samples)
 end
 
 """Write dominating pairs to CSV (`dominator`, `dominated`). References `CSV` from includer scope."""

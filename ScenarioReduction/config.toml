@@ -24,7 +24,7 @@ verify_mapping_tol = 1.0e-8
 [stochastic_dominance]
 solver = "Gurobi"
 sampling_mode = "uniform"
-num_samples = 128
+num_samples = 512
 number_of_samples_sequences = 1
 use_adequacy_cuts = true
 mean_shift = false
@@ -32,8 +32,8 @@ gaussian_shrinkage = 0.2
 gaussian_nonneg_mode = "clip"
 record_conflicts = true
 # Set to 0 to disable (passes nothing to stochastic_dominance)
-max_runtime_sec = 6000.0
-solve_time_limit_sec = 600.0
+max_runtime_sec = 600000.0
+solve_time_limit_sec = 600000.0
 
 [solve]
 representative_periods = 30
@@ -55,10 +55,13 @@ tulipa_energy_model_rev = "227a80f7907e2c7178edb0697874cfb6666ad644"
 # Repeatable multi-run experiment driver (run_experiment! in test_stochastic_dominance.jl).
 # When enabled, the __main__ block runs the experiment instead of the single run!().
 enabled = true
-name = "trialBoris"
+name = "NightNight"
 # Base output folder, relative to ScenarioReduction/. Per-run folders are <output_dir>/<name>/runK/.
 output_dir = "outputs/experiments"
-num_runs = 2
-base_seed = 19990907
+num_runs = 1
+base_seed = 19990906
 # Number of input scenarios sampled before screening (per run). Overrides simulation.number_of_scenarios.
-num_input_scenarios = 3
+num_input_scenarios = 20
+# Post-screening full-resolution solves (run_experiment! only). Screening always runs.
+run_ground_truth = false          # all sampled scenarios → run<K>/full_resolution_all/
+run_selected_scenarios = false      # pointwise-undominated subset → run<K>/full_resolution_undominated/

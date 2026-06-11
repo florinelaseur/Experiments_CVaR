@@ -44,6 +44,8 @@ struct ScenarioReductionConfig
     experiment_num_runs::Int
     experiment_base_seed::Int
     experiment_num_input_scenarios::Int
+    experiment_run_ground_truth::Bool
+    experiment_run_selected_scenarios::Bool
 end
 
 function _optional_positive_seconds(x)::Union{Nothing,Float64}
@@ -122,6 +124,8 @@ function load_config(;
         Int(get(experiment, "num_runs", 1)),
         Int(get(experiment, "base_seed", Int(sim["random_seed"]))),
         Int(get(experiment, "num_input_scenarios", Int(sim["number_of_scenarios"]))),
+        Bool(get(experiment, "run_ground_truth", true)),
+        Bool(get(experiment, "run_selected_scenarios", true)),
     )
 end
 
@@ -201,6 +205,8 @@ function save_config_toml(cfg::ScenarioReductionConfig, path::AbstractString)
             "num_runs" => cfg.experiment_num_runs,
             "base_seed" => cfg.experiment_base_seed,
             "num_input_scenarios" => cfg.experiment_num_input_scenarios,
+            "run_ground_truth" => cfg.experiment_run_ground_truth,
+            "run_selected_scenarios" => cfg.experiment_run_selected_scenarios,
         ),
     )
     open(path, "w") do io
