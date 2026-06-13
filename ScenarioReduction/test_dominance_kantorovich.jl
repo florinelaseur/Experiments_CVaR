@@ -59,15 +59,10 @@ include(joinpath(REPO_ROOT, "utils", "kantorovich_reduction.jl"))
 include(joinpath(SCRIPT_DIR, "src", "utils.jl"))
 include(joinpath(SCRIPT_DIR, "src", "dominance.jl"))
 include(joinpath(SCRIPT_DIR, "src", "experiment_common.jl"))
-
-ids_to_str(ids) = join(ids, " ")
-
-# Map LOCAL scenario ids (1..N after renumbering) back to this run's SOURCE ids.
-map_local_to_source(local_ids, source_ids_sorted) =
-    Int[Int(source_ids_sorted[i]) for i in local_ids]
-
-stage_complete(stage_dir, solvers) =
-    all(isfile(joinpath(stage_dir, string(s), "results.csv")) for s in solvers)
+# ids_to_str, map_local_to_source, stage_complete, read_objective_status,
+# optimality_gap_percent, investment_mw_matches (unit-tested in
+# test/test_hybrid_experiment.jl).
+include(joinpath(SCRIPT_DIR, "src", "hybrid_helpers.jl"))
 
 function hybrid_summary_dataframe()
     return DataFrame(;
@@ -159,16 +154,8 @@ function append_stage_rows!(summary, stage_dir, run_idx, seed, meta, solvers)
     return summary
 end
 
-function read_objective_status(path)
-    isfile(path) || return (NaN, "MISSING")
-    df = CSV.read(path, DataFrame)
-    isempty(df) && return (NaN, "MISSING")
-    obj = hasproperty(df, :objective_value) ? Float64(df.objective_value[1]) : NaN
-    status = hasproperty(df, :termination_status) ? String(df.termination_status[1]) : "UNKNOWN"
-    return (obj, status)
-end
-
-# Out-of-sample optimality gap per solver:
+# Out-of-sample optimality gap per solver (uses optimality_gap_percent from
+# src/hybrid_helpers.jl):
 #   OG(%) = (F(z^reduced, full) − F(z^full, full)) / F(z^full, full) × 100
 function append_og_rows!(og, run_idx, seed, run_dir, solvers, meta, reduced_source)
     for s in solvers
@@ -176,8 +163,7 @@ function append_og_rows!(og, run_idx, seed, run_dir, solvers, meta, reduced_sour
             read_objective_status(joinpath(run_dir, "full_fixed", string(s), "results.csv"))
         F_bench, bench_status =
             read_objective_status(joinpath(run_dir, "full_benchmark", string(s), "results.csv"))
-        og_percent =
-            (isnan(F_fixed) || isnan(F_bench)) ? NaN : (F_fixed - F_bench) / F_bench * 100
+        og_percent = optimality_gap_percent(F_fixed, F_bench)
         push!(
             og,
             (
@@ -402,6 +388,21 @@ function run_hybrid_run!(cfg, run_idx, base, summary, selection, selection_path,
                 use_names=run_cfg.use_names,
                 fix_investment_mw=mw,
             )
+            # Cross-check: when the fixed solve was OPTIMAL it re-exports its
+            # investment, which must equal the reduced solve's investment we fixed
+            # (validates the MW→model-unit alignment end-to-end). No export when
+            # INFEASIBLE → fixed_mw is nothing and the check is skipped.
+            fixed_mw = read_investment_mw(joinpath(fixed_dir, string(s)))
+            if fixed_mw !== nothing
+                chk = investment_mw_matches(mw, fixed_mw)
+                if chk.match
+                    @info "full_fixed investment matches the fixed reduced investment" solver =
+                        s max_abs_diff = chk.max_abs_diff
+                else
+                    @warn "full_fixed investment differs from the fixed reduced investment — investigate the fix path" solver =
+                        s max_abs_diff = chk.max_abs_diff reduced_mw = mw fixed_mw = fixed_mw
+                end
+            end
         end
         append_stage_rows!(summary, fixed_dir, run_idx, seed, meta, run_cfg.solvers)
     else

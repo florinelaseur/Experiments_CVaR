@@ -34,15 +34,62 @@ end
 
 @testmodule InvestmentFixSetup begin
     using JuMP: JuMP
+    using CSV: CSV
     using DataFrames: DataFrame, DataFrames
 
     include(joinpath(@__DIR__, "..", "src", "investment_mapping.jl"))
     include(joinpath(@__DIR__, "..", "src", "utils.jl"))
 
     export JuMP,
+           CSV,
            INVESTABLE_ASSETS,
            DataFrame,
-           fix_variables_from_sample
+           fix_variables_from_sample,
+           read_investment_mw
+end
+
+# Solver-free helpers for the hybrid dominance + Kantorovich driver:
+# select_kantorovich_scenarios (utils/kantorovich_reduction.jl) + the pure
+# id/resume/gap helpers (src/hybrid_helpers.jl). Neither file uses DuckDB/TEM at
+# top level, so this loads without a solver.
+@testmodule HybridSetup begin
+    using DataFrames: DataFrame, DataFrames, nrow
+    using CSV: CSV
+
+    include(joinpath(@__DIR__, "..", "..", "utils", "kantorovich_reduction.jl"))
+    include(joinpath(@__DIR__, "..", "src", "hybrid_helpers.jl"))
+
+    # Wide profiles_df fixture: one row per (scenario, timestep) with the 5
+    # profile columns build_scenario_matrix expects, distinct per scenario.
+    function _toy_profiles(n_scenarios, n_timesteps)
+        rows = NamedTuple[]
+        for s in 1:n_scenarios, t in 1:n_timesteps
+            push!(rows, (
+                milestone_year=2030,
+                scenario=s,
+                timestep=t,
+                solar=1.0 * s + 0.1t,
+                wind_offshore=2.0 * s - 0.2t,
+                wind_onshore=0.5 * s + 0.3t,
+                demand=10.0 * s - t,
+                hydro_inflow=1.0 * s + 0.1t,
+            ))
+        end
+        return DataFrame(rows)
+    end
+
+    export DataFrame, DataFrames, nrow, CSV,
+           _toy_profiles,
+           select_kantorovich_scenarios,
+           build_scenario_matrix,
+           compute_cost_matrix,
+           kantorovich_forward_select,
+           ids_to_str,
+           map_local_to_source,
+           stage_complete,
+           read_objective_status,
+           optimality_gap_percent,
+           investment_mw_matches
 end
 
 @testmodule ScenarioDominanceSetup begin
