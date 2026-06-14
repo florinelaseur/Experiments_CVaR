@@ -5,14 +5,6 @@
 # one multi-scenario model, we build one single-scenario model at a time, solve
 # all samples against it, then free it — so only one model lives in memory.
 #
-# This mirrors the proven pattern in
-# old_scripts/decisive_single_scenario_test.jl (build_single_scenario_connection +
-# the model-build half of solve_with_fixed_investment) and the single-scenario
-# generator get_assets_investment_bounds.jl::solve_one_scenario, but uses the
-# low-level TEM pipeline (create_internal_tables! → compute_*_indices →
-# prepare_profiles_structure → create_model) so the `variables` container is
-# available for fix_variables_from_sample.
-#
 # Like src/utils.jl, this file references TEM/TC/TIO/DuckDB/JuMP from the
 # includer's scope (they resolve lazily at call time), and `configure_for_warmstart!`
 # from dominance.jl (defined before this is ever called). So do NOT add

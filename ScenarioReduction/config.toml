@@ -26,7 +26,7 @@ verify_mapping_tol = 1.0e-8
 [dominance]
 solver = "Gurobi"
 sampling_mode = "uniform"
-num_samples = 512
+num_samples = 256
 number_of_samples_sequences = 1
 use_adequacy_cuts = true
 mean_shift = false
@@ -40,7 +40,7 @@ solve_time_limit_sec = 600000.0
 # shared by all dominance scripts: "pointwise" | "fsd" | "ssd".
 dominance_method = "pointwise"
 # How many scenarios the dominance peel contributes (hybrid experiment, etc.).
-dominance_pick_k = 2
+dominance_pick_k = 3
 
 [solve]
 representative_periods = 30
@@ -79,14 +79,14 @@ run_selected_scenarios = false      # undominated subset (dominance.dominance_me
 # dominance peeling plus kantorovich_pick_n disjoint scenarios by Kantorovich
 # forward selection, solves the reduced set, then evaluates out-of-sample on the
 # full set (investments fixed from the reduced solve vs. an unconstrained benchmark).
-enabled = false
-name = "dom_kant"
+enabled = true
+name = "dom_kant5_30"
 # Base output folder, relative to ScenarioReduction/. Per-run folders are <output_dir>/<name>/runK/.
 output_dir = "outputs/experiments"
-num_runs = 1
-base_seed = 19990906
-num_input_scenarios = 20
+num_runs = 5
+base_seed = 19990999
+num_input_scenarios = 30
 # Scenarios picked by Kantorovich from the complement of the dominance picks.
-kantorovich_pick_n = 2
+kantorovich_pick_n = 12
 run_full_benchmark = true         # full N-scenario solve, no fixed investments → run<K>/full_benchmark/
 run_fixed_full = true             # full N-scenario solve, investments fixed from reduced solve → run<K>/full_fixed/

@@ -8,53 +8,11 @@
 using QuasiMonteCarlo: QuasiMonteCarlo
 using LinearAlgebra: cholesky, Symmetric, Diagonal, diag, I
 using Random: Random, Xoshiro
+using SpecialFunctions: erfinv
 using Statistics: Statistics
 
-# Beasley-Springer-Moro inverse standard-normal CDF.
-# Pure base-Julia rational approximation, accurate to ~1e-9. Used here because
-# the root project does not have SpecialFunctions as a direct dependency (it's
-# only transitively in the Manifest), so `using SpecialFunctions: erfinv` does
-# not resolve when this file is included from main.jl / test_stochastic_dominance.jl.
-# Reference: Boyle, Broadie & Glasserman, "Monte Carlo Methods for Security
-# Pricing" (1997), eqn. (8). Standard QMC textbook implementation.
-const _BSM_A = (
-    -3.969683028665376e+01,  2.209460984245205e+02, -2.759285104469687e+02,
-     1.383577518672690e+02, -3.066479806614716e+01,  2.506628277459239e+00,
-)
-const _BSM_B = (
-    -5.447609879822406e+01,  1.615858368580409e+02, -1.556989798598866e+02,
-     6.680131188771972e+01, -1.328068155288572e+01,
-)
-const _BSM_C = (
-    -7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00,
-    -2.549732539343734e+00,  4.374664141464968e+00,  2.938163982698783e+00,
-)
-const _BSM_D = (
-     7.784695709041462e-03,  3.224671290700398e-01,  2.445134137142996e+00,
-     3.754408661907416e+00,
-)
-const _BSM_PLOW  = 0.02425
-const _BSM_PHIGH = 1.0 - _BSM_PLOW
-
-function _norminvcdf(p::Real)
-    # Lower tail (rational approximation in q = √(−2 ln p)).
-    if p < _BSM_PLOW
-        q = sqrt(-2.0 * log(p))
-        return (((((_BSM_C[1]*q + _BSM_C[2])*q + _BSM_C[3])*q + _BSM_C[4])*q + _BSM_C[5])*q + _BSM_C[6]) /
-               ((((_BSM_D[1]*q + _BSM_D[2])*q + _BSM_D[3])*q + _BSM_D[4])*q + 1.0)
-    end
-    # Upper tail (mirror of the lower tail).
-    if p > _BSM_PHIGH
-        q = sqrt(-2.0 * log(1.0 - p))
-        return -(((((_BSM_C[1]*q + _BSM_C[2])*q + _BSM_C[3])*q + _BSM_C[4])*q + _BSM_C[5])*q + _BSM_C[6]) /
-                ((((_BSM_D[1]*q + _BSM_D[2])*q + _BSM_D[3])*q + _BSM_D[4])*q + 1.0)
-    end
-    # Central region (rational approximation in r = (p − 0.5)²).
-    q = p - 0.5
-    r = q * q
-    return (((((_BSM_A[1]*r + _BSM_A[2])*r + _BSM_A[3])*r + _BSM_A[4])*r + _BSM_A[5])*r + _BSM_A[6]) * q /
-           (((((_BSM_B[1]*r + _BSM_B[2])*r + _BSM_B[3])*r + _BSM_B[4])*r + _BSM_B[5])*r + 1.0)
-end
+"""Standard-normal quantile Φ⁻¹(u) for uniform `u ∈ (0, 1)`."""
+_standard_normal_quantile(u::Real) = √2 * erfinv(2u - 1)
 
 """
     sobol_gaussian_samples(N, μ, Σ; scramble=true, seed=1, jitter=1e-8)
@@ -91,7 +49,8 @@ function sobol_gaussian_samples(
     U = QuasiMonteCarlo.sample(N, zeros(d), ones(d), sampler)
 
     eps_safe = 1e-12
-    W = _norminvcdf.(clamp.(U, eps_safe, 1 - eps_safe))
+    U_safe = clamp.(U, eps_safe, 1 - eps_safe)
+    W = _standard_normal_quantile.(U_safe)
 
     L = cholesky(Symmetric(Matrix(Σ) + jitter * I)).L
 
