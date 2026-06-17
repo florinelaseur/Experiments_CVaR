@@ -126,122 +126,91 @@ results_df = DataFrame(;
 )
 
 function main()
-    # 1. INITIALIZE DISK-BACKED BENCHMARK DB TO SAVE BASE RAM
+    # =====================================================================
+    # STATIC BENCHMARK SETUP
+    # =====================================================================
     benchmark_db_file = joinpath(output_base_dir, "benchmark.duckdb")
     rm(benchmark_db_file, force=true)
-    connection_benchmark_setup = DuckDB.DBInterface.connect(DuckDB.DB, benchmark_db_file)
+    connection_benchmark = DuckDB.DBInterface.connect(DuckDB.DB, benchmark_db_file)
     
-    TIO.read_csv_folder(connection_benchmark_setup, input_data_path)
-    profiles_wide = TIO.get_table(connection_benchmark_setup, "profiles_wide")
+    TIO.read_csv_folder(connection_benchmark, input_data_path)
+    profiles_wide = TIO.get_table(connection_benchmark, "profiles_wide")
     
     all_scenarios = sort(unique(profiles_wide.scenario))
     n_scenarios = length(all_scenarios)
     time_to_cluster = 0.0
 
+    solver = "Gurobi"
+    optimizer, parameters = get_solver_parameters(Symbol(solver))
+
     if run_benchmark
-        @info "Running the base case study (0_HourlyBenchmark) setup"
+        @info "Building the STATIC N=$(n_scenarios) Benchmark Model in RAM ONCE..."
         base_name = "0_HourlyBenchmark"
 
-        # update the CSV input data for Tulipa from the config file info
         DuckDB.query(
-            connection_benchmark_setup,
-            "
-            UPDATE model_parameters 
-            SET
-                risk_aversion_weight_lambda = $(lambda) ,
-                risk_aversion_confidence_level_alpha = $(alpha);
-            ",
+            connection_benchmark,
+            "UPDATE model_parameters SET risk_aversion_weight_lambda = $(lambda), risk_aversion_confidence_level_alpha = $(alpha);"
         )
-        # Ensure Relatively Complete Recourse
         DuckDB.query(
-            connection_benchmark_setup,
+            connection_benchmark,
             "UPDATE asset SET capacity = 1000000 WHERE asset IN ('ens', 'smr_ccs');"
         )
 
-        # transform the profiles data from wide to long
-        TC.transform_wide_to_long!(
-            connection_benchmark_setup,
-            "profiles_wide",
-            "profiles";
-            exclude_columns=["scenario", "milestone_year", "timestep"],
-        )
+        TC.transform_wide_to_long!(connection_benchmark, "profiles_wide", "profiles"; exclude_columns=["scenario", "milestone_year", "timestep"])
+        layout = TC.ProfilesTableLayout(; year=:milestone_year, cols_to_groupby=[:milestone_year, :scenario])
+        time_to_cluster = @elapsed TC.dummy_cluster!(connection_benchmark; layout=layout)
+        TEM.populate_with_defaults!(connection_benchmark)
+        DuckDB.query(connection_benchmark, "UPDATE asset SET is_seasonal = false")
 
-        layout = TC.ProfilesTableLayout(;
-            year=:milestone_year,
-            cols_to_groupby=[:milestone_year, :scenario],
+        energy_problem_benchmark = TEM.EnergyProblem(connection_benchmark)
+        TEM.create_model!(
+            energy_problem_benchmark;
+            optimizer=optimizer,
+            optimizer_parameters=parameters,
+            model_file_name="",
+            enable_names=enable_names,
+            direct_model=direct_model,
         )
-        time_to_cluster = @elapsed TC.dummy_cluster!(connection_benchmark_setup; layout=layout)
-        TEM.populate_with_defaults!(connection_benchmark_setup)
-        DuckDB.query(connection_benchmark_setup, "UPDATE asset SET is_seasonal = false")
-
-        @info "⏩ FAST RESUME: Bypassing initial benchmark model creation to save RAM."
+        @info "✅ Static Benchmark Model built and retained in memory."
     end
     
-    # Close the setup connection so DuckDB releases internal RAM caches
-    DuckDB.close(connection_benchmark_setup)
-    connection_benchmark_setup = nothing
-    GC.gc(true)
-
     # =====================================================================
     # IPDSR STANDALONE EXPERIMENT
     # =====================================================================
     base_name = "IPDSR_Experiment"
-    solver = "Gurobi"
-    optimizer, parameters = get_solver_parameters(Symbol(solver))
-
     @info "Processing case study: $base_name"
 
     iter = 0
-    
-    # Bootstrap Iteration 1: Randomly select K scenarios to start
     last_selected_scenarios = shuffle(all_scenarios)[1:target_scenarios]
     last_weights = fill(1.0 / target_scenarios, target_scenarios)
     
-    ipdsr_converged = false
-
     while iter < IPDSR_MAX_ITER
         iter += 1
         @info "=== IPDSR Iteration $iter ==="
         
-        # 1. Create a fresh connection (Disk-backed to save RAM)
         db_file = joinpath(output_base_dir, "temp_iter_$(iter).duckdb")
         connection = DuckDB.DBInterface.connect(DuckDB.DB, db_file)
         TIO.read_csv_folder(connection, input_data_path)
 
-        # 2. Physically delete discarded scenarios from the database 
         scen_str = join(["'" * string(s) * "'" for s in last_selected_scenarios], ", ")
         DuckDB.query(connection, "DELETE FROM profiles_wide WHERE scenario NOT IN ($scen_str)")
         DuckDB.query(connection, "DELETE FROM stochastic_scenario WHERE scenario NOT IN ($scen_str)")
 
-        # Update the weights for the kept scenarios
         for (i, scen) in enumerate(last_selected_scenarios)
             weight = last_weights[i]
             DuckDB.query(connection, "UPDATE stochastic_scenario SET probability = $weight WHERE scenario = '$scen'")
         end
 
-        # Apply risk parameters
-        DuckDB.query(
-            connection,
-            "UPDATE model_parameters SET risk_aversion_weight_lambda = $(lambda), risk_aversion_confidence_level_alpha = $(alpha);"
-        )
+        DuckDB.query(connection, "UPDATE model_parameters SET risk_aversion_weight_lambda = $(lambda), risk_aversion_confidence_level_alpha = $(alpha);")
 
-        # Transform to long format
-        TC.transform_wide_to_long!(
-            connection,
-            "profiles_wide",
-            "profiles";
-            exclude_columns=["scenario", "milestone_year", "timestep"],
-        )
-        
-        # Bypass TC.cluster! entirely. We just format the data.
+        TC.transform_wide_to_long!(connection, "profiles_wide", "profiles"; exclude_columns=["scenario", "milestone_year", "timestep"])
         layout = TC.ProfilesTableLayout(; year=:milestone_year, cols_to_groupby=[:milestone_year, :scenario])
         time_to_cluster = @elapsed TC.dummy_cluster!(connection; layout=layout)
         TEM.populate_with_defaults!(connection)
         DuckDB.query(connection, "UPDATE asset SET is_seasonal = false")
 
-        # 3. Build and Solve the TRUE Reduced Model
+        # --- BUILD EPHEMERAL REDUCED MODEL ---
         time_to_read = @elapsed energy_problem = TEM.EnergyProblem(connection)
-        
         @info "Creating the REDUCED model (K=$target_scenarios)"
         time_to_create = @elapsed TEM.create_model!(
             energy_problem;
@@ -259,7 +228,6 @@ function main()
         time_to_solve = @elapsed TEM.solve_model!(energy_problem)
         time_to_save = @elapsed TEM.save_solution!(energy_problem)
         
-        # --- EXTRACT METRICS & VALUES BEFORE NUKING THE REDUCED MODEL ---
         LB = energy_problem.objective_value
         reduced_term_status = string(energy_problem.termination_status)
         reduced_num_cons = JuMP.num_constraints(energy_problem.model; count_variable_in_set_constraints=false)
@@ -268,7 +236,8 @@ function main()
         val_assets_investment = JuMP.value.(energy_problem.variables[:assets_investment].container)
         val_assets_investment_energy = JuMP.value.(energy_problem.variables[:assets_investment_energy].container)
 
-        # --- AGGRESSIVELY DESTROY THE REDUCED MODEL TO FREE RAM ---
+        # --- AGGRESSIVELY DESTROY THE REDUCED MODEL ---
+        @info "Destroying Ephemeral Reduced Model to free RAM..."
         if hasproperty(energy_problem, :model) && !isnothing(energy_problem.model)
             empty!(energy_problem.model)
             finalize(energy_problem.model)
@@ -276,28 +245,13 @@ function main()
         energy_problem = nothing
         GC.gc(true)
         if Sys.islinux()
-            ccall(:malloc_trim, Cint, (Cint,), 0) # Force Linux to reclaim C-library memory
+            ccall(:malloc_trim, Cint, (Cint,), 0)
         end
         
-        # 4. Apply to Benchmark and Calculate OG
+        # --- APPLY TO STATIC BENCHMARK ---
         if run_benchmark
-            @info "Evaluating validation decision against the Benchmark"
+            @info "Evaluating validation decision against the Static Benchmark"
 
-            @info "Opening Benchmark DuckDB connection..."
-            conn_bench = DuckDB.DBInterface.connect(DuckDB.DB, benchmark_db_file)
-
-            @info "Building the N=$(n_scenarios) Benchmark Model in RAM..."
-            energy_problem_benchmark = TEM.EnergyProblem(conn_bench)
-            TEM.create_model!(
-                energy_problem_benchmark;
-                optimizer=optimizer,
-                optimizer_parameters=parameters,
-                model_file_name="",
-                enable_names=enable_names,
-                direct_model=direct_model,
-            )
-            
-            # --- APPLY EXTRACTED VALUES TO BENCHMARK ---
             var_to_fix_inv = energy_problem_benchmark.variables[:assets_investment].container
             for (var, val) in zip(var_to_fix_inv, val_assets_investment)
                 JuMP.fix(var, val; force=true)
@@ -309,6 +263,7 @@ function main()
             end
             
             time_to_resolve_benchmark = @elapsed TEM.solve_model!(energy_problem_benchmark)
+            TEM.save_solution!(energy_problem_benchmark) # Required to populate DuckDB tables for the queries below!
             
             UB = energy_problem_benchmark.objective_value
             OG = abs(UB - LB) / abs(UB)
@@ -318,19 +273,19 @@ function main()
             @info "Current Optimality Gap (OG): $(round(OG * 100, digits=3))%"
  
             ens_query = "SELECT COUNT(*) as count FROM var_flow WHERE from_asset = 'ens' AND to_asset = 'e_demand' AND solution > 0.0"
-            n_lol_ens_df = DuckDB.query(conn_bench, ens_query) |> DataFrame
+            n_lol_ens_df = DuckDB.query(connection_benchmark, ens_query) |> DataFrame
             n_lol_ens = nrow(n_lol_ens_df) > 0 ? n_lol_ens_df.count[1] : 0
 
             smr_query = "SELECT COUNT(*) as count FROM var_flow WHERE from_asset = 'smr_ccs' AND to_asset = 'h2_demand' AND solution > 0.0"
-            n_lol_smr_df = DuckDB.query(conn_bench, smr_query) |> DataFrame
+            n_lol_smr_df = DuckDB.query(connection_benchmark, smr_query) |> DataFrame
             n_lol_smr_cca = nrow(n_lol_smr_df) > 0 ? n_lol_smr_df.count[1] : 0
 
             water_query = "SELECT SUM(solution) as total FROM var_flow WHERE from_asset = 'water_borrower' AND to_asset = 'hydro_reservoir'"
-            water_df = DuckDB.query(conn_bench, water_query) |> DataFrame
+            water_df = DuckDB.query(connection_benchmark, water_query) |> DataFrame
             amount_water_borrowed = (nrow(water_df) > 0 && !ismissing(water_df.total[1])) ? water_df.total[1] : 0.0
             
             mu_query = "SELECT solution FROM var_value_at_risk_threshold_mu LIMIT 1"
-            mu_value_df = DuckDB.query(conn_bench, mu_query) |> DataFrame
+            mu_value_df = DuckDB.query(connection_benchmark, mu_query) |> DataFrame
             mu_value = (nrow(mu_value_df) > 0 && !ismissing(mu_value_df.solution[1])) ? Float64(mu_value_df.solution[1]) : 0.0
 
             new_results_row = (
@@ -361,7 +316,6 @@ function main()
                 TEM.export_solution_to_csv_files(output_folder_fixed, energy_problem_benchmark)
                 
                 push!(results_df, new_results_row)
-                DuckDB.close(conn_bench)
                 break
             end
 
@@ -373,7 +327,6 @@ function main()
             F_costs = df_costs.operational_cost
             gamma = fill(1.0 / number_of_scenarios, number_of_scenarios)
             
-            # Aggregate and Solve
             N_prime = min(length(F_costs), max(20, 10)) 
             F_agg, gamma_agg, original_mapping = aggregate_objectives(F_costs, gamma, N_prime)
             
@@ -383,7 +336,6 @@ function main()
             if isempty(selected_agg_idx)
                 @warn "IPDSR failed to find scenarios. Saving current best and aborting."
                 push!(results_df, new_results_row)
-                DuckDB.close(conn_bench)
                 break
             end
 
@@ -397,28 +349,11 @@ function main()
                 TEM.export_solution_to_csv_files(output_folder_fixed, energy_problem_benchmark)
                 
                 push!(results_df, new_results_row)
-                DuckDB.close(conn_bench)
                 break
             end
 
             last_selected_scenarios = copy(selected_original_scenarios)
             last_weights = copy(new_weights)
-            
-            @info "Destroying the Benchmark Model to free RAM for the next iteration..."
-            if hasproperty(energy_problem_benchmark, :model) && !isnothing(energy_problem_benchmark.model)
-                empty!(energy_problem_benchmark.model)
-                finalize(energy_problem_benchmark.model)
-            end
-            energy_problem_benchmark = nothing
-            
-            # Clear duckdb internal caches per iteration
-            DuckDB.close(conn_bench)
-            conn_bench = nothing
-            
-            GC.gc(true)
-            if Sys.islinux()
-                ccall(:malloc_trim, Cint, (Cint,), 0) # Force Linux to reclaim C-library memory
-            end
             
         else
             # Handles the case if the user set run_benchmark = false in config
@@ -439,7 +374,7 @@ function main()
             break
         end
         
-        # Explicitly close DuckDB, delete temp file, and force full GC
+        # Explicitly close temporary loop DuckDB and force full GC
         DuckDB.close(connection)
         connection = nothing
         df_costs = nothing
@@ -451,8 +386,9 @@ function main()
         end
     end 
     
-    # Physically delete the benchmark database at the end of the script
+    # Clean up benchmark connection at the very end
     if run_benchmark
+        DuckDB.close(connection_benchmark)
         rm(benchmark_db_file, force=true)
     end
 
