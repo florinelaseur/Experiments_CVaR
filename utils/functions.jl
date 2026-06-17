@@ -13,7 +13,7 @@ function get_solver_parameters(optimizer::Symbol)
             "OutputFlag" => 1,
             "Method" => 1,
             "Crossover" => 0,       
-            "NodefileStart" => 0.1,
+            "NodefileStart" => 0.5, 
             "Threads" => 2,
             "Presolve" => 1,
         )

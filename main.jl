@@ -58,6 +58,13 @@ number_of_scenarios = parse(Int, get(ENV, "NUMBER_OF_SCENARIOS", string(config["
 target_scenarios = parse(Int, get(ENV, "TARGET_SCENARIOS", string(number_of_scenarios ÷ 2)))
 output_base_dir = get(ENV, "OUTPUT_DIR", joinpath(@__DIR__, "outputs"))
 
+if haskey(ENV, "PREFLIGHT") && ENV["PREFLIGHT"] == "1"
+    @info "PREFLIGHT MODE: Overriding config for smoke test."
+    representative_periods = [2]
+    number_of_scenarios = 4
+    target_scenarios = 2
+end
+
 run_benchmark = config["simulation"]["run_benchmark"]
 
 profiles_path = joinpath(@__DIR__, "create-scenarios", "profiles-wide-all-scenarios.csv")
@@ -73,6 +80,10 @@ df_stochastic_scenario = DataFrame(;
     probability=fill(1.0 / number_of_scenarios, number_of_scenarios),
 )
 CSV.write(joinpath(input_data_path, "stochastic-scenario.csv"), df_stochastic_scenario; writeheader=true)
+
+all_profiles_df = nothing
+profiles_df = nothing
+GC.gc()
 
 case_studies_info = CSV.read(
     "case-studies-info.csv",
@@ -130,7 +141,7 @@ function main()
         DuckDB.query(
             connection_benchmark,
             "
-            UPDATE model_parameters -- tables are with underscore in DuckDB world
+            UPDATE model_parameters 
             SET
                 risk_aversion_weight_lambda = $(lambda) ,
                 risk_aversion_confidence_level_alpha = $(alpha);
@@ -174,55 +185,6 @@ function main()
             )
 
             @info "⏩ FAST RESUME: Bypassing the 1-hour solve. Proceeding directly to IPDSR..."
-
-            # output_folder = joinpath(output_base_dir, base_name, string(solver))
-            # mkpath(output_folder)
-
-            # @info "Solving the model and saving the solution for the base case study (0_HourlyBenchmark) with $solver"
-            # time_to_solve = @elapsed TEM.solve_model!(energy_problem_benchmark)
-            # time_to_save = @elapsed TEM.save_solution!(energy_problem_benchmark)
-            # TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
-
-            # df_cost_per_scenario = export_operational_cost_per_scenario(energy_problem_benchmark, output_folder)
-            # plot_operational_cost_per_scenario(df_cost_per_scenario, output_folder)
-
-            # mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
-            # mu_value = only(mu_value_df.solution)
-            # var_flow_df = TIO.get_table(connection_benchmark, "var_flow")
-            # flow_ens = filter(row -> row.from_asset == "ens" && row.to_asset == "e_demand", var_flow_df)
-            # flow_smr_ccs = filter(row -> row.from_asset == "smr_ccs" && row.to_asset == "h2_demand", var_flow_df)
-            # water_borrowed = filter(row -> row.from_asset == "water_borrower" && row.to_asset == "hydro_reservoir", var_flow_df)
-
-            # # count steps with loss of load
-            # n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
-            # n_lol_smr_cca = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
-            # amount_water_borrowed_b = sum(water_borrowed.solution)
-
-            # new_results_row = (
-            #     base_name=base_name,
-            #     rp=1,
-            #     solver=solver,
-            #     time_to_cluster=0.0,
-            #     time_to_read=time_to_read,
-            #     time_to_create=time_to_create,
-            #     time_to_solve=time_to_solve,
-            #     time_to_save=time_to_save,
-            #     objective_value=energy_problem_benchmark.objective_value,
-            #     termination_status=string(energy_problem_benchmark.termination_status),
-            #     num_constraints=JuMP.num_constraints(
-            #         energy_problem_benchmark.model;
-            #         count_variable_in_set_constraints=false,
-            #     ),
-            #     num_variables=JuMP.num_variables(energy_problem_benchmark.model),
-            #     time_to_resolve_benchmark=0.0,
-            #     objective_value_resolve_benchmark=0.0,
-            #     termination_status_resolve_benchmark="",
-            #     num_loss_of_load_e_demand=n_lol_ens,
-            #     num_loss_of_load_h2_demand=n_lol_smr_cca,
-            #     water_borrowed=amount_water_borrowed_b,
-            #     value_at_risk_threshold_mu=mu_value,
-            # )
-            # push!(results_df, new_results_row)
         end
     end
 
@@ -249,11 +211,11 @@ function main()
         @info "=== IPDSR Iteration $iter ==="
         
         # 1. Create a fresh connection
-        connection = DuckDB.DBInterface.connect(DuckDB.DB)
+        db_file = joinpath(output_base_dir, "temp_iter_$(iter).duckdb")
+        connection = DuckDB.DBInterface.connect(db_file)
         TIO.read_csv_folder(connection, input_data_path)
 
-        # 2. THE FIX: Physically delete discarded scenarios from the database 
-        # so Tulipa only builds a model for the K selected scenarios (Saves 50% RAM!)
+        # 2. Physically delete discarded scenarios from the database 
         scen_str = join(["'" * string(s) * "'" for s in last_selected_scenarios], ", ")
         DuckDB.query(connection, "DELETE FROM profiles_wide WHERE scenario NOT IN ($scen_str)")
         DuckDB.query(connection, "DELETE FROM stochastic_scenario WHERE scenario NOT IN ($scen_str)")
@@ -319,19 +281,22 @@ function main()
             @info "--- IPDSR Iteration $iter Status ---"
             @info "LB (Reduced Cost): $(round(LB, digits=2)) | UB (True Cost): $(round(UB, digits=2))"
             @info "Current Optimality Gap (OG): $(round(OG * 100, digits=3))%"
+ 
+            ens_query = "SELECT COUNT(*) as count FROM var_flow WHERE from_asset = 'ens' AND to_asset = 'e_demand' AND solution > 0.0"
+            n_lol_ens_df = DuckDB.query(connection_benchmark, ens_query) |> DataFrame
+            n_lol_ens = nrow(n_lol_ens_df) > 0 ? n_lol_ens_df.count[1] : 0
 
-            # Save metrics
-            var_flow_df = TIO.get_table(connection_benchmark, "var_flow")
-            flow_ens = filter(row -> row.from_asset == "ens" && row.to_asset == "e_demand", var_flow_df)
-            flow_smr_ccs = filter(row -> row.from_asset == "smr_ccs" && row.to_asset == "h2_demand", var_flow_df)
-            water_borrowed = filter(row -> row.from_asset == "water_borrower" && row.to_asset == "hydro_reservoir", var_flow_df)
+            smr_query = "SELECT COUNT(*) as count FROM var_flow WHERE from_asset = 'smr_ccs' AND to_asset = 'h2_demand' AND solution > 0.0"
+            n_lol_smr_df = DuckDB.query(connection_benchmark, smr_query) |> DataFrame
+            n_lol_smr_cca = nrow(n_lol_smr_df) > 0 ? n_lol_smr_df.count[1] : 0
+
+            water_query = "SELECT SUM(solution) as total FROM var_flow WHERE from_asset = 'water_borrower' AND to_asset = 'hydro_reservoir'"
+            water_df = DuckDB.query(connection_benchmark, water_query) |> DataFrame
+            amount_water_borrowed = (nrow(water_df) > 0 && !ismissing(water_df.total[1])) ? water_df.total[1] : 0.0
             
-            n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
-            n_lol_smr_cca = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
-            amount_water_borrowed = sum(water_borrowed.solution)
-            
-            mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
-            mu_value = only(mu_value_df.solution)
+            mu_query = "SELECT solution FROM var_value_at_risk_threshold_mu LIMIT 1"
+            mu_value_df = DuckDB.query(connection_benchmark, mu_query) |> DataFrame
+            mu_value = (nrow(mu_value_df) > 0 && !ismissing(mu_value_df.solution[1])) ? Float64(mu_value_df.solution[1]) : 0.0
 
             new_results_row = (
                 base_name=base_name, rp=1, solver=Symbol(solver),
@@ -420,10 +385,17 @@ function main()
             break
         end
         
-        # 6. MEMORY LEAK FIX: Explicitly close the DuckDB connection and clear memory
+        if hasproperty(energy_problem, :model) && !isnothing(energy_problem.model)
+            empty!(energy_problem.model)
+        end
+        
+        # Explicitly close DuckDB, delete temp file, and force full GC
         DuckDB.close(connection)
-        energy_problem = nothing
-        GC.gc()
+        connection = nothing
+        df_costs = nothing
+        rm(db_file, force=true)
+        
+        GC.gc(true)
     end 
     
     # Clean up benchmark connection at the very end
