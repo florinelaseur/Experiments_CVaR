@@ -69,9 +69,14 @@ def run_experiment(n_scenarios: int, target_k: int, seed: int, base_out_dir: Pat
 
 def main():
     # --- EXPERIMENT DEFINITIONS ---
-    scenario_pools = [10, 20, 30]
+    scenario_pools = [30, 
+                      20, 
+                      10
+                    ]
     seeds = [1, 2, 3, 4, 5, 6, 7]
     base_out_dir = Path(__file__).parent / "pipeline-results"
+    experiment_name = "2026-06-17_001"
+    base_out_dir = base_out_dir / experiment_name
 
     print("=" * 60)
     print(" IPDSR BATCH EXPERIMENT PIPELINE")
