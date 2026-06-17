@@ -169,3 +169,114 @@ end
            sample_vector_by_asset,
            JSON
 end
+
+# Equivalence between the two variable-fixing entry points:
+#   fix_variables_from_solution! (utils/functions.jl) — positional zip of solved
+#     model-unit values from a reduced model onto a benchmark model (no reorder,
+#     no unit conversion).
+#   fix_variables_from_sample   (src/utils.jl)        — for :assets_investment,
+#     treats the sample as MW in INVESTABLE_ASSETS order, then reorders to
+#     container order and divides by capacity (MW -> model units).
+# src/utils.jl is include-safe from tests (TEM/TC/DuckDB are referenced lazily in
+# functions we never call); it transitively includes investment_mapping.jl.
+# utils/functions.jl is pure function definitions (no top-level `using`/code), so
+# including it only needs `DataFrame` in scope at definition time.
+@testmodule FixEquivalenceSetup begin
+    using JuMP: JuMP
+    using HiGHS: HiGHS
+    using DataFrames: DataFrame, DataFrames, eachrow, nrow
+
+    include(joinpath(@__DIR__, "..", "src", "utils.jl"))
+    include(joinpath(@__DIR__, "..", "..", "utils", "functions.jl"))
+
+    # In-memory analog of read_investment_mw: read solved model-unit values from a
+    # solved container and convert to MW in INVESTABLE_ASSETS order. This is the
+    # inverse of align_investment_sample_to_indices, so feeding the result back
+    # through fix_variables_from_sample must reproduce the solution-path fix values.
+    function investment_mw_from_solution(variables, capacity_lookup; assets=INVESTABLE_ASSETS)
+        inv = variables[:assets_investment]
+        model_units = JuMP.value.(inv.container)            # container order, model units
+        inv_df = DataFrame(inv.indices)
+        by_asset = Dict{String,Float64}()
+        for (i, row) in enumerate(eachrow(inv_df))
+            asset = string(row.asset)
+            by_asset[asset] = model_units[i] * capacity_lookup[asset]   # -> MW
+        end
+        return Float64[by_asset[a] for a in assets]         # INVESTABLE_ASSETS order, MW
+    end
+
+    # Build a reduced (HiGHS-solved) + benchmark (solver-free) pair of mock objects
+    # whose `var_symbol` containers share `asset_order`. `model_units[i]` is the
+    # solved value placed on container position i of the reduced model; a trivial
+    # solve over fixed variables makes JuMP.value(reduced container) == model_units.
+    # The benchmark variables are only ever fixed/unfixed, so they need no solver.
+    function build_solved_mock(asset_order, model_units; var_symbol=:assets_investment, year=2030)
+        n = length(asset_order)
+        @assert length(model_units) == n
+        inv_df = DataFrame(; asset=collect(asset_order), milestone_year=fill(year, n))
+
+        rmodel = JuMP.Model(HiGHS.Optimizer)
+        JuMP.set_silent(rmodel)
+        red = [JuMP.@variable(rmodel) for _ in 1:n]
+        for i in 1:n
+            JuMP.fix(red[i], Float64(model_units[i]); force=true)
+        end
+        JuMP.optimize!(rmodel)
+
+        bmodel = JuMP.Model()
+        bench = [JuMP.@variable(bmodel) for _ in 1:n]
+
+        reduced = (; variables=Dict(var_symbol => (; indices=inv_df, container=red)))
+        benchmark = (; variables=Dict(var_symbol => (; indices=inv_df, container=bench)))
+        return (; reduced, benchmark, reduced_model=rmodel, bench_model=bmodel)
+    end
+
+    # Fix the benchmark via the solution path, record fix_values, UNFIX, then fix via
+    # the sample path using the *equivalent* sample, record, and compare. Returns a
+    # NamedTuple (no @test inside) so it composes for positive and negative cases.
+    function assert_fix_paths_equivalent!(
+        benchmark,
+        reduced,
+        var_symbol;
+        capacity_lookup=nothing,
+        tol=1e-8,
+    )
+        container = benchmark.variables[var_symbol].container
+
+        fix_variables_from_solution!(benchmark, reduced, var_symbol)         # path A
+        via_solution = Float64[JuMP.fix_value(v) for v in container]
+        for v in container
+            JuMP.unfix(v)
+        end
+
+        sample = if var_symbol == :assets_investment
+            capacity_lookup === nothing &&
+                error("capacity_lookup required for :assets_investment")
+            investment_mw_from_solution(reduced.variables, capacity_lookup)  # MW, INVESTABLE_ASSETS order
+        else
+            collect(JuMP.value.(reduced.variables[var_symbol].container))    # model units, container order
+        end
+        fix_variables_from_sample(benchmark.variables, var_symbol, sample; capacity_lookup)  # path B
+        via_sample = Float64[JuMP.fix_value(v) for v in container]
+
+        @assert length(via_solution) == length(via_sample)
+        max_abs_diff = maximum(abs.(via_solution .- via_sample))
+        return (;
+            via_solution,
+            via_sample,
+            sample,
+            max_abs_diff,
+            equivalent=max_abs_diff <= tol,
+        )
+    end
+
+    export JuMP,
+           HiGHS,
+           DataFrame,
+           INVESTABLE_ASSETS,
+           fix_variables_from_sample,
+           fix_variables_from_solution!,
+           investment_mw_from_solution,
+           build_solved_mock,
+           assert_fix_paths_equivalent!
+end
