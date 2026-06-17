@@ -35,5 +35,5 @@ const LEGEND_METHOD_MAP = Dict(
 
 const IPDSR_THREADS = 2
 const IPDSR_TIME_LIMIT = 60.0
-const IPDSR_MIP_GAP = 0.01
+const IPDSR_MIP_GAP = 0.0
 const IPDSR_MAX_ITER = 20

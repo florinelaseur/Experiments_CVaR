@@ -165,7 +165,7 @@ def main():
     scenario_pools = [30, 20, 10]
     seeds = [1, 2, 3, 4, 5, 6, 7]
     base_out_dir = Path(__file__).parent / "pipeline-results"
-    experiment_name = "2026-06-17_003"
+    experiment_name = "2026-06-17_005"
     base_out_dir = base_out_dir / experiment_name
 
     # Create base dir before setting up master logger

@@ -210,9 +210,9 @@ function main()
         iter += 1
         @info "=== IPDSR Iteration $iter ==="
         
-        # 1. Create a fresh connection
+        # 1. Create a fresh connection (Disk-backed to save RAM)
         db_file = joinpath(output_base_dir, "temp_iter_$(iter).duckdb")
-        connection = DuckDB.DBInterface.connect(db_file)
+        connection = DuckDB.DBInterface.connect(DuckDB.DB, db_file)
         TIO.read_csv_folder(connection, input_data_path)
 
         # 2. Physically delete discarded scenarios from the database 
@@ -266,15 +266,40 @@ function main()
         time_to_solve = @elapsed TEM.solve_model!(energy_problem)
         time_to_save = @elapsed TEM.save_solution!(energy_problem)
         
+        # --- NEW: EXTRACT METRICS & VALUES BEFORE NUKING THE REDUCED MODEL ---
+        LB = energy_problem.objective_value
+        reduced_term_status = string(energy_problem.termination_status)
+        reduced_num_cons = JuMP.num_constraints(energy_problem.model; count_variable_in_set_constraints=false)
+        reduced_num_vars = JuMP.num_variables(energy_problem.model)
+        
+        val_assets_investment = JuMP.value.(energy_problem.variables[:assets_investment].container)
+        val_assets_investment_energy = JuMP.value.(energy_problem.variables[:assets_investment_energy].container)
+
+        # --- NEW: AGGRESSIVELY DESTROY THE REDUCED MODEL TO FREE RAM ---
+        if hasproperty(energy_problem, :model) && !isnothing(energy_problem.model)
+            empty!(energy_problem.model)
+            finalize(energy_problem.model)
+        end
+        energy_problem = nothing
+        GC.gc(true)
+        
         # 4. Apply to Benchmark and Calculate OG
         if run_benchmark
             @info "Evaluating validation decision against the Benchmark"
-            fix_variables_from_solution!(energy_problem_benchmark, energy_problem, :assets_investment)
-            fix_variables_from_solution!(energy_problem_benchmark, energy_problem, :assets_investment_energy)
+            
+            # --- NEW: APPLY EXTRACTED VALUES TO BENCHMARK ---
+            var_to_fix_inv = energy_problem_benchmark.variables[:assets_investment].container
+            for (var, val) in zip(var_to_fix_inv, val_assets_investment)
+                JuMP.fix(var, val; force=true)
+            end
+
+            var_to_fix_ene = energy_problem_benchmark.variables[:assets_investment_energy].container
+            for (var, val) in zip(var_to_fix_ene, val_assets_investment_energy)
+                JuMP.fix(var, val; force=true)
+            end
             
             time_to_resolve_benchmark = @elapsed TEM.solve_model!(energy_problem_benchmark)
             
-            LB = energy_problem.objective_value
             UB = energy_problem_benchmark.objective_value
             OG = abs(UB - LB) / abs(UB)
             
@@ -303,9 +328,9 @@ function main()
                 time_to_cluster=time_to_cluster, time_to_read=time_to_read,
                 time_to_create=time_to_create, time_to_solve=time_to_solve,
                 time_to_save=time_to_save, objective_value=LB,
-                termination_status=string(energy_problem.termination_status),
-                num_constraints=JuMP.num_constraints(energy_problem.model; count_variable_in_set_constraints=false),
-                num_variables=JuMP.num_variables(energy_problem.model),
+                termination_status=reduced_term_status,
+                num_constraints=reduced_num_cons,
+                num_variables=reduced_num_vars,
                 time_to_resolve_benchmark=time_to_resolve_benchmark,
                 objective_value_resolve_benchmark=UB,
                 termination_status_resolve_benchmark=string(energy_problem_benchmark.termination_status),
@@ -316,7 +341,7 @@ function main()
             # Check Convergence
             if OG <= IPDSR_MIP_GAP || iter == IPDSR_MAX_ITER
                 if OG <= IPDSR_MIP_GAP
-                    @info "✅ IPDSR SUCCESSFULLY CONVERGED at Iteration $iter!"
+                    @info "✅ IPDSR SUCCESSFULLY CONVERGED at Iteration $(iter)!"
                 else
                     @warn "⚠️ IPDSR hit Max Iterations ($IPDSR_MAX_ITER) without perfect convergence."
                 end
@@ -372,10 +397,10 @@ function main()
                 base_name=base_name, rp=1, solver=Symbol(solver),
                 time_to_cluster=time_to_cluster, time_to_read=time_to_read,
                 time_to_create=time_to_create, time_to_solve=time_to_solve,
-                time_to_save=time_to_save, objective_value=energy_problem.objective_value,
-                termination_status=string(energy_problem.termination_status),
-                num_constraints=JuMP.num_constraints(energy_problem.model; count_variable_in_set_constraints=false),
-                num_variables=JuMP.num_variables(energy_problem.model),
+                time_to_save=time_to_save, objective_value=LB,
+                termination_status=reduced_term_status,
+                num_constraints=reduced_num_cons,
+                num_variables=reduced_num_vars,
                 time_to_resolve_benchmark=0.0, objective_value_resolve_benchmark=0.0,
                 termination_status_resolve_benchmark="", num_loss_of_load_e_demand=0,
                 num_loss_of_load_h2_demand=0, water_borrowed=0.0, value_at_risk_threshold_mu=0.0,
@@ -385,10 +410,7 @@ function main()
             break
         end
         
-        if hasproperty(energy_problem, :model) && !isnothing(energy_problem.model)
-            empty!(energy_problem.model)
-        end
-        
+
         # Explicitly close DuckDB, delete temp file, and force full GC
         DuckDB.close(connection)
         connection = nothing
