@@ -1,5 +1,5 @@
 
-function get_solver_parameters(optimizer::Symbol)
+function get_solver_parameters(optimizer::Symbol, seed::Int = 42)
     if optimizer == :HiGHS
         return HiGHS.Optimizer,
         Dict(
@@ -11,11 +11,12 @@ function get_solver_parameters(optimizer::Symbol)
     elseif optimizer == :Gurobi
         return Gurobi.Optimizer, Dict(
             "OutputFlag" => 1,
-            "Method" => 1,
+            "Method" => 2,
             "Crossover" => 0,       
             "NodefileStart" => 0.5, 
             "Threads" => 2,
             "Presolve" => 1,
+            "Seed" => seed,
         )
     else
         return HiGHS.Optimizer, Dict()

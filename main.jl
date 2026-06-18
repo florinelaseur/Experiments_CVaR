@@ -24,6 +24,7 @@ using TOML: TOML
 using Plots
 using Random
 using DataFrames
+using Dates
 
 seed = parse(Int, get(ENV, "EXPERIMENT_SEED", "19990907"))
 Random.seed!(seed)
@@ -141,7 +142,7 @@ function main()
     time_to_cluster = 0.0
 
     solver = "Gurobi"
-    optimizer, parameters = get_solver_parameters(Symbol(solver))
+    optimizer, parameters = get_solver_parameters(Symbol(solver), seed)
 
     if run_benchmark
         @info "Building the STATIC N=$(n_scenarios) Benchmark Model in RAM ONCE..."
@@ -271,7 +272,8 @@ function main()
             @info "--- IPDSR Iteration $iter Status ---"
             @info "LB (Reduced Cost): $(round(LB, digits=2)) | UB (True Cost): $(round(UB, digits=2))"
             @info "Current Optimality Gap (OG): $(round(OG * 100, digits=3))%"
- 
+            @info "Current time: $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS.sss"))"
+            
             ens_query = "SELECT COUNT(*) as count FROM var_flow WHERE from_asset = 'ens' AND to_asset = 'e_demand' AND solution > 0.0"
             n_lol_ens_df = DuckDB.query(connection_benchmark, ens_query) |> DataFrame
             n_lol_ens = nrow(n_lol_ens_df) > 0 ? n_lol_ens_df.count[1] : 0
@@ -331,7 +333,7 @@ function main()
             F_agg, gamma_agg, original_mapping = aggregate_objectives(F_costs, gamma, N_prime)
             
             @info "Solving IPDSR MIP to reduce to K = $target_scenarios scenarios..."
-            selected_agg_idx, new_weights = solve_ipdsr_mip(F_agg, gamma_agg, target_scenarios, lambda, alpha)
+            selected_agg_idx, new_weights = solve_ipdsr_mip(F_agg, gamma_agg, target_scenarios, lambda, alpha, seed)
             
             if isempty(selected_agg_idx)
                 @warn "IPDSR failed to find scenarios. Saving current best and aborting."

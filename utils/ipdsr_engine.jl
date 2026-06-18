@@ -42,7 +42,7 @@ function aggregate_objectives(F::Vector{Float64}, gamma::Vector{Float64}, N_prim
     return F_agg, gamma_agg, mapping
 end
 
-function solve_ipdsr_mip(F::Vector{Float64}, gamma::Vector{Float64}, K::Int, lambda::Float64, alpha::Float64)
+function solve_ipdsr_mip(F::Vector{Float64}, gamma::Vector{Float64}, K::Int, lambda::Float64, alpha::Float64, seed::Int = 42)
     N = length(F)
 
     # 1. Calculate original VaR (v_xi_alpha)
@@ -73,6 +73,7 @@ function solve_ipdsr_mip(F::Vector{Float64}, gamma::Vector{Float64}, K::Int, lam
     JuMP.set_optimizer_attribute(model, "Threads", IPDSR_THREADS) 
     JuMP.set_optimizer_attribute(model, "TimeLimit", IPDSR_TIME_LIMIT) 
     JuMP.set_optimizer_attribute(model, "MIPGap", IPDSR_MIP_GAP) 
+    JuMP.set_optimizer_attribute(model, "Seed", seed)
 
     @variable(model, u[1:N], Bin)
     @variable(model, v[1:N, 1:N], Bin)
