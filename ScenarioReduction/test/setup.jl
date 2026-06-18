@@ -184,6 +184,7 @@ end
 @testmodule FixEquivalenceSetup begin
     using JuMP: JuMP
     using HiGHS: HiGHS
+    using CSV: CSV
     using DataFrames: DataFrame, DataFrames, eachrow, nrow
 
     include(joinpath(@__DIR__, "..", "src", "utils.jl"))
@@ -272,10 +273,12 @@ end
 
     export JuMP,
            HiGHS,
+           CSV,
            DataFrame,
            INVESTABLE_ASSETS,
            fix_variables_from_sample,
            fix_variables_from_solution!,
+           read_investment_mw,
            investment_mw_from_solution,
            build_solved_mock,
            assert_fix_paths_equivalent!

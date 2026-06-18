@@ -52,12 +52,14 @@ representative_periods = config["simulation"]["representative_periods"]
 solvers = [Symbol(el) for el in config["simulation"]["solvers"]]
 lambda = config["simulation"]["risk_aversion_weight_lambda"]
 alpha = config["simulation"]["risk_aversion_confidence_level"]
-number_of_scenarios = config["simulation"]["number_of_scenarios"]
+#number_of_scenarios = config["simulation"]["number_of_scenarios"]
+number_of_scenarios = 10
 run_benchmark = config["simulation"]["run_benchmark"]
 
 profiles_path = joinpath(@__DIR__, "create-scenarios", "profiles-wide-all-scenarios.csv")
 all_profiles_df = CSV.read(profiles_path, DataFrame)
-profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
+#profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
+profiles_df = get_scenario_set_by_ids(all_profiles_df, [127, 129, 29, 31, 44, 72, 83, 94, 96, 139])
 selected_scenarios = sort(unique(profiles_df.scenario))
 mapping = Dict(old => new for (new, old) in enumerate(selected_scenarios))
 profiles_df[!, :scenario] = [mapping[s] for s in profiles_df.scenario]
@@ -168,7 +170,7 @@ function main()
                 direct_model=direct_model,
             )
 
-            output_folder = joinpath(@__DIR__, "outputs", base_name, string(solver))
+            output_folder = joinpath(@__DIR__, "outputs/test-results", base_name, string(solver))
             mkpath(output_folder)
 
             @info "Solving the model and saving the solution for the base case study (0_HourlyBenchmark) with $solver"

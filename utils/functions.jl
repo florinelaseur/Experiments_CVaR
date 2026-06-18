@@ -547,6 +547,15 @@ function get_scenario_set(input_df::DataFrame, cardinality::Int)
     return filter(row -> row.scenario in selected, input_df)
 end
 
+function get_scenario_set_by_ids(input_df::DataFrame, scenario_ids::AbstractVector{<:Integer})
+    selected = sort(unique(Int.(scenario_ids)))
+    isempty(selected) && error("scenario_ids must be non-empty")
+    available = Set(Int.(input_df.scenario))
+    missing = [id for id in selected if id ∉ available]
+    !isempty(missing) && error("scenario id(s) not in input_df: $(missing)")
+    return filter(row -> row.scenario in selected, input_df)
+end
+
 
 function export_operational_cost_per_scenario(energy_problem, output_folder)
     costs_per_scenario = energy_problem.expressions[:flows_operational_cost_per_scenario]

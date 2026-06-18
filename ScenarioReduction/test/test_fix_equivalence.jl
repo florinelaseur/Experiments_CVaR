@@ -131,3 +131,59 @@ end
     @test !all(isapprox.(via_solution, via_sample_raw; atol=1e-8))
     @test maximum(abs.(via_solution .- via_sample_raw)) > 1e-8
 end
+
+@testitem "read_investment_mw fixture round-trip agrees with solution path and fix_variables_from_sample" setup = [
+    FixEquivalenceSetup,
+] tags = [:fix_equivalence, :unit, :hybrid] begin
+    # Static mock CSV (fixtures/var_assets_investment.csv): rows in reverse container
+    # container order. Model units per RIDM container position [ccgt, wind, solar, ocgt,
+    # electrolizer, wind_offshore, battery] are [12.5, 4.0, 33.0, 9.0, 1.5, 7.0, 88.0].
+    fixture_dir = joinpath(@__DIR__, "fixtures")
+    caps = Dict(
+        "ccgt" => 0.8,
+        "ocgt" => 0.1,
+        "solar" => 0.5,
+        "wind" => 0.4,
+        "wind_offshore" => 0.4,
+        "electrolizer" => 0.1,
+        "battery" => 0.05,
+    )
+    asset_order = ["ccgt", "wind", "solar", "ocgt", "electrolizer", "wind_offshore", "battery"]
+    model_units = Float64[12.5, 4.0, 33.0, 9.0, 1.5, 7.0, 88.0]
+    expected_mw = Float64[10.0, 0.9, 16.5, 1.6, 2.8, 0.15, 4.4]
+
+    m = build_solved_mock(asset_order, model_units)
+
+    mw_from_csv = read_investment_mw(fixture_dir)
+    @test mw_from_csv !== nothing
+    @test mw_from_csv ≈ expected_mw
+
+    mw_from_mem = investment_mw_from_solution(m.reduced.variables, caps)
+    @test mw_from_mem ≈ expected_mw
+    @test mw_from_csv ≈ mw_from_mem
+
+    container = m.benchmark.variables[:assets_investment].container
+
+    fix_variables_from_solution!(m.benchmark, m.reduced, :assets_investment)
+    via_solution = Float64[JuMP.fix_value(v) for v in container]
+    @test via_solution ≈ model_units
+    for v in container
+        JuMP.unfix(v)
+    end
+
+    fix_variables_from_sample(
+        m.benchmark.variables,
+        :assets_investment,
+        mw_from_csv;
+        capacity_lookup=caps,
+    )
+    via_sample_from_csv = Float64[JuMP.fix_value(v) for v in container]
+    @test via_sample_from_csv ≈ model_units
+    @test via_sample_from_csv ≈ via_solution
+
+    r = assert_fix_paths_equivalent!(
+        m.benchmark, m.reduced, :assets_investment; capacity_lookup=caps,
+    )
+    @test r.equivalent
+    @test r.sample ≈ expected_mw
+end

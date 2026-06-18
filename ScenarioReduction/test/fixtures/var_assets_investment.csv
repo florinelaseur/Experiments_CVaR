@@ -1,0 +1,8 @@
+asset,solution,capacity
+battery,88.0,0.05
+wind_offshore,7.0,0.4
+electrolizer,1.5,0.1
+ocgt,9.0,0.1
+solar,33.0,0.5
+wind,4.0,0.4
+ccgt,12.5,0.8
