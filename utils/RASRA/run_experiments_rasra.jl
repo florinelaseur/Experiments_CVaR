@@ -1,5 +1,4 @@
-# Run batch experiments for main.jl and rasra.jl across multiple seeds and scenario counts
-# It passes the seed via the EXPERIMENT_SEED env variable so each child process is fully isolated
+# Run batch experiments for main.jl, rasra.jl, and main_fixed_rasra.jl across multiple seeds and scenario counts
 
 # Experiment values
 const SEEDS = [1, 2, 3, 4, 5, 6, 7]
@@ -14,6 +13,7 @@ const N_TO_J = Dict(
 
 const RUN_MAIN = true
 const RUN_RASRA = true
+const RUN_MAIN_FIXED_RASRA = true   # Only works if RUN_RASRA = true
 
 using TOML: TOML
 
@@ -21,10 +21,10 @@ const PROJECT_DIR = normpath(joinpath(@__DIR__, "..", ".."))
 const CONFIG_PATH = joinpath(PROJECT_DIR, "config.toml")
 const MAIN_PATH = joinpath(PROJECT_DIR, "main.jl")
 const RASRA_PATH = joinpath(PROJECT_DIR, "rasra.jl")
+const MAIN_FIXED_RASRA_PATH = joinpath(PROJECT_DIR, "main_fixed_rasra.jl")
 
-# Helper functions
-
-"""Patch config.toml with the given key value pairs under [simulation]."""
+# Helpers
+"""Patch config.toml with the given key-value pairs under [simulation]."""
 function patch_config!(pairs::Pair{String}...)
     config = TOML.parsefile(CONFIG_PATH)
     for (k, v) in pairs
@@ -73,8 +73,8 @@ end
 
 # Main loop
 function run_all_experiments()
-    # Check whether N_TO_J are valid up front
-    if RUN_RASRA
+    # Validate N_TO_J up front
+    if RUN_RASRA || RUN_MAIN_FIXED_RASRA
         for n in N_SCENARIOS
             if !haskey(N_TO_J, n)
                 error("N_TO_J has no entry for N=$n")
@@ -86,13 +86,19 @@ function run_all_experiments()
         end
     end
 
-    total = length(SEEDS) * length(N_SCENARIOS) * (RUN_MAIN + RUN_RASRA)
+    if RUN_MAIN_FIXED_RASRA && !RUN_RASRA
+        error("RUN_MAIN_FIXED_RASRA = true requires RUN_RASRA = true")
+    end
+
+    n_scripts = RUN_MAIN + RUN_RASRA + RUN_MAIN_FIXED_RASRA
+    total = length(SEEDS) * length(N_SCENARIOS) * n_scripts
     log = RunRecord[]
     run_idx = 0
 
     for seed in SEEDS, n in N_SCENARIOS
         @info "seed=$seed, N=$n"
 
+        # Full benchmark
         if RUN_MAIN
             run_idx += 1
             patch_config!("number_of_scenarios" => n)
@@ -101,40 +107,56 @@ function run_all_experiments()
             push!(log, RunRecord("main.jl", seed, n, 0, ok, dt))
         end
 
+        # RASRA reduction
+        rasra_ok = false
         if RUN_RASRA
             run_idx += 1
             j = N_TO_J[n]
             patch_config!("number_of_scenarios" => n, "rasra_size_of_j" => j)
             label = "rasra.jl [$run_idx/$total] N=$n J=$j seed=$seed"
-            ok, dt = run_script(RASRA_PATH, seed; label = label)
-            push!(log, RunRecord("rasra.jl", seed, n, j, ok, dt))
+            rasra_ok, dt = run_script(RASRA_PATH, seed; label = label)
+            push!(log, RunRecord("rasra.jl", seed, n, j, rasra_ok, dt))
+        end
+
+        # Re-solve on main with fixed investment decisions
+        if RUN_MAIN_FIXED_RASRA
+            run_idx += 1
+            if !rasra_ok
+                @warn "Skipping main_fixed_rasra.jl for seed=$seed N=$n because rasra.jl failed"
+                push!(log, RunRecord("fixed_rasra.jl", seed, n, 0, false, 0.0))
+            else
+                patch_config!("number_of_scenarios" => n)
+                label = "main_fixed_rasra.jl [$run_idx/$total] N=$n seed=$seed"
+                ok, dt = run_script(MAIN_FIXED_RASRA_PATH, seed; label = label)
+                push!(log, RunRecord("fixed_rasra.jl", seed, n, 0, ok, dt))
+            end
         end
     end
 
-    # Summary
-    println("\n", "="^70)
+    # Summary table
+    println("\n", "="^76)
     println("Experiment Summary")
-    println("="^70)
-    println(rpad("Script", 12), rpad("Seed", 12), rpad("N", 6), rpad("J", 6), rpad("Status", 10), "Time (s)")
-    println("-"^70)
+    println("="^76)
+    println(rpad("Script", 18), rpad("Seed", 8), rpad("N", 6), rpad("J", 6), rpad("Status", 10), "Time (s)")
+    println("-"^76)
     for r in log
         status = r.success ? "OK" : "FAILED"
         j_str = r.j == 0 ? "-" : string(r.j)
         println(
-            rpad(r.script, 12),
-            rpad(string(r.seed), 12),
+            rpad(r.script, 18),
+            rpad(string(r.seed), 8),
             rpad(string(r.n), 6),
             rpad(j_str, 6),
             rpad(status, 10),
             round(r.elapsed; digits = 1),
         )
     end
-    println("="^70)
+    println("="^76)
 
     n_ok = count(r -> r.success, log)
     n_failed = count(r -> !r.success, log)
     total_time = sum(r.elapsed for r in log)
-    @info "Done: $n_ok succeeded, $n_failed failed, total time $(round(total_time / 60; digits=1)) min"
+    @info "Done: $n_ok succeeded, $n_failed failed, " * "total wall time $(round(total_time / 60; digits=1)) min"
 
     return log
 end

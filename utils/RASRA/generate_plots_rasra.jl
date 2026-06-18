@@ -1,5 +1,5 @@
-# This script generates comparison plots between RASRA and the full benchmark
-# Reads results CSVs from outputs/ produced by run_experiments_rasra.jl
+# Generate comparison plots for RASRA vs. the full benchmark
+# Reads three CSV results from the methods and compares the Optimality Gap, and CVaR deviation, and runtime
 
 using CSV
 using DataFrames
@@ -18,14 +18,14 @@ config = TOML.parsefile(joinpath(PROJECT_DIR, "config.toml"))
 const LAMBDA = config["simulation"]["risk_aversion_weight_lambda"]
 const ALPHA = config["simulation"]["risk_aversion_confidence_level"]
 
-# Filter main results to the full hourly benchmark only
 const BENCHMARK_BASE_NAME = "0_HourlyBenchmark"
 
 mkpath(OUTDIR)
 
 const COL_RASRA = RGB(0.122, 0.471, 0.706)
 const COL_BENCHMARK = RGB(0.698, 0.094, 0.122)
-const COL_ZERO = RGB(0.4, 0.4, 0.4)
+const COL_FIXED = RGB(0.596, 0.306, 0.639)
+const COL_ZERO = RGB(0.4,   0.4,   0.4)
 
 const STEP_COLS = [
     RGB(0.122, 0.471, 0.706),
@@ -42,25 +42,29 @@ const STEP_LABELS = [
     "Step 6: solve reduced",
 ]
 
-"""Extract (N, seed) from filenames."""
+# Loaders
+
+"""Extract (N, seed) from a filename like results_rasra_fixed_N20_seed3.csv."""
 function parse_n_seed(filename::String)
     m = match(r"_N(\d+)_seed(\d+)\.csv$", filename)
     isnothing(m) && return nothing
     return parse(Int, m[1]), parse(Int, m[2])
 end
 
-"""Load all CSVs with the given prefix, append :N and :seed from the filename."""
+"""Load all CSVs in INPUTDIR whose basename starts with pattern_prefix,
+appending :N and :seed columns parsed from the filename."""
 function load_all(pattern_prefix::String)
     files = filter(readdir(INPUTDIR; join=true)) do f
-        basename(f) |> b -> startswith(b, pattern_prefix) && endswith(b, ".csv")
+        b = basename(f)
+        startswith(b, pattern_prefix) && endswith(b, ".csv")
     end
-    isempty(files) && error("No files found in '$INPUTDIR' matching '$pattern_prefix*.csv'")
+    isempty(files) && error("No files in '$INPUTDIR' matching '$(pattern_prefix)*.csv'")
 
     frames = DataFrame[]
     for f in sort(files)
         ns = parse_n_seed(basename(f))
         if isnothing(ns)
-            @warn "Could not parse N/seed from filename '$(basename(f))' (skipping)"
+            @warn "Could not parse N/seed from '$(basename(f))': skipping"
             continue
         end
         n, s = ns
@@ -69,51 +73,67 @@ function load_all(pattern_prefix::String)
         df[!, :seed] .= s
         push!(frames, df)
     end
-    isempty(frames) && error("No valid files loaded for prefix '$pattern_prefix'")
-    return vcat(frames...; cols=:union)
+    isempty(frames) && error("No valid files for prefix '$pattern_prefix'")
+    return vcat(frames...; cols = :union)
 end
 
-@info "Loading main.jl results"
+# Load results
+@info "Loading main.jl benchmark results"
 main_raw = load_all("results_N")
 
 @info "Loading RASRA results"
 rasra_df = load_all("results_rasra_N")
 
+@info "Loading fixed re-solve results"
+rasra_fixed_df = load_all("results_rasra_fixed_N")
+
+# Filter benchmark to the hourly benchmark rows only
 if !hasproperty(main_raw, :base_name)
-    error("main.jl CSVs have no 'base_name' column (cannot filter to benchmark rows)")
+    error("main.jl CSVs have no 'base_name' column")
 end
-
 main_df = filter(r -> r.base_name == BENCHMARK_BASE_NAME, main_raw)
+nrow(main_df) == 0 && error("No rows with base_name == \"$BENCHMARK_BASE_NAME\" in main results")
 
-if nrow(main_df) == 0
-    error("""No rows with base_name == "$BENCHMARK_BASE_NAME" found in main.jl results. Available base_name values: $(unique(main_raw.base_name))""")
+for df in (main_df, rasra_df, rasra_fixed_df)
+    if hasproperty(df, :solver)
+        df[!, :solver] = string.(df.solver)
+    end
 end
 
-joined = innerjoin(rasra_df, main_df; on = [:N, :seed], makeunique = true)
-
-n_dropped = min(nrow(rasra_df), nrow(main_df)) - nrow(joined)
-if n_dropped > 0
-    @warn "$n_dropped rows dropped during join. Check that (N, seed) pairs exist in both main and RASRA results"
-end
-nrow(joined) == 0 && error("Join produced zero rows. No matching (N, seed) pairs between RASRA and main results")
-
-N_values = sort(unique(joined.N))
-@info "N values: $N_values, seeds per N: $(nrow(filter(r -> r.N == N_values[1], joined)))"
-
-# RASRA columns come first in the join, so clashing main columns get a suffix of _1
-rasra_obj_col = :objective_value
-main_obj_col = hasproperty(joined, :objective_value_1) ? :objective_value_1 : :objective_value
-
-# Use Tulipa's optimal mu for both sides
-rasra_mu_col = :value_at_risk_threshold_mu
-main_mu_col = hasproperty(joined, :value_at_risk_threshold_mu_1) ?
-               :value_at_risk_threshold_mu_1 : :value_at_risk_threshold_mu
-
-transform!(joined,
-    [rasra_obj_col, main_obj_col] => ByRow((r, m) -> (r - m) / m * 100) => :og_pct,
-    [rasra_mu_col, main_mu_col] => ByRow((r, m) -> (r - m) / m * 100) => :var_thresh_dev_pct,
+# Build comparison dataframe for OG and CVaR plots
+fixed_cols = select(rasra_fixed_df,
+    :N, :seed, :solver,
+    :objective_value_fixed,
+    :value_at_risk_threshold_mu => :mu_fixed,
 )
 
+bench_cols = select(main_df,
+    :N, :seed, :solver,
+    :objective_value => :objective_benchmark,
+    :value_at_risk_threshold_mu => :mu_benchmark,
+)
+
+comparison_df = innerjoin(fixed_cols, bench_cols; on = [:N, :seed, :solver])
+
+n_dropped = nrow(fixed_cols) + nrow(bench_cols) - 2 * nrow(comparison_df)
+if n_dropped > 0
+    @warn "$n_dropped rows lost in comparison join: check that (N, seed, solver) " *
+          "pairs exist in both rasra_fixed and main results"
+end
+nrow(comparison_df) == 0 && error("Comparison join produced zero rows")
+
+transform!(comparison_df,
+    [:objective_value_fixed, :objective_benchmark] =>
+        ByRow((fixed, bench) -> (fixed - bench) / bench * 100) => :og_pct,
+    [:mu_fixed, :mu_benchmark] =>
+        ByRow((mf, mb) -> isnan(mf) || isnan(mb) || mb == 0.0 ?
+                          NaN : (mf - mb) / mb * 100) => :cvar_dev_pct,
+)
+
+N_values = sort(unique(comparison_df.N))
+@info "N values: $N_values, seeds per N: $(nrow(filter(r -> r.N == N_values[1], comparison_df)))"
+
+# Helpers for plots
 function per_n_vectors(df, col)
     ns = sort(unique(df.N))
     return ns, [df[df.N .== n, col] for n in ns]
@@ -139,7 +159,7 @@ end
 
 # Plot 1: Optimality Gap
 @info "Plot 1: OG boxplot"
-n_vals, og_vecs = per_n_vectors(joined, :og_pct)
+n_vals, og_vecs = per_n_vectors(comparison_df, :og_pct)
 
 p1 = plot(;
     title = "Optimality Gap: RASRA vs. Full Benchmark",
@@ -151,28 +171,39 @@ p1 = plot(;
 hline!(p1, [0.0]; color = COL_ZERO, linestyle = :dash, linewidth = 1.5, label = "Zero reference")
 add_boxplots!(p1, n_vals, og_vecs; series_color = COL_RASRA, series_label = "RASRA")
 savefig(p1, joinpath(OUTDIR, "1_og_boxplot.png"))
-@info "Saved as 1_og_boxplot.png"
+@info "Saved 1_og_boxplot.png"
 
-# Plot 2: VaR Threshold Deviation
-@info "Plot 2: VaR threshold deviation boxplot"
-_, var_dev_vecs = per_n_vectors(joined, :var_thresh_dev_pct)
+# Plot 2: CVaR Deviation
+@info "Plot 2: CVaR deviation boxplot"
+_, cvar_vecs = per_n_vectors(comparison_df, :cvar_dev_pct)
 
 p2 = plot(;
-    title = "VaR Threshold Deviation: RASRA vs. Full Benchmark",
-    ylabel = "VaR threshold deviation (%)",
+    title = "CVaR Deviation: RASRA vs. Full Benchmark",
+    ylabel = "CVaR deviation (%)",
     size = (700, 450),
     grid = true,
     gridalpha = 0.3,
 )
 hline!(p2, [0.0]; color = COL_ZERO, linestyle = :dash, linewidth = 1.5, label = "Zero reference")
-add_boxplots!(p2, n_vals, var_dev_vecs; series_color = COL_RASRA, series_label = "RASRA")
-savefig(p2, joinpath(OUTDIR, "2_var_threshold_boxplot.png"))
-@info "Saved as 2_var_threshold_boxplot.png"
+add_boxplots!(p2, n_vals, cvar_vecs; series_color = COL_RASRA, series_label = "RASRA")
+savefig(p2, joinpath(OUTDIR, "2_cvar_deviation_boxplot.png"))
+@info "Saved 2_cvar_deviation_boxplot.png"
 
 # Plot 3: Runtime breakdown
 @info "Plot 3: Runtime breakdown"
 
-n_groups = length(n_vals)
+rasra_timing = select(rasra_df,
+    :N, :seed, :solver,
+    :time_step1_backward_reduction,
+    :time_step2_solve_j,
+    :time_step3_evaluate_costs,
+    :time_step4_identify_effective,
+    :time_step5_adjust_probabilities,
+    :time_step6_solve_reduced,
+)
+runtime_df = rasra_timing
+
+n_groups = length(N_values)
 bar_width = 0.35
 x_rasra = collect(1:n_groups) .- bar_width / 2
 x_main = collect(1:n_groups) .+ bar_width / 2
@@ -185,7 +216,7 @@ p3 = plot(;
     legend = :topleft,
     grid = true,
     gridalpha = 0.3,
-    xticks = (1:n_groups, string.(n_vals)),
+    xticks = (1:n_groups, string.(N_values)),
 )
 
 step_specs = [
@@ -197,11 +228,13 @@ step_specs = [
 ]
 
 mean_step_times = map(step_specs) do (col, _, _)
-    map(n_vals) do n
-        sub = filter(r -> r.N == n, joined)
-        isnothing(col) ?
-            mean(sub.time_step4_identify_effective .+ sub.time_step5_adjust_probabilities) :
+    map(N_values) do n
+        sub = filter(r -> r.N == n, runtime_df)
+        if isnothing(col)
+            mean(sub.time_step4_identify_effective .+ sub.time_step5_adjust_probabilities)
+        else
             mean(sub[!, col])
+        end
     end
 end
 
@@ -222,22 +255,23 @@ for ((_, label, col_color), means) in zip(step_specs, mean_step_times)
     bottoms .= tops
 end
 
-main_times = map(n_vals) do n
+# Benchmark bar (full solve time only, no fixed overhead)
+bench_times = map(N_values) do n
     mean(filter(r -> r.N == n, main_df).time_to_solve)
 end
 
 for i in 1:n_groups
     xl, xr = x_main[i] - bar_width/2, x_main[i] + bar_width/2
-    plot!(p3, Shape([xl, xr, xr, xl], [0.0, 0.0, main_times[i], main_times[i]]);
+    plot!(p3, Shape([xl, xr, xr, xl], [0.0, 0.0, bench_times[i], bench_times[i]]);
         fillcolor = COL_BENCHMARK,
         linecolor = :white,
         linewidth = 0.5,
         fillalpha = 0.6,
-        label = i == 1 ? "Full solve (main.jl)" : "",
+        label = i == 1 ? "Full benchmark solve" : "",
     )
 end
 
 savefig(p3, joinpath(OUTDIR, "3_runtime_breakdown.png"))
-@info "Saved as 3_runtime_breakdown.png"
+@info "Saved 3_runtime_breakdown.png"
 
 @info "Done. All plots saved to $OUTDIR"

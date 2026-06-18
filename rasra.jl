@@ -212,48 +212,48 @@ end
 # The approximated cost for scenario i is: approx_cost(i) = max_{j in J} dot(dual_vector[j], profile_vector[i])
 function approximate_costs_via_duals(energy_problem_j, conn_j, profiles_df, j_scenario_ids, lambda)
     asset_to_col = Dict(
-        "e_demand"      => "demand",
-        "solar"         => "solar",
+        "e_demand" => "demand",
+        "solar" => "solar",
         "wind_offshore" => "wind_offshore",
-        "wind_onshore"  => "wind_onshore",
-        "hydro_inflow"  => "hydro_inflow",
+        "wind" => "wind_onshore",
+        "hydro_reservoir" => "hydro_inflow",
     )
     col_to_asset = Dict(v => k for (k, v) in asset_to_col)
     stochastic_assets = Set(keys(asset_to_col))
 
     profile_cols = setdiff(names(profiles_df), ["scenario", "milestone_year", "timestep"])
 
-    # 1. Collect duals from all relevant cons tables
-    cons_tables = [
-        ("cons_balance_consumer",    "dual_balance_consumer"),
-        ("cons_balance_conversion",  "dual_balance_conversion"),
-        ("cons_balance_producer",    "dual_balance_producer"),
+    # 1. Collect duals from all relevant constraint tables
+    cons_table_names = [
+        "cons_balance_consumer",
+        "cons_capacity_outgoing_simple_method",
+        "cons_balance_storage_rep_period",
+        "cons_balance_conversion",
     ]
     all_duals_df = DataFrame(rep_period=Int[], asset=String[], time_block_start=Int[], dual=Float64[])
 
-    for (tbl, dual_col) in cons_tables
+    for tbl in cons_table_names
         exists = only(DuckDB.query(conn_j,
             "SELECT COUNT(*) FROM duckdb_tables() WHERE table_name = '$tbl'") |> DataFrame)[1]
         exists == 0 && continue
 
-        has_dual = nrow(DuckDB.query(conn_j,
+        dual_col_df = DuckDB.query(conn_j,
             "SELECT column_name FROM duckdb_columns()
-             WHERE table_name = '$tbl' AND column_name = '$dual_col'") |> DataFrame) > 0
-        has_dual || continue
+             WHERE table_name = '$tbl' AND column_name LIKE 'dual%'") |> DataFrame
+        isempty(dual_col_df) && (@warn "No dual column found in $tbl: skipping"; continue)
+        dual_col = dual_col_df[1, :column_name]
 
         rows = DuckDB.query(conn_j,
             "SELECT asset, rep_period, time_block_start, $dual_col AS dual
              FROM $tbl
              WHERE asset IN ($(join(["'" * a * "'" for a in stochastic_assets], ", ")))
                AND $dual_col IS NOT NULL") |> DataFrame
-        append!(all_duals_df, rows)
+        isempty(rows) || append!(all_duals_df, rows)
     end
 
     if nrow(all_duals_df) == 0
         error("""
-        approximate_costs_via_duals: no balance-constraint duals found for any of
-        $stochastic_assets. Make sure save_solution! was called with compute_duals=true.
-        Tip: inspect with TIO.get_table(conn_j, "cons_balance_consumer").
+        approximate_costs_via_duals: no balance-constraint duals found for any of $stochastic_assets.
         """)
     end
 
@@ -273,18 +273,18 @@ function approximate_costs_via_duals(energy_problem_j, conn_j, profiles_df, j_sc
     @info "Dual approximation active profile columns: $active_cols"
 
     # 3. Build dual vectors for each j in J
-    j_reindex   = Dict(new => old for (new, old) in enumerate(j_scenario_ids))
-    timesteps   = sort(unique(all_duals_df.time_block_start))
+    j_reindex = Dict(new => old for (new, old) in enumerate(j_scenario_ids))
+    timesteps = sort(unique(all_duals_df.time_block_start))
     n_timesteps = length(timesteps)
 
     dual_vectors = Dict{Int, Vector{Float64}}()
     for j_new in sort(unique(all_duals_df.rep_period))
-        j_orig  = j_reindex[j_new]
+        j_orig = j_reindex[j_new]
         duals_j = filter(r -> r.rep_period == j_new, all_duals_df)
 
         dual_vec = Float64[]
         for col in active_cols
-            asset     = col_to_asset[col]
+            asset = col_to_asset[col]
             duals_col = filter(r -> r.asset == asset, duals_j)
             sort!(duals_col, :time_block_start)
             if nrow(duals_col) != n_timesteps
@@ -308,7 +308,7 @@ function approximate_costs_via_duals(energy_problem_j, conn_j, profiles_df, j_sc
     costs_df = DataFrame(scenario=Int[], operational_cost=Float64[])
 
     for i in all_scenario_ids
-        rows_i      = sort(profiles_df[profiles_df.scenario .== i, :], :timestep)
+        rows_i = sort(profiles_df[profiles_df.scenario .== i, :], :timestep)
         profile_vec = vec(Matrix(rows_i[:, active_cols]))
 
         approx_cost = maximum(
@@ -480,7 +480,7 @@ function run_rasra()
             TEM.solve_model!(energy_problem_reduced)
         end
 
-        output_folder = joinpath(@__DIR__, "outputs", base_name, "N$(number_of_scenarios)", string(solver))
+        output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", base_name, string(solver))
         mkpath(output_folder)
 
         t_save = @elapsed begin
@@ -530,7 +530,7 @@ function run_rasra()
             water_borrowed = amount_water,
         ))
 
-        @info "RASRA done — solver: $solver | effective scenarios: $num_effective | reduced scenarios: $num_reduced | objective: $(energy_problem_reduced.objective_value)"
+        @info "RASRA done - solver: $solver | effective scenarios: $num_effective | reduced scenarios: $num_reduced | objective: $(energy_problem_reduced.objective_value)"
     end
 
     rasra_results_path = "outputs/results_rasra_N$(number_of_scenarios)_seed$(seed).csv"

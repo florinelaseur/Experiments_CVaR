@@ -167,7 +167,7 @@ function main()
                 direct_model=direct_model,
             )
 
-            output_folder = joinpath(@__DIR__, "outputs", base_name, "N$(number_of_scenarios)", string(solver))
+            output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", base_name, string(solver))
             mkpath(output_folder)
 
             @info "Solving the model and saving the solution for the base case study (0_HourlyBenchmark) with $solver"
@@ -396,7 +396,7 @@ function main()
                     enable_names=enable_names,
                 )
 
-                output_folder = joinpath(@__DIR__, "outputs", case_name, string(solver))
+                output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
                 mkpath(output_folder)
 
                 @info "Solving the model and saving the solution for the case study: $case_name with $solver"
@@ -498,7 +498,7 @@ function main()
                         only(mu_value_df.solution)
                     end
 
-                    output_folder = joinpath(@__DIR__, "outputs", "fixed", case_name, string(solver))
+                    output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", "fixed", case_name, string(solver))
                     mkpath(output_folder)
                     TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
 
