@@ -495,7 +495,7 @@ function main()
                     max.(0.0, df_tail_scenarios.total_cost .- mu_value)
 
                 df_tail_scenarios = filter(
-                    row -> row.total_cost >= mu_value - tol,
+                    row -> row.total_cost > mu_value - tol,
                     df_tail_scenarios,
                 )
 
@@ -744,9 +744,9 @@ function main()
                     only(mu_value_df.solution)
                 end
 
-                if !isnan(mu_value)
+                if !isnan(mu_value_red)
                     @info "mu_value of CC (24 periods per scenario on reduced scenario set) is defined"
-                    @show mu_value
+                    @show mu_value_red
                 end
 
                 df_cost_per_scenario = export_total_cost_per_scenario(energy_problem_red, output_folder)
