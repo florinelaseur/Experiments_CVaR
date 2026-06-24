@@ -1,7 +1,7 @@
 # to give information about the simulations that we are running
 
 [simulation]
-
+scenario_data = "create-scenarios"
 input_data = "base-input-data/RIDM-case-study"
 input_data_CC = "base-input-data/RIDM-case-study-CC"
 number_of_scenarios = 30

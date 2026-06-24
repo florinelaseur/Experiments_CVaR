@@ -22,10 +22,9 @@ using JuMP: JuMP
 using TOML: TOML
 using Plots
 using Random
+using DataFrames
 
 Random.seed!(19990907)
-
-using DataFrames
 
 # helper functions
 @info "Including helper functions"
