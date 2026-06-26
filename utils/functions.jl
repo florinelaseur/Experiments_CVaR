@@ -589,15 +589,15 @@ function export_operational_cost_per_scenario(energy_problem, output_folder)
     return df
 end
 
-function export_total_cost_per_scenario(energy_problem, output_folder)
+function export_total_operational_cost_per_scenario(energy_problem, output_folder)
     expr = energy_problem.expressions[:scenario_tail_excess]
     df = expr.indices |> DataFrame
     total_costs = JuMP.value.(
-        expr.expressions[:total_cost_per_scenario]
+        expr.expressions[:total_operational_cost_per_scenario]
     )
     df[!, :total_cost] = total_costs
     CSV.write(
-        joinpath(output_folder, "total_cost_per_scenario.csv"),
+        joinpath(output_folder, "total_operational_cost_per_scenario.csv"),
         df;
         writeheader=true,
     )
@@ -645,23 +645,23 @@ function plot_cost_per_scenario(
         )
     end
 
-    savefig(p, joinpath(output_folder, "total_cost_per_scenario.png"))
+    savefig(p, joinpath(output_folder, "total_operational_cost_per_scenario.png"))
 
-    @info "Plots saved in: $(joinpath(output_folder, "total_cost_per_scenario.png"))"
+    @info "Plots saved in: $(joinpath(output_folder, "total_operational_cost_per_scenario.png"))"
 
     return p
 end
 
 function plot_cost_per_scenario_inc_tail(
-    total_cost_per_scenario_df::DataFrame,
+    total_operational_cost_per_scenario_df::DataFrame,
     df_tail_scenarios::DataFrame,
     output_folder,
     mu_value_df::DataFrame,
     case_name,
 )
     p = scatter(
-        total_cost_per_scenario_df.scenario,
-        total_cost_per_scenario_df.total_cost;
+        total_operational_cost_per_scenario_df.scenario,
+        total_operational_cost_per_scenario_df.total_cost;
         xlabel="Scenario",
         ylabel="Total Cost",
         title="Tail scenarios of $case_name",
@@ -694,16 +694,16 @@ function plot_cost_per_scenario_inc_tail(
 
     savefig(
         p,
-        joinpath(output_folder, "total_cost_per_scenario.png"),
+        joinpath(output_folder, "total_operational_cost_per_scenario.png"),
     )
 
-    @info "Plots saved in: $(joinpath(output_folder, "total_cost_per_scenario.png"))"
+    @info "Plots saved in: $(joinpath(output_folder, "total_operational_cost_per_scenario.png"))"
 
     return p
 end
 
 function plot_cost_per_scenario_inc_tail_inc_representative(
-    total_cost_per_scenario_df::DataFrame,
+    total_operational_cost_per_scenario_df::DataFrame,
     df_tail_scenarios::DataFrame,
     df_representative_scenarios::DataFrame,
     output_folder,
@@ -711,8 +711,8 @@ function plot_cost_per_scenario_inc_tail_inc_representative(
     case_name,
 )
     p = scatter(
-        total_cost_per_scenario_df.scenario,
-        total_cost_per_scenario_df.total_cost;
+        total_operational_cost_per_scenario_df.scenario,
+        total_operational_cost_per_scenario_df.total_cost;
         xlabel="Scenario",
         ylabel="Total Cost",
         title="Tail scenarios of $case_name",
@@ -754,10 +754,10 @@ function plot_cost_per_scenario_inc_tail_inc_representative(
 
     savefig(
         p,
-        joinpath(output_folder, "total_cost_per_scenario_inc_tail_inc_rep.png"),
+        joinpath(output_folder, "total_operational_cost_per_scenario_inc_tail_inc_rep.png"),
     )
 
-    @info "Plots saved in: $(joinpath(output_folder, "total_cost_per_scenario_inc_tail_inc_rep.png"))"
+    @info "Plots saved in: $(joinpath(output_folder, "total_operational_cost_per_scenario_inc_tail_inc_rep.png"))"
 
     return p
 end

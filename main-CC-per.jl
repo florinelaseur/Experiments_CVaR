@@ -4,9 +4,9 @@
 # in the LICENSE.md file or at https://opensource.org/license/apache-2-0.
 
 cd(@__DIR__)
-using Pkg: Pkg
-Pkg.activate(".")
-Pkg.instantiate()
+# using Pkg: Pkg
+# Pkg.activate(".")
+# Pkg.instantiate()
 
 # Load the required packages
 import TulipaEnergyModel as TEM
@@ -190,7 +190,7 @@ function main()
             TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
 
 
-            df_cost_per_scenario = export_total_cost_per_scenario(energy_problem_benchmark, output_folder)
+            df_cost_per_scenario = export_total_operational_cost_per_scenario(energy_problem_benchmark, output_folder)
             plot_cost_per_scenario(df_cost_per_scenario, output_folder)
 
 
@@ -429,7 +429,7 @@ function main()
                     @show mu_value
                 end
 
-                df_cost_per_scenario = export_total_cost_per_scenario(energy_problem_full, output_folder)
+                df_cost_per_scenario = export_total_operational_cost_per_scenario(energy_problem_full, output_folder)
                 plot_cost_per_scenario(df_cost_per_scenario, output_folder, mu_value_df)
 
                 var_flow_df = TIO.get_table(connection_full, "var_flow")
@@ -494,7 +494,7 @@ function main()
                 mkpath(output_folder)
 
                 CSV.write(
-                    joinpath(output_folder, "total_cost_per_scenario.csv"),
+                    joinpath(output_folder, "total_operational_cost_per_scenario.csv"),
                     df_cost_per_scenario;
                     writeheader=true,
                 )
@@ -761,7 +761,7 @@ function main()
                     @show mu_value_red
                 end
 
-                df_cost_per_scenario = export_total_cost_per_scenario(energy_problem_red, output_folder)
+                df_cost_per_scenario = export_total_operational_cost_per_scenario(energy_problem_red, output_folder)
                 plot_cost_per_scenario(df_cost_per_scenario, output_folder, mu_value_df)
 
                 var_flow_df = TIO.get_table(connection, "var_flow")
@@ -865,7 +865,7 @@ function main()
                 mkpath(output_folder)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem_full)
 
-                df_cost_per_scenario = export_total_cost_per_scenario(energy_problem_full, output_folder)
+                df_cost_per_scenario = export_total_operational_cost_per_scenario(energy_problem_full, output_folder)
                 plot_cost_per_scenario(df_cost_per_scenario, output_folder, mu_value_df)
 
                 new_results_row = (

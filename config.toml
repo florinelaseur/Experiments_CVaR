@@ -10,7 +10,7 @@ scenario_data = "create-scenarios"
 representative_periods = [24]
 run_benchmark = false
 scenarios_starting_set_sizes = [10, 15, 20]
-number_of_scenarios = 20
+number_of_scenarios = 10
 
 [clustering]
 heuristic_distance = false

@@ -315,15 +315,15 @@ function main()
                     only(mu_value_df.solution)
                 end
 
-                total_cost_per_scenario_df = export_total_cost_per_scenario(energy_problem, output_folder)
+                total_operational_cost_per_scenario_df = export_total_operational_cost_per_scenario(energy_problem, output_folder)
                 CSV.write(
-                    joinpath(output_folder, "total_cost_per_scenario.csv"),
-                    total_cost_per_scenario_df;
+                    joinpath(output_folder, "total_operational_cost_per_scenario.csv"),
+                    total_operational_cost_per_scenario_df;
                     writeheader=true,
                 )
                 tol = 1e-5
 
-                df_tail_scenarios = copy(total_cost_per_scenario_df)
+                df_tail_scenarios = copy(total_operational_cost_per_scenario_df)
 
                 df_tail_scenarios[!, :solution] =
                     max.(0.0, df_tail_scenarios.total_cost .- mu_value)
@@ -336,7 +336,7 @@ function main()
                 df_tail_scenarios = df_tail_scenarios[:, [:id, :scenario, :probability, :total_cost]]
 
                 plot_cost_per_scenario_inc_tail(
-                    total_cost_per_scenario_df,
+                    total_operational_cost_per_scenario_df,
                     df_tail_scenarios,
                     output_folder,
                     mu_value_df,
@@ -469,17 +469,17 @@ function main()
 
                 #     output_folder = joinpath(@__DIR__, "outputs_copy", "fixed", case_name, string(solver))
                 #     mkpath(output_folder)
-                #     total_cost_per_scenario_df = export_total_cost_per_scenario(energy_problem_hourly, output_folder)
+                #     total_operational_cost_per_scenario_df = export_total_operational_cost_per_scenario(energy_problem_hourly, output_folder)
 
                 #     plot_cost_per_scenario(
-                #         total_cost_per_scenario_df,
+                #         total_operational_cost_per_scenario_df,
                 #         output_folder,
                 #         mu_value_df_hourly,
                 #     )
 
                 #     CSV.write(
-                #         joinpath(output_folder, "total_cost_per_scenario.csv"),
-                #         total_cost_per_scenario_df;
+                #         joinpath(output_folder, "total_operational_cost_per_scenario.csv"),
+                #         total_operational_cost_per_scenario_df;
                 #         writeheader=true,
                 #     )
 
@@ -564,17 +564,17 @@ function main()
 
     tail_scenarios_ids = df_tail_scenarios[!, 2]
 
-    df_total_cost_per_scenario =
-        CSV.read(joinpath(output_folder, "total_cost_per_scenario.csv"), DataFrame)
+    df_total_operational_cost_per_scenario =
+        CSV.read(joinpath(output_folder, "total_operational_cost_per_scenario.csv"), DataFrame)
 
-    df_sorted = sort(df_total_cost_per_scenario, :total_cost)
+    df_sorted = sort(df_total_operational_cost_per_scenario, :total_cost)
     middle_idx = ceil(Int, nrow(df_sorted) / 2)
     average_case_row = df_sorted[middle_idx, :]
 
     if average_case_row.scenario in tail_scenarios_ids
         df_non_tail = filter(
             row -> !(row.scenario in tail_scenarios_ids),
-            df_total_cost_per_scenario,
+            df_total_operational_cost_per_scenario,
         )
 
         df_sorted_non_tail = sort(df_non_tail, :total_cost)
@@ -590,7 +590,7 @@ function main()
     mu_value_df = CSV.read(joinpath(output_folder, "var_value_at_risk_threshold_mu.csv"), DataFrame)
 
     plot_cost_per_scenario_inc_tail_inc_representative(
-        df_total_cost_per_scenario,
+        df_total_operational_cost_per_scenario,
         df_tail_scenarios,
         df_representative_non_tail_scenario,
         output_folder,
@@ -827,8 +827,8 @@ function main()
                     only(mu_value_df.solution)
                 end
 
-                total_cost_per_scenario_df = export_total_cost_per_scenario(energy_problem, output_folder)
-                plot_cost_per_scenario(total_cost_per_scenario_df, output_folder, mu_value_df)
+                total_operational_cost_per_scenario_df = export_total_operational_cost_per_scenario(energy_problem, output_folder)
+                plot_cost_per_scenario(total_operational_cost_per_scenario_df, output_folder, mu_value_df)
 
                 @info "Fixing variables in the hourly case study: $case_name with $solver"
                 #create an hourly model, fix the variables of the 180 RPs, and resolve hourly for these scenarios.
@@ -948,17 +948,17 @@ function main()
 
                     output_folder = joinpath(@__DIR__, "outputs_copy", "fixed", case_name, string(solver))
                     mkpath(output_folder)
-                    total_cost_per_scenario_df = export_total_cost_per_scenario(energy_problem_hourly, output_folder)
+                    total_operational_cost_per_scenario_df = export_total_operational_cost_per_scenario(energy_problem_hourly, output_folder)
 
                     CSV.write(
-                        joinpath(output_folder, "total_cost_per_scenario.csv"),
-                        total_cost_per_scenario_df;
+                        joinpath(output_folder, "total_operational_cost_per_scenario.csv"),
+                        total_operational_cost_per_scenario_df;
                         writeheader=true,
                     )
 
 
                     plot_cost_per_scenario(
-                        total_cost_per_scenario_df,
+                        total_operational_cost_per_scenario_df,
                         output_folder,
                         mu_value_df_hourly,
                     )
