@@ -1,0 +1,79 @@
+cd(@__DIR__)
+using Pkg: Pkg
+Pkg.activate(".")
+Pkg.instantiate()
+
+using CSV: CSV
+using TOML: TOML
+using DataFrames
+
+@info "Including helper functions"
+include("utils/functions.jl")
+include("utils/constants.jl")
+
+function run_experiments()
+    config_path = joinpath(@__DIR__, "config.toml")
+    config = TOML.parsefile(config_path)
+    n_seeds = config["simulation"]["seeds"]
+    seeds = collect(1:n_seeds)
+    scenario_sizes = config["simulation"]["scenarios_starting_set_sizes"]
+    representative_periods = config["simulation"]["representative_periods"]
+    main_cc_path = joinpath(@__DIR__, "main-CC-per.jl")
+
+    log = DataFrame(
+        seed=Int[],
+        number_of_scenarios=Int[],
+        representative_periods=String[],
+        success=Bool[],
+        elapsed=Float64[],
+    )
+
+    for seed in seeds
+        for n in scenario_sizes
+            for rps in representative_periods
+                @info "Running experiment with seed=$seed, number_of_scenarios=$n, representative_periods=$rps"
+
+                config = TOML.parsefile(config_path)
+                config["simulation"]["number_of_scenarios"] = n
+                config["simulation"]["representative_periods"] = [rps]
+                config["simulation"]["run_benchmark"] = false
+
+                open(config_path, "w") do io
+                    TOML.print(io, config)
+                end
+
+                env = copy(ENV)
+                env["EXPERIMENT_SEED"] = string(seed)
+                t = time()
+                success = true
+
+                cmd = Cmd(`$(Base.julia_cmd()) --project=$(@__DIR__) $main_cc_path`; env=env, dir=@__DIR__,)
+
+                try
+                    run(cmd)
+                catch error
+                    success = false
+                    @warn "Experiment failed for seed=$seed, number_of_scenarios=$n, representative_periods=$rps with error: $error" exception = error
+                end
+
+                elapsed = time() - t
+
+                push!(log, (
+                    seed=seed,
+                    number_of_scenarios=n,
+                    representative_periods=string([rps]),
+                    success=success,
+                    elapsed=elapsed,
+                ))
+            end
+        end
+    end
+
+    out = joinpath(@__DIR__, "outputs", "experiment_log_CC_per.csv")
+    mkpath(dirname(out))
+    CSV.write(out, log)
+
+    return log
+end
+
+run_experiments()

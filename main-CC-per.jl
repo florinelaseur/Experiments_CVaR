@@ -24,9 +24,9 @@ using Plots
 using Random
 using DataFrames
 
-Random.seed!(19990907)
+seed = parse(Int, get(ENV, "EXPERIMENT_SEED", "19990907"))
+Random.seed!(seed)
 
-# helper functions
 @info "Including helper functions"
 include("utils/functions.jl")
 include("utils/constants.jl")
@@ -116,6 +116,8 @@ results_df = DataFrame(;
     water_borrowed=Float64[],
     value_at_risk_threshold_mu_full=Float64[],
     scenario_set=String[],
+    seed=Int[],
+    number_of_scenarios=Int[],
 )
 
 function main()
@@ -237,6 +239,8 @@ function main()
                 num_loss_of_load_h2_demand=n_lol_smr_cca,
                 water_borrowed=amount_water_borrowed_b,
                 value_at_risk_threshold_mu=mu_value,
+                seed=seed,
+                number_of_scenarios=number_of_scenarios,
             )
             push!(results_df, new_results_row)
         end
@@ -478,6 +482,8 @@ function main()
                     water_borrowed=amount_water_borrowed_b,
                     value_at_risk_threshold_mu_full=mu_value,
                     scenario_set="full",
+                    seed=seed,
+                    number_of_scenarios=number_of_scenarios,
                 )
                 push!(results_df, new_results_row)
 
@@ -840,7 +846,7 @@ function main()
                 lole_h2_demand = n_lol_smr_cca / number_of_scenarios
 
                 # count how much water_borrowed
-                amount_water_borrowed = sum(water_borrowed.solution)
+                amount_water_borrowed_b = sum(water_borrowed.solution)
 
                 # get mu solution
                 mu_value_df = TIO.get_table(connection_full, "var_value_at_risk_threshold_mu")
@@ -850,9 +856,9 @@ function main()
                     only(mu_value_df.solution)
                 end
 
-                if !isnan(mu_value)
+                if !isnan(mu_value_full)
                     @info "mu_value of Resolve Benchmark (24 periods per scenario on full scenario set) is defined"
-                    @show mu_value
+                    @show mu_value_full
                 end
 
                 output_folder = joinpath(@__DIR__, "outputs", "fixed", case_name, string(solver))
@@ -889,6 +895,8 @@ function main()
                     water_borrowed=amount_water_borrowed_b,
                     value_at_risk_threshold_mu_full=mu_value_full,
                     scenario_set="reduced",
+                    seed=seed,
+                    number_of_scenarios=number_of_scenarios,
                 )
                 push!(results_df, new_results_row)
                 #else
@@ -922,7 +930,7 @@ function main()
         end
     end
 
-    results_df |> CSV.write("outputs/results.csv"; writeheader=true)
+    results_df |> CSV.write("outputs/results_CC_per_N$(number_of_scenarios)_seed$(seed).csv"; writeheader=true)
 
     return nothing
 end
