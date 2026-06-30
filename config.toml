@@ -1,15 +1,15 @@
 [simulation]
-risk_aversion_confidence_level = 0.8
+risk_aversion_confidence_level = 0.9
 input_data_CC = "base-input-data/RIDM-case-study-CC"
 input_data = "base-input-data/RIDM-case-study"
 fix_level_storage = true
 solvers = ["Gurobi"]
-seeds = 3
-risk_aversion_weight_lambda = 0.2
+seeds = 10
+risk_aversion_weight_lambda = 0.1
 scenario_data = "create-scenarios"
 representative_periods = [24]
 run_benchmark = false
-scenarios_starting_set_sizes = [10, 15, 20]
+scenarios_starting_set_sizes = [10, 40, 70]
 number_of_scenarios = 10
 
 [clustering]

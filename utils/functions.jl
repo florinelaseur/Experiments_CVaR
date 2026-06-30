@@ -786,6 +786,8 @@ function plot_normalized_asset_investment_differences(
 
     inv_diff_df = DataFrame(
         asset=assets,
+        benchmark_solution=benchmark_solution,
+        approximation_solution=approximation_solution,
         diff=inv_diff,
     )
 
@@ -800,6 +802,12 @@ function plot_normalized_asset_investment_differences(
     savefig(
         p_investment,
         joinpath(output_folder, "normalized_investment_differences.png"),
+    )
+
+    CSV.write(
+        joinpath(output_folder, "normalized_investment_differences.csv"),
+        inv_diff_df;
+        writeheader=true,
     )
 
     @info "Plots saved in: $(joinpath(output_folder, "normalized_investment_differences.png"))"
@@ -1002,8 +1010,6 @@ function plot_comparison_copy(output_folder, number_of_scenarios)
 
     plots_folder = joinpath(output_folder, "plots")
     mkpath(plots_folder)
-
-    df_plot = copy(df_results)
 
     df_plot = copy(df_results)
 
@@ -1262,4 +1268,57 @@ function recovery_analysis(input_data_path::String, rep_periods_mapping::DataFra
     savefig(p, joinpath(output_folder, "recovery_analysis_bars.png"))
 
     return recovery_df, joined
+end
+
+function plot_comparison_runtime(results_path)
+    df_results = CSV.read(results_path, DataFrame)
+
+    plots_folder = joinpath(dirname(results_path), "plots", "runtime")
+    mkpath(plots_folder)
+
+    df_plot = copy(df_results)
+
+    # RP model runtime, excluding clustering
+    df_plot[!, :runtime_rp] =
+        df_plot.time_to_cluster .+
+        df_plot.time_to_read .+
+        df_plot.time_to_create .+
+        df_plot.time_to_solve .+
+        df_plot.time_to_save
+
+    comparison = DataFrame(
+        case_label=String[],
+        runtime=Float64[],
+    )
+
+    for row in eachrow(df_plot)
+
+        if row.scenario_set == "full"
+            push!(comparison, (
+                "$(row.rp) periods full set",
+                row.runtime_rp,
+            ))
+
+        elseif row.scenario_set == "reduced"
+            push!(comparison, (
+                "$(row.rp) periods reduced set",
+                row.runtime_rp,))
+
+            push!(comparison, (
+                "$(row.rp) periods + fix + resolve full set",
+                row.runtime_rp,)) #Alice does not include resolve + row.time_to_resolve_full
+        end
+    end
+
+    p_runtime = bar(
+        comparison.case_label,
+        comparison.runtime;
+        xlabel="Case",
+        ylabel="Runtime [s]",
+        title="Runtime Comparison",
+        label=false,
+        xrotation=30,
+    )
+
+    savefig(p_runtime, joinpath(plots_folder, "runtime_comparison_N$(df_plot.number_of_scenarios[1]).png"))
 end

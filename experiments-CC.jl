@@ -1,11 +1,13 @@
 cd(@__DIR__)
-using Pkg: Pkg
-Pkg.activate(".")
-Pkg.instantiate()
+# using Pkg: Pkg
+# Pkg.activate(".")
+# Pkg.instantiate()
 
 using CSV: CSV
 using TOML: TOML
 using DataFrames
+using Plots
+using StatsPlots
 
 @info "Including helper functions"
 include("utils/functions.jl")
@@ -28,8 +30,8 @@ function run_experiments()
         elapsed=Float64[],
     )
 
-    for seed in seeds
-        for n in scenario_sizes
+    for n in scenario_sizes
+        for seed in seeds
             for rps in representative_periods
                 @info "Running experiment with seed=$seed, number_of_scenarios=$n, representative_periods=$rps"
 
@@ -65,6 +67,9 @@ function run_experiments()
                     success=success,
                     elapsed=elapsed,
                 ))
+            end
+            if seed == last(seeds)
+                plot_comparison_runtime(joinpath(@__DIR__, "outputs", "results_CC_per_N$(n)_seed$(seed).csv"))
             end
         end
     end

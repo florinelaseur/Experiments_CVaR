@@ -410,13 +410,15 @@ function main()
                     enable_names=enable_names,
                 )
 
-                output_folder = joinpath(@__DIR__, "outputs", case_name, string(solver))
+                output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
                 mkpath(output_folder)
 
                 @info "Solving the model and saving the solution for the case study: $case_name with $solver"
                 time_to_solve = @elapsed TEM.solve_model!(energy_problem_full)
                 time_to_save = @elapsed TEM.save_solution!(energy_problem_full)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem_full)
+
+                benchmark_investment_df = TIO.get_table(connection_full, "var_assets_investment")
 
                 mu_value_df = TIO.get_table(connection_full, "var_value_at_risk_threshold_mu")
                 mu_value = if nrow(mu_value_df) == 0
@@ -490,7 +492,7 @@ function main()
                 @info "Contribution C (CC): Scenario selection"
 
                 #insert scenario selection and create and solve energy_problem_red
-                output_folder = joinpath(@__DIR__, "outputs", case_name, "scenario selection for CC")
+                output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", case_name, "scenario selection for CC")
                 mkpath(output_folder)
 
                 CSV.write(
@@ -741,13 +743,29 @@ function main()
                     enable_names=enable_names,
                 )
 
-                output_folder = joinpath(@__DIR__, "outputs", case_name, string(solver))
+                output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
                 mkpath(output_folder)
 
                 @info "Solving the model and saving the solution for the case study: $case_name with $solver"
                 time_to_solve = @elapsed TEM.solve_model!(energy_problem_red)
                 time_to_save = @elapsed TEM.save_solution!(energy_problem_red)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem_red)
+
+                CC_investment_df = TIO.get_table(connection, "var_assets_investment")
+                investment_output_folder = joinpath(
+                    @__DIR__,
+                    "outputs",
+                    "N$(number_of_scenarios)_seed$(seed)",
+                    "investment_analysis",
+                )
+                mkpath(investment_output_folder)
+
+                plot_normalized_asset_investment_differences(
+                    benchmark_investment_df,
+                    CC_investment_df;
+                    output_folder=investment_output_folder,
+                    case_name=case_name,
+                )
 
                 mu_value_df = TIO.get_table(connection, "var_value_at_risk_threshold_mu")
                 mu_value_red = if nrow(mu_value_df) == 0
@@ -861,7 +879,7 @@ function main()
                     @show mu_value_full
                 end
 
-                output_folder = joinpath(@__DIR__, "outputs", "fixed", case_name, string(solver))
+                output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", "fixed", case_name, string(solver))
                 mkpath(output_folder)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem_full)
 
