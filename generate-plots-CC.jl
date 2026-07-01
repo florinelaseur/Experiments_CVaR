@@ -1,7 +1,7 @@
 cd(@__DIR__)
-using Pkg: Pkg
-Pkg.activate(".")
-Pkg.instantiate()
+# using Pkg: Pkg
+# Pkg.activate(".")
+# Pkg.instantiate()
 
 using CSV: CSV
 using TOML: TOML
