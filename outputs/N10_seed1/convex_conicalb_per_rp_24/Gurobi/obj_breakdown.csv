@@ -1,0 +1,12 @@
+name,value
+assets_investment_cost,209.5604014462947
+assets_fixed_cost_compact_vintage_method,0.0
+assets_fixed_cost_aggregated_vintage_method,55.96078790355112
+storage_assets_energy_investment_cost,0.0
+storage_assets_energy_fixed_cost,0.0
+flows_investment_cost,0.0
+flows_fixed_cost,0.0
+flows_operational_cost,229.02606508832386
+vintage_flows_operational_cost,0.0
+units_on_operational_cost,0.0
+conditional_value_at_risk_term,329.392036995069

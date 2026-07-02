@@ -1,0 +1,8 @@
+asset,benchmark_solution,approximation_solution,diff
+ccgt,1.3197675631316694,1.3163077650029191,-0.0026215208082100198
+wind,2.881522078019083,3.036341764538004,0.05372844015318205
+solar,0.0,0.0,0.0
+ocgt,0.0,0.0,0.0
+electrolizer,1.0,1.0,0.0
+wind_offshore,0.0,0.0,0.0
+battery,0.0,0.0,0.0

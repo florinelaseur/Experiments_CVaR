@@ -321,24 +321,6 @@ function main()
                     clustering_kwargs,
                     weight_fitting_kwargs,
                 )
-                if use_ratio == true
-                    DuckDB.query(
-                        connection_full,
-                        "UPDATE profiles_rep_periods AS x
-                            SET value =
-                                CASE
-                                    WHEN x.profile_name = 'demand' THEN x.value
-                                    ELSE x.value * d.value
-                                END
-                            FROM profiles_rep_periods AS d
-                            WHERE d.timestep   = x.timestep
-                            AND d.rep_period       = x.rep_period
-                            AND d.milestone_year       = x.milestone_year
-                            AND d.scenario   = x.scenario
-                            AND d.profile_name = 'demand';
-                                ",
-                    )
-                end
 
             elseif stochastic_method == :cross_scenario
                 layout = TC.ProfilesTableLayout(;
@@ -357,23 +339,6 @@ function main()
                     clustering_kwargs,
                     weight_fitting_kwargs,
                 )
-                if use_ratio == true
-                    DuckDB.query(
-                        connection_full,
-                        "UPDATE profiles_rep_periods AS x
-                            SET value =
-                                CASE
-                                    WHEN x.profile_name = 'demand' THEN x.value
-                                    ELSE x.value * d.value
-                                END
-                            FROM profiles_rep_periods AS d
-                            WHERE d.timestep   = x.timestep
-                            AND d.rep_period       = x.rep_period
-                            AND d.milestone_year       = x.milestone_year
-                            AND d.profile_name = 'demand';
-                                ",
-                    )
-                end
             else
                 error("Unknown stochastic method: $stochastic_method")
             end
@@ -454,7 +419,7 @@ function main()
 
                 amount_water_borrowed_err = sum(water_borrowed.solution)
                 if amount_water_borrowed_err > 0.0
-                    error("Borrowed water has been used: $amount_water_borrowed")
+                    error("Borrowed water has been used: $amount_water_borrowed_err")
                 end
 
                 new_results_row = (
@@ -790,7 +755,7 @@ function main()
                 )
                 amount_water_borrowed_err = sum(water_borrowed.solution)
                 if amount_water_borrowed_err > 0.0
-                    error("Borrowed water has been used: $amount_water_borrowed")
+                    error("Borrowed water has been used: $amount_water_borrowed_err")
                 end
 
 
