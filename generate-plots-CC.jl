@@ -83,9 +83,9 @@ function plot_boxplot()
     transform!(
         comparison_df,
         [:objective_oos, :objective_full] =>
-            ByRow((oos, full) -> (oos - full) / full * 100) => :oos_gap_pct,
+            ByRow((oos, full) -> (oos - full) / full) => :oos_gap_pct,
     )
-
+    sort!(comparison_df, [:number_of_scenarios, :seed])
     CSV.write(joinpath(outdir, "comparison_CC_per_oos_gap.csv"), comparison_df)
 
     n_values = sort(unique(comparison_df.number_of_scenarios))
@@ -93,7 +93,7 @@ function plot_boxplot()
 
     p = plot(;
         title="OOS Gap: reduced solution evaluated on scenario starting set",
-        ylabel="OOS gap (%)",
+        ylabel="Normalized OOS gap (oos - full) / full",
         xlabel="Number of scenarios in starting set",
         size=(700, 450),
         grid=true,
@@ -192,7 +192,9 @@ function plot_investment_difference_boxplots()
 
         p = plot(;
             title="Normalized investment difference: $asset",
-            ylabel="(CC - full) / full",
+            ylabel=asset in ["e_demand_lol", "h2_demand_lol"] ?
+                   "Number of loss-of-load timesteps" :
+                   "(CC - full) / full",
             xlabel="Number of scenarios in starting set",
             size=(700, 450),
             grid=true,

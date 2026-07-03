@@ -766,9 +766,13 @@ function plot_normalized_asset_investment_differences(
     benchmark_df::DataFrame,
     approximation_df::DataFrame;
     output_folder,
-    case_name,)
-    assets = benchmark_df[!, :asset]
+    case_name,
+    benchmark_num_loss_of_load_e_demand=0.0,
+    benchmark_num_loss_of_load_h2_demand=0.0,
+    approximation_num_loss_of_load_e_demand=0.0,
+    approximation_num_loss_of_load_h2_demand=0.0,)
 
+    assets = benchmark_df[!, :asset]
     benchmark_solution = benchmark_df[!, :solution]
     approximation_solution = approximation_df[!, :solution]
 
@@ -790,6 +794,20 @@ function plot_normalized_asset_investment_differences(
         approximation_solution=approximation_solution,
         diff=inv_diff,
     )
+
+    push!(inv_diff_df, (
+        asset="e_demand_lol",
+        benchmark_solution=benchmark_num_loss_of_load_e_demand,
+        approximation_solution=approximation_num_loss_of_load_e_demand,
+        diff=approximation_num_loss_of_load_e_demand - benchmark_num_loss_of_load_e_demand,
+    ))
+
+    push!(inv_diff_df, (
+        asset="h2_demand_lol",
+        benchmark_solution=benchmark_num_loss_of_load_h2_demand,
+        approximation_solution=approximation_num_loss_of_load_h2_demand,
+        diff=approximation_num_loss_of_load_h2_demand - benchmark_num_loss_of_load_h2_demand,
+    ))
 
     p_investment = bar(
         inv_diff_df.asset,

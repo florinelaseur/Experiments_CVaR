@@ -211,7 +211,7 @@ function main()
 
             # count steps with loss of load
             n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
-            n_lol_smr_cca = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
+            n_lol_smr_ccs = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
 
             # count how much water_borrowed
             amount_water_borrowed_b = sum(water_borrowed.solution)
@@ -236,7 +236,7 @@ function main()
                 objective_value_resolve_benchmark=0.0,
                 termination_status_resolve_benchmark="",
                 num_loss_of_load_e_demand=n_lol_ens,
-                num_loss_of_load_h2_demand=n_lol_smr_cca,
+                num_loss_of_load_h2_demand=n_lol_smr_ccs,
                 water_borrowed=amount_water_borrowed_b,
                 value_at_risk_threshold_mu=mu_value,
                 seed=seed,
@@ -383,6 +383,9 @@ function main()
                 time_to_save = @elapsed TEM.save_solution!(energy_problem_full)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem_full)
 
+                output_file = joinpath(output_folder, "rep_periods_mapping.csv")
+                DuckDB.execute(connection_full, "COPY rep_periods_mapping TO '$output_file' (HEADER, DELIMITER ',')")
+
                 benchmark_investment_df = TIO.get_table(connection_full, "var_assets_investment")
 
                 mu_value_df = TIO.get_table(connection_full, "var_value_at_risk_threshold_mu")
@@ -411,8 +414,8 @@ function main()
                 # count steps with loss of load
                 n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
                 lole_e_demand = n_lol_ens / number_of_scenarios
-                n_lol_smr_cca = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
-                lole_h2_demand = n_lol_smr_cca / number_of_scenarios
+                n_lol_smr_ccs = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
+                lole_h2_demand = n_lol_smr_ccs / number_of_scenarios
 
                 # count how much water_borrowed
                 amount_water_borrowed_b = sum(water_borrowed.solution)
@@ -444,7 +447,7 @@ function main()
                     termination_status_resolve_full="",
                     num_loss_of_load_e_demand=n_lol_ens,
                     lole_e_demand=lole_e_demand,
-                    num_loss_of_load_h2_demand=n_lol_smr_cca,
+                    num_loss_of_load_h2_demand=n_lol_smr_ccs,
                     lole_h2_demand=lole_h2_demand,
                     water_borrowed=amount_water_borrowed_b,
                     value_at_risk_threshold_mu_full=mu_value,
@@ -716,6 +719,10 @@ function main()
                 time_to_save = @elapsed TEM.save_solution!(energy_problem_red)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem_red)
 
+                output_file = joinpath(output_folder, "rep_periods_mapping.csv")
+                DuckDB.execute(connection, "COPY rep_periods_mapping TO '$output_file' (HEADER, DELIMITER ',')")
+
+
                 CC_investment_df = TIO.get_table(connection, "var_assets_investment")
                 investment_output_folder = joinpath(
                     @__DIR__,
@@ -730,6 +737,8 @@ function main()
                     CC_investment_df;
                     output_folder=investment_output_folder,
                     case_name=case_name,
+                    num_loss_of_load_e_demand=n_lol_ens,
+                    num_loss_of_load_h2_demand=n_lol_smr_ccs,
                 )
 
                 mu_value_df = TIO.get_table(connection, "var_value_at_risk_threshold_mu")
@@ -825,8 +834,8 @@ function main()
                 # count steps with loss of load
                 n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
                 lole_e_demand = n_lol_ens / number_of_scenarios
-                n_lol_smr_cca = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
-                lole_h2_demand = n_lol_smr_cca / number_of_scenarios
+                n_lol_smr_ccs = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
+                lole_h2_demand = n_lol_smr_ccs / number_of_scenarios
 
                 # count how much water_borrowed
                 amount_water_borrowed_b = sum(water_borrowed.solution)
@@ -847,6 +856,10 @@ function main()
                 output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", "fixed", case_name, string(solver))
                 mkpath(output_folder)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem_full)
+
+                output_file = joinpath(output_folder, "rep_periods_mapping.csv")
+                DuckDB.execute(connection_full, "COPY rep_periods_mapping TO '$output_file' (HEADER, DELIMITER ',')")
+
 
                 df_cost_per_scenario = export_total_operational_cost_per_scenario(energy_problem_full, output_folder)
                 plot_cost_per_scenario(df_cost_per_scenario, output_folder, mu_value_df)
@@ -873,7 +886,7 @@ function main()
                     termination_status_resolve_full=string(energy_problem_full.termination_status,),
                     num_loss_of_load_e_demand=n_lol_ens,
                     lole_e_demand=lole_e_demand,
-                    num_loss_of_load_h2_demand=n_lol_smr_cca,
+                    num_loss_of_load_h2_demand=n_lol_smr_ccs,
                     lole_h2_demand=lole_h2_demand,
                     water_borrowed=amount_water_borrowed_b,
                     value_at_risk_threshold_mu_full=mu_value_full,
