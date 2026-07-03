@@ -32,3 +32,6 @@ outputs/
 
 # Configuration filees for VS Code Julia extension
 .vscode/
+profiles-wide-all-scenarios.csv
+profiles-wide.csv
+create-scenarios/profiles-wide-all-scenarios.csv
