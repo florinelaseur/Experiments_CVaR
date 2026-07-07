@@ -412,10 +412,10 @@ function main()
                     var_flow_df,
                 )
                 # count steps with loss of load
-                n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
-                lole_e_demand = n_lol_ens / number_of_scenarios
-                n_lol_smr_ccs = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
-                lole_h2_demand = n_lol_smr_ccs / number_of_scenarios
+                bm_n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
+                lole_e_demand = bm_n_lol_ens / number_of_scenarios
+                bm_n_lol_smr_ccs = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
+                lole_h2_demand = bm_n_lol_smr_ccs / number_of_scenarios
 
                 # count how much water_borrowed
                 amount_water_borrowed_b = sum(water_borrowed.solution)
@@ -445,9 +445,9 @@ function main()
                     time_to_resolve_full=0.0,
                     objective_value_resolve_full=0.0,
                     termination_status_resolve_full="",
-                    num_loss_of_load_e_demand=n_lol_ens,
+                    num_loss_of_load_e_demand=bm_n_lol_ens,
                     lole_e_demand=lole_e_demand,
-                    num_loss_of_load_h2_demand=n_lol_smr_ccs,
+                    num_loss_of_load_h2_demand=bm_n_lol_smr_ccs,
                     lole_h2_demand=lole_h2_demand,
                     water_borrowed=amount_water_borrowed_b,
                     value_at_risk_threshold_mu_full=mu_value,
@@ -732,15 +732,6 @@ function main()
                 )
                 mkpath(investment_output_folder)
 
-                plot_normalized_asset_investment_differences(
-                    benchmark_investment_df,
-                    CC_investment_df;
-                    output_folder=investment_output_folder,
-                    case_name=case_name,
-                    num_loss_of_load_e_demand=n_lol_ens,
-                    num_loss_of_load_h2_demand=n_lol_smr_ccs,
-                )
-
                 mu_value_df = TIO.get_table(connection, "var_value_at_risk_threshold_mu")
                 mu_value_red = if nrow(mu_value_df) == 0
                     NaN
@@ -766,11 +757,6 @@ function main()
                 if amount_water_borrowed_err > 0.0
                     error("Borrowed water has been used: $amount_water_borrowed_err")
                 end
-
-
-
-
-
 
                 #if run_benchmark
                 @info "Fixing variables in the benchmark case study: RP on full set with $solver"
@@ -837,6 +823,17 @@ function main()
                 n_lol_smr_ccs = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
                 lole_h2_demand = n_lol_smr_ccs / number_of_scenarios
 
+
+                plot_normalized_asset_investment_differences(
+                    benchmark_investment_df,
+                    CC_investment_df;
+                    output_folder=investment_output_folder,
+                    case_name=case_name,
+                    benchmark_num_loss_of_load_e_demand=bm_n_lol_ens,
+                    benchmark_num_loss_of_load_h2_demand=bm_n_lol_ens,
+                    approximation_num_loss_of_load_e_demand=n_lol_ens,
+                    approximation_num_loss_of_load_h2_demand=n_lol_smr_ccs,
+                )
                 # count how much water_borrowed
                 amount_water_borrowed_b = sum(water_borrowed.solution)
 
