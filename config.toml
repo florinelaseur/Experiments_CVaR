@@ -1,5 +1,5 @@
 [simulation]
-risk_aversion_confidence_level = 0.9
+risk_aversion_confidence_level = 0.8
 input_data_CC = "base-input-data/RIDM-case-study-CC"
 input_data = "base-input-data/RIDM-case-study"
 fix_level_storage = true
