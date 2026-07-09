@@ -340,7 +340,7 @@ function plot_values_stocmethod_method( # considering options: method, stochasti
 end
 
 function parse_rep_period_name(name::String) # the vars were created as storage_level_rep_period[$(row.asset),$(row.year),$(row.rep_period),$(row.time_block_start):$(row.time_block_end)]
-    inside = name[findfirst('[', name)+1:end-1] # inside []
+    inside = name[(findfirst('[', name)+1):(end-1)] # inside []
     parts = split(inside, ",")
     return (
         asset=parts[1],
@@ -351,7 +351,7 @@ function parse_rep_period_name(name::String) # the vars were created as storage_
 end
 
 function parse_over_clustered_name(name::String) # storage_level_inter_period[$(row.asset),$(row.year),$(row.scenario),$(row.period_block_start):$(row.period_block_end)]
-    inside = name[findfirst('[', name)+1:end-1]
+    inside = name[(findfirst('[', name)+1):(end-1)]
     parts = split(inside, ",")
     return (
         asset=parts[1],
@@ -620,7 +620,7 @@ function plot_cost_per_scenario(
 )
 
     folder_parts = splitpath(output_folder)
-    title_suffix = join(folder_parts[end-1:end], Base.Filesystem.path_separator)
+    title_suffix = join(folder_parts[(end-1):end], Base.Filesystem.path_separator)
 
     p = scatter(
         input_df.scenario,
@@ -1322,9 +1322,9 @@ function plot_comparison_runtime(results_path)
                 "$(row.rp) periods reduced set",
                 row.runtime_rp,))
 
-            push!(comparison, (
-                "$(row.rp) periods + fix + resolve full set",
-                row.runtime_rp,)) #Alice does not include resolve + row.time_to_resolve_full
+            # push!(comparison, (
+            #     "$(row.rp) periods + fix + resolve full set",
+            #     row.runtime_rp,)) #Alice does not include resolve + row.time_to_resolve_full
         end
     end
 

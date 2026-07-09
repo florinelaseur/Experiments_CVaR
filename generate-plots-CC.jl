@@ -53,7 +53,7 @@ function plot_boxplot()
     bench_df = select(
         filter(row ->
                 row.scenario_set == "full" &&
-                    string(row.termination_status) == "OPTIMAL",
+                string(row.termination_status) == "OPTIMAL",
             vcat(raw_dfs...),
         ),
         :number_of_scenarios,
@@ -65,13 +65,13 @@ function plot_boxplot()
     reduced_df = select(
         filter(row ->
                 row.scenario_set == "reduced" &&
-                    string(row.termination_status) == "OPTIMAL",
+                string(row.termination_status) == "OPTIMAL",
             vcat(raw_dfs...),
         ),
         :number_of_scenarios,
         :seed,
         :solver,
-        :objective_value_resolve_full => :objective_oos,
+        :objective_value_resolve_full => :objective_red,
     )
 
     comparison_df = innerjoin(
@@ -82,18 +82,18 @@ function plot_boxplot()
 
     transform!(
         comparison_df,
-        [:objective_oos, :objective_full] =>
-            ByRow((oos, full) -> (oos - full) / full) => :oos_gap_pct,
+        [:objective_red, :objective_full] =>
+            ByRow((red, full) -> (red - full) / full) => :rel_gap_pct,
     )
     sort!(comparison_df, [:number_of_scenarios, :seed])
-    CSV.write(joinpath(outdir, "comparison_CC_per_oos_gap.csv"), comparison_df)
+    CSV.write(joinpath(outdir, "comparison_CC_per_rel_gap.csv"), comparison_df)
 
     n_values = sort(unique(comparison_df.number_of_scenarios))
-    gap_vectors = [comparison_df[comparison_df.number_of_scenarios.==n, :oos_gap_pct] for n in n_values]
+    gap_vectors = [comparison_df[comparison_df.number_of_scenarios .== n, :rel_gap_pct] for n in n_values]
 
     p = plot(;
-        title="OOS Gap: reduced solution evaluated on scenario starting set",
-        ylabel="Normalized OOS gap (oos - full) / full",
+        title="Relative Gap: reduced solution evaluated on scenario starting set",
+        ylabel="Relative Gap (reduced - full) / full",
         xlabel="Number of scenarios in starting set",
         size=(700, 450),
         grid=true,
@@ -129,10 +129,10 @@ function plot_boxplot()
         xticks=(1:length(n_values), string.(n_values)),
     )
 
-    savefig(p, joinpath(outdir, "1_oos_gap_boxplot_CC_per.png"))
+    savefig(p, joinpath(outdir, "1_rel_gap_boxplot_CC_per.png"))
 
-    @info "Saved comparison CSV to $(joinpath(outdir, "comparison_CC_per_oos_gap.csv"))"
-    @info "Saved plot to $(joinpath(outdir, "1_oos_gap_boxplot_CC_per.png"))"
+    @info "Saved comparison CSV to $(joinpath(outdir, "comparison_CC_per_rel_gap.csv"))"
+    @info "Saved plot to $(joinpath(outdir, "1_rel_gap_boxplot_CC_per.png"))"
 
     return comparison_df
 end
@@ -186,7 +186,7 @@ function plot_investment_difference_boxplots()
 
         n_values = sort(unique(asset_df.number_of_scenarios))
         diff_vectors = [
-            asset_df[asset_df.number_of_scenarios.==n, :diff]
+            asset_df[asset_df.number_of_scenarios .== n, :diff]
             for n in n_values
         ]
 
