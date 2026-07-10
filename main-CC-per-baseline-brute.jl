@@ -453,8 +453,8 @@ function main()
                     @show mu_value
                 end
 
-                df_cost_per_scenario = export_total_operational_cost_per_scenario(energy_problem_full, output_folder)
-                plot_cost_per_scenario(df_cost_per_scenario, output_folder, mu_value_df)
+                benchmark_cost_df = export_total_operational_cost_per_scenario(energy_problem_full, output_folder)
+                plot_cost_per_scenario(benchmark_cost_df, output_folder, mu_value_df)
 
                 var_flow_df = TIO.get_table(connection_full, "var_flow")
                 flow_ens = filter(row -> row.from_asset == "ens" && row.to_asset == "e_demand", var_flow_df)
@@ -533,13 +533,13 @@ function main()
 
                 CSV.write(
                     joinpath(output_folder, "total_operational_cost_per_scenario.csv"),
-                    df_cost_per_scenario;
+                    benchmark_cost_df;
                     writeheader=true,
                 )
 
                 tol = 1e-5
 
-                df_tail_scenarios = copy(df_cost_per_scenario)
+                df_tail_scenarios = copy(benchmark_cost_df)
 
                 df_tail_scenarios[!, :solution] =
                     max.(0.0, df_tail_scenarios.total_cost .- mu_value)
@@ -552,7 +552,7 @@ function main()
                 df_tail_scenarios = df_tail_scenarios[:, [:id, :scenario, :probability, :total_cost]]
 
                 plot_cost_per_scenario_inc_tail(
-                    df_cost_per_scenario,
+                    benchmark_cost_df,
                     df_tail_scenarios,
                     output_folder,
                     mu_value_df,
@@ -572,14 +572,14 @@ function main()
 
                 tail_scenarios_ids = df_tail_scenarios[!, 2]
 
-                df_sorted = sort(df_cost_per_scenario, :total_cost)
+                df_sorted = sort(benchmark_cost_df, :total_cost)
                 middle_idx = ceil(Int, nrow(df_sorted) / 2)
                 average_case_row = df_sorted[middle_idx, :]
 
                 if average_case_row.scenario in tail_scenarios_ids
                     df_non_tail = filter(
                         row -> !(row.scenario in tail_scenarios_ids),
-                        df_cost_per_scenario,
+                        benchmark_cost_df,
                     )
 
                     df_sorted_non_tail = sort(df_non_tail, :total_cost)
@@ -594,7 +594,7 @@ function main()
                 CSV.write(joinpath(@__DIR__, output_folder, "average_case_scenario.csv"), df_representative_non_tail_scenario; writeheader=true)
 
                 plot_cost_per_scenario_inc_tail_inc_representative(
-                    df_cost_per_scenario,
+                    benchmark_cost_df,
                     df_tail_scenarios,
                     df_representative_non_tail_scenario,
                     output_folder,
@@ -927,9 +927,39 @@ function main()
                     DuckDB.execute(connection_full, "COPY rep_periods_mapping TO '$output_file' (HEADER, DELIMITER ',')")
 
 
-                    df_cost_per_scenario = export_total_operational_cost_per_scenario(energy_problem_full, output_folder)
-                    plot_cost_per_scenario(df_cost_per_scenario, output_folder, mu_value_df)
+                    resolve_cost_df = export_total_operational_cost_per_scenario(energy_problem_full, output_folder)
+                    plot_cost_per_scenario(resolve_cost_df, output_folder, mu_value_df)
 
+                    comparison = innerjoin(
+                        benchmark_cost_df,
+                        resolve_cost_df;
+                        on=:scenario,
+                        makeunique=true,
+                    )
+
+                    comparison.ratio =
+                        comparison.total_cost_2 ./ comparison.total_cost_1
+
+                    outlier_df = filter(
+                        row -> row.ratio > 3.0,
+                        comparison,
+                    )
+                    if outlier_df
+
+                        outlier_ids = outlier_df.scenario
+
+                        extra =
+                            filter(
+                                row ->
+                                    row.scenario in outlier_ids &&
+                                        !(row.scenario in df_tail_scenarios.scenario),
+                                df_cost_per_scenario,
+                            )
+                        append!(df_tail_scenarios, extra)
+                        tail_scenarios_ids = df_tail_scenarios[!, 2]
+
+                        #REPERFORM CC AND FIX THESE INVESTMENTS IN BASELINE, makes sure this is skipped for the next time in main that this happens 
+                    end
                     new_results_row = (
                         base_name=case_name,
                         rp=rp,

@@ -297,8 +297,265 @@ function plot_boxplot(; evaluation::Symbol=:baseline)
     return comparison_df
 end
 
+function plot_regret_vs_rp()
+
+    files = filter(f -> begin
+            b = basename(f)
+            startswith(b, "results_CC_per_N") && endswith(b, ".csv")
+        end, readdir(inputdir; join=true))
+
+    dfs = DataFrame[]
+
+    for f in sort(files)
+        n, seed = parse_n_seed(basename(f))
+        df = CSV.read(f, DataFrame)
+        df.number_of_scenarios .= n
+        df.seed .= seed
+        push!(dfs, df)
+    end
+
+    all_df = vcat(dfs...; cols=:union)
+
+    baseline_df = select(
+        filter(row ->
+                row.base_name == "0_HourlyBenchmark" &&
+                    row.scenario_set == "full",
+            all_df),
+        :number_of_scenarios,
+        :seed,
+        :solver,
+        :objective_value => :objective_baseline,
+    )
+
+    reduced_df = select(
+        filter(row ->
+                row.scenario_set == "reduced" &&
+                    string(row.termination_status_resolve_baseline) == "OPTIMAL",
+            all_df),
+        :number_of_scenarios,
+        :seed,
+        :solver,
+        :rp,
+        :objective_value_resolve_baseline,
+    )
+
+    regret_df = innerjoin(
+        reduced_df,
+        baseline_df;
+        on=[:number_of_scenarios, :seed, :solver],
+    )
+
+    transform!(
+        regret_df,
+        [:objective_value_resolve_baseline, :objective_baseline] =>
+            ByRow((x, y) -> (x - y) / y) => :regret,
+    )
+
+    CSV.write(
+        joinpath(outdir, "comparison_CC_per_regret_vs_rp.csv"),
+        regret_df;
+        writeheader=true,
+    )
+
+    p = plot(
+        xlabel="Representative periods",
+        ylabel="Regret",
+        title="Regret after fixing CC investments in hourly baseline",
+        legend=:topright,
+        size=(700, 450),
+        grid=true,
+        gridalpha=0.3,
+    )
+
+    for seed in sort(unique(regret_df.seed))
+        df_seed = sort(
+            filter(r -> r.seed == seed, regret_df),
+            :rp,
+        )
+
+        plot!(
+            p,
+            df_seed.rp,
+            df_seed.regret;
+            marker=:circle,
+            linewidth=2,
+            label="Seed $seed",
+        )
+    end
+
+    savefig(
+        p,
+        joinpath(outdir, "regret_vs_representative_periods.png"),
+    )
+
+    return regret_df
+end
+
+function plot_runtime_vs_rp()
+    files = filter(
+        f -> begin
+            b = basename(f)
+            startswith(b, "results_CC_per_N") && endswith(b, ".csv")
+        end,
+        readdir(inputdir; join=true),
+    )
+
+    if isempty(files)
+        @warn "No results_CC_per_N*.csv files found in $inputdir"
+        return DataFrame()
+    end
+
+    raw_dfs = DataFrame[]
+
+    for f in sort(files)
+        n, seed = parse_n_seed(basename(f))
+        df = CSV.read(f, DataFrame)
+
+        df[!, :number_of_scenarios] .= n
+        df[!, :seed] .= seed
+
+        push!(raw_dfs, df)
+    end
+
+    all_df = vcat(raw_dfs...; cols=:union)
+
+    # Runtime of each solved model.
+    all_df[!, :runtime_model] =
+        all_df.time_to_cluster .+
+        all_df.time_to_read .+
+        all_df.time_to_create .+
+        all_df.time_to_solve .+
+        all_df.time_to_save
+
+    # One hourly-baseline runtime per N, seed and solver.
+    baseline_df = select(
+        filter(
+            row ->
+                row.base_name == "0_HourlyBenchmark" &&
+                    row.scenario_set == "full" &&
+                    string(row.termination_status) == "OPTIMAL",
+            all_df,
+        ),
+        :number_of_scenarios,
+        :seed,
+        :solver,
+        :runtime_model => :runtime_baseline,
+        :time_to_read => :time_to_read_baseline,
+        :time_to_create => :time_to_create_baseline,
+    )
+
+    # CC runtime plus the hourly resolve with CC investments fixed.
+    cc_df = select(
+        filter(
+            row ->
+                row.scenario_set == "reduced" &&
+                    string(row.termination_status_resolve_baseline) == "OPTIMAL",
+            all_df,
+        ),
+        :number_of_scenarios,
+        :seed,
+        :solver,
+        :rp,
+        :runtime_model,
+        :time_to_resolve_baseline,
+    )
+
+    runtime_df = innerjoin(
+        cc_df,
+        baseline_df;
+        on=[:number_of_scenarios, :seed, :solver],
+    )
+
+    transform!(
+        runtime_df,
+        [
+            :runtime_model,
+            :time_to_read_baseline,
+            :time_to_create_baseline,
+            :time_to_resolve_baseline,
+        ] =>
+            ByRow(
+                (
+                    runtime_cc,
+                    time_read_baseline,
+                    time_create_baseline,
+                    time_resolve_baseline,
+                ) ->
+                    runtime_cc +
+                    time_read_baseline +
+                    time_create_baseline +
+                    time_resolve_baseline,
+            ) => :runtime_cc_resolve,
+    )
+
+    sort!(
+        runtime_df,
+        [:number_of_scenarios, :seed, :solver, :rp],
+    )
+
+    CSV.write(
+        joinpath(outdir, "comparison_CC_per_runtime_vs_rp.csv"),
+        runtime_df;
+        writeheader=true,
+    )
+
+    for n in sort(unique(runtime_df.number_of_scenarios))
+        df_n = filter(
+            row -> row.number_of_scenarios == n,
+            runtime_df,
+        )
+
+        p = plot(
+            xlabel="Number of representative periods",
+            ylabel="Runtime (seconds)",
+            title="Runtime versus representative periods, N=$n",
+            size=(750, 475),
+            grid=true,
+            gridalpha=0.3,
+            legend=:topright,
+        )
+
+        for seed in sort(unique(df_n.seed))
+            df_seed = sort(
+                filter(row -> row.seed == seed, df_n),
+                :rp,
+            )
+
+            plot!(
+                p,
+                df_seed.rp,
+                df_seed.runtime_baseline;
+                marker=:circle,
+                linewidth=2,
+                label="Hourly baseline, seed $seed",
+            )
+
+            plot!(
+                p,
+                df_seed.rp,
+                df_seed.runtime_cc_resolve;
+                marker=:circle,
+                linewidth=2,
+                label="CC + hourly resolve, seed $seed",
+            )
+        end
+
+        savefig(
+            p,
+            joinpath(
+                outdir,
+                "runtime_vs_representative_periods_N$(n).png",
+            ),
+        )
+    end
+
+    return runtime_df
+end
+
 plot_boxplot(evaluation=:baseline)
 plot_investment_difference_boxplots(evaluation=:baseline)
+plot_regret_vs_rp()
+plot_runtime_vs_rp()
 
 if config["simulation"]["fix_benchmark"]
     plot_boxplot(evaluation=:benchmark)

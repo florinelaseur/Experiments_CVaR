@@ -1296,8 +1296,8 @@ function plot_comparison_runtime(results_path)
 
     df_plot = copy(df_results)
 
-    # RP model runtime, excluding clustering
-    df_plot[!, :runtime_rp] =
+    # Runtime of the model itself, including clustering
+    df_plot[!, :runtime_model] =
         df_plot.time_to_cluster .+
         df_plot.time_to_read .+
         df_plot.time_to_create .+
@@ -1307,38 +1307,68 @@ function plot_comparison_runtime(results_path)
     comparison = DataFrame(
         case_label=String[],
         runtime=Float64[],
+        rp=Int[],
+        case_type=String[],
     )
 
     for row in eachrow(df_plot)
 
-        if row.scenario_set == "full"
+        # Free hourly baseline solve
+        if row.base_name == "0_HourlyBenchmark" &&
+           row.scenario_set == "full"
+
             push!(comparison, (
-                "$(row.rp) periods full set",
-                row.runtime_rp,
+                case_label="Hourly baseline",
+                runtime=row.runtime_model,
+                rp=0,
+                case_type="baseline",
             ))
 
-        elseif row.scenario_set == "reduced"
-            push!(comparison, (
-                "$(row.rp) periods reduced set",
-                row.runtime_rp,))
+            # CC solve plus hourly OOS resolve with CC investments fixed
+        elseif row.scenario_set == "reduced" &&
+               string(row.termination_status_resolve_baseline) == "OPTIMAL"
 
-            # push!(comparison, (
-            #     "$(row.rp) periods + fix + resolve full set",
-            #     row.runtime_rp,)) #Alice does not include resolve + row.time_to_resolve_full
+            runtime_cc_and_resolve =
+                row.runtime_model +
+                row.time_to_resolve_baseline
+
+            push!(comparison, (
+                case_label="$(row.rp) RPs: CC + hourly resolve",
+                runtime=runtime_cc_and_resolve,
+                rp=row.rp,
+                case_type="CC + resolve baseline",
+            ))
         end
     end
 
-    p_runtime = bar(
-        comparison.case_label,
-        comparison.runtime;
-        xlabel="Case",
-        ylabel="Runtime [s]",
-        title="Runtime Comparison",
-        label=false,
-        xrotation=30,
+    sort!(
+        comparison,
+        [:case_type, :rp],
+        by=[
+            x -> x == "baseline" ? 0 : 1,
+            identity,
+        ],
     )
 
-    savefig(p_runtime, joinpath(plots_folder, "runtime_comparison_N$(df_plot.number_of_scenarios[1]).png"))
+    CSV.write(
+        joinpath(plots_folder, "runtime_comparison.csv"),
+        comparison;
+        writeheader=true,
+    )
+
+    p = bar(
+        comparison.case_label,
+        comparison.runtime;
+        ylabel="Runtime (seconds)",
+        xlabel="Method",
+        title="Hourly baseline versus CC + hourly OOS resolve",
+        legend=false,
+        xrotation=25,
+        size=(850, 500),
+    )
+
+    savefig(p, joinpath(plots_folder, "runtime_comparison_N$(df_plot.number_of_scenarios[1]).png"))
+    return comparison
 end
 
 function parse_n_seed(filename::String)
