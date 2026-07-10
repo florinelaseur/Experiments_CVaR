@@ -27,11 +27,6 @@ mkpath(outdir)
 col_cc = RGB(0.122, 0.471, 0.706)
 col_zero = RGB(0.4, 0.4, 0.4)
 
-function parse_n_seed(filename::String)
-    m = match(r"results_CC_per_N(\d+)_seed(\d+)\.csv$", filename)
-    return parse(Int, m[1]), parse(Int, m[2])
-end
-
 function plot_investment_difference_boxplots(; evaluation::Symbol=:baseline)
     investment_files = String[]
 
@@ -96,7 +91,7 @@ function plot_investment_difference_boxplots(; evaluation::Symbol=:baseline)
 
         n_values = sort(unique(asset_df.number_of_scenarios))
         diff_vectors = [
-            asset_df[asset_df.number_of_scenarios .== n, :diff]
+            asset_df[asset_df.number_of_scenarios.==n, :diff]
             for n in n_values
         ]
 
@@ -179,8 +174,8 @@ function plot_boxplot(; evaluation::Symbol=:baseline)
         bench_df = select(
             filter(row ->
                     row.base_name == "0_HourlyBenchmark" &&
-                    row.scenario_set == "full" &&
-                    string(row.termination_status) == "OPTIMAL",
+                        row.scenario_set == "full" &&
+                        string(row.termination_status) == "OPTIMAL",
                 all_df),
             :number_of_scenarios,
             :seed,
@@ -191,7 +186,7 @@ function plot_boxplot(; evaluation::Symbol=:baseline)
         reduced_df = select(
             filter(row ->
                     row.scenario_set == "reduced" &&
-                    string(row.termination_status_resolve_baseline) == "OPTIMAL",
+                        string(row.termination_status_resolve_baseline) == "OPTIMAL",
                 all_df),
             :number_of_scenarios,
             :seed,
@@ -210,8 +205,8 @@ function plot_boxplot(; evaluation::Symbol=:baseline)
         bench_df = select(
             filter(row ->
                     row.scenario_set == "full" &&
-                    row.base_name != "0_HourlyBenchmark" &&
-                    string(row.termination_status) == "OPTIMAL",
+                        row.base_name != "0_HourlyBenchmark" &&
+                        string(row.termination_status) == "OPTIMAL",
                 all_df),
             :number_of_scenarios,
             :seed,
@@ -223,7 +218,7 @@ function plot_boxplot(; evaluation::Symbol=:baseline)
         reduced_df = select(
             filter(row ->
                     row.scenario_set == "reduced" &&
-                    string(row.termination_status_resolve_benchmark) == "OPTIMAL",
+                        string(row.termination_status_resolve_benchmark) == "OPTIMAL",
                 all_df),
             :number_of_scenarios,
             :seed,
@@ -259,7 +254,7 @@ function plot_boxplot(; evaluation::Symbol=:baseline)
 
     n_values = sort(unique(comparison_df.number_of_scenarios))
     gap_vectors = [
-        comparison_df[comparison_df.number_of_scenarios .== n, :rel_gap]
+        comparison_df[comparison_df.number_of_scenarios.==n, :rel_gap]
         for n in n_values
     ]
 

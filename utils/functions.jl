@@ -1340,3 +1340,8 @@ function plot_comparison_runtime(results_path)
 
     savefig(p_runtime, joinpath(plots_folder, "runtime_comparison_N$(df_plot.number_of_scenarios[1]).png"))
 end
+
+function parse_n_seed(filename::String)
+    m = match(r"results_CC_per_N(\d+)_seed(\d+)\.csv$", filename)
+    return parse(Int, m[1]), parse(Int, m[2])
+end
