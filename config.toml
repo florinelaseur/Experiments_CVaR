@@ -1,14 +1,14 @@
 [simulation]
-fix_benchmark = false
+fix_benchmark = true
 risk_aversion_confidence_level = 0.9
 input_data_CC = "base-input-data/RIDM-case-study-CC"
 input_data = "base-input-data/RIDM-case-study"
 fix_level_storage = false
 solvers = ["Gurobi"]
-seeds = 1
+seeds = 2
 risk_aversion_weight_lambda = 0.1
 scenario_data = "create-scenarios"
-representative_periods = [120]
+representative_periods = [24]
 run_benchmark = false
 scenarios_starting_set_sizes = [10]
 number_of_scenarios = 10

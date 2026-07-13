@@ -707,7 +707,7 @@ function plot_cost_per_scenario_inc_tail_inc_representative(
     df_tail_scenarios::DataFrame,
     df_representative_scenarios::DataFrame,
     output_folder,
-    mu_value_df::DataFrame,
+    mu_value::Float64,
     case_name,
 )
     p = scatter(
@@ -739,18 +739,15 @@ function plot_cost_per_scenario_inc_tail_inc_representative(
         label="Representative scenarios",
     )
 
-    if nrow(mu_value_df) > 0
-        mu_value = only(mu_value_df.solution)
+    hline!(
+        p,
+        [mu_value];
+        linestyle=:dash,
+        linewidth=2,
+        color=:black,
+        label="VaR threshold μ",
+    )
 
-        hline!(
-            p,
-            [mu_value];
-            linestyle=:dash,
-            linewidth=2,
-            color=:black,
-            label="VaR threshold μ",
-        )
-    end
 
     savefig(
         p,
