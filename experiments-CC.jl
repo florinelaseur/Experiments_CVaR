@@ -15,11 +15,11 @@ include("utils/constants.jl")
 
 function run_experiments()
     config_path = joinpath(@__DIR__, "config.toml")
-    config = TOML.parsefile(config_path)
-    n_seeds = config["simulation"]["seeds"]
+    original_config = TOML.parsefile(config_path)
+    n_seeds = original_config["simulation"]["seeds"]
     seeds = collect(1:n_seeds)
-    scenario_sizes = config["simulation"]["scenarios_starting_set_sizes"]
-    representative_periods = config["simulation"]["representative_periods"]
+    scenario_sizes = copy(original_config["simulation"]["scenarios_starting_set_sizes"],)
+    representative_periods = copy(original_config["simulation"]["representative_periods"],)
     main_cc_path = joinpath(@__DIR__, "main-CC-per-baseline-brute.jl")
 
     log = DataFrame(
@@ -35,7 +35,7 @@ function run_experiments()
             for rps in representative_periods
                 @info "Running experiment with seed=$seed, number_of_scenarios=$n, representative_periods=$rps"
 
-                config = TOML.parsefile(config_path)
+                config = deepcopy(original_config)
                 config["simulation"]["number_of_scenarios"] = n
                 config["simulation"]["representative_periods"] = [rps]
                 config["simulation"]["run_benchmark"] = false

@@ -29,6 +29,7 @@ JuliaLocalPreferences.toml
 
 # output folder
 outputs/
+outputs copy*/
 
 # Configuration filees for VS Code Julia extension
 .vscode/
@@ -36,3 +37,4 @@ create-scenarios/profiles-wide-all-scenarios.csv
 base-input-data/**/profiles-wide.csv
 base-input-data/**/stochastic-scenario.csv
 create-scenarios/profiles-wide-all-scenarios.csv
+

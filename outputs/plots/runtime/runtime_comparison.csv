@@ -1,0 +1,3 @@
+case_label,runtime,rp,case_type
+Hourly baseline,1229.608318992,0,baseline
+24 RPs: CC + hourly resolve,41.017387299999996,24,CC + resolve baseline

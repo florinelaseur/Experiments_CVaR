@@ -960,9 +960,10 @@ function main()
                             filter(
                                 row ->
                                     row.scenario in outlier_ids &&
-                                        !(row.scenario in df_tail_scenarios.scenario),
-                                df_cost_per_scenario,
+                                    !(row.scenario in df_tail_scenarios.scenario),
+                                benchmark_cost_df,
                             )
+                        extra=select(extra, names(df_tail_scenarios))
                         append!(df_tail_scenarios, extra)
 
                         CSV.write(
@@ -1078,14 +1079,15 @@ function main()
                         )
 
                         CSV.write(
-                            joinpath(output_folder, "input_profiles_inc_outlier", "profiles-wide.csv"),
-                            profiles_df_CC;
+                            joinpath(input_data_path_CC, "twice", "stochastic-scenario.csv"),
+                            df_stochastic_scenario_CC;
                             writeheader=true,
                         )
 
+                        mkpath(joinpath(output_folder, "input_profiles_inc_outlier"))
                         CSV.write(
-                            joinpath(input_data_path_CC, "twice", "stochastic-scenario.csv"),
-                            df_stochastic_scenario_CC;
+                            joinpath(output_folder, "input_profiles_inc_outlier", "profiles-wide.csv"),
+                            profiles_df_CC;
                             writeheader=true,
                         )
 
