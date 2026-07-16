@@ -30,14 +30,14 @@ function run_experiments()
         elapsed=Float64[],
     )
 
-    for n in scenario_sizes
-        for seed in seeds
-            for rps in representative_periods
-                @info "Running experiment with seed=$seed, number_of_scenarios=$n, representative_periods=$rps"
+    try
+        for n in scenario_sizes
+            for seed in seeds
+                @info "Running experiment with seed=$seed, number_of_scenarios=$n, representative_periods=$representative_periods"
 
                 config = deepcopy(original_config)
                 config["simulation"]["number_of_scenarios"] = n
-                config["simulation"]["representative_periods"] = [rps]
+                config["simulation"]["representative_periods"] = copy(representative_periods)
                 config["simulation"]["run_benchmark"] = false
 
                 open(config_path, "w") do io
@@ -55,7 +55,7 @@ function run_experiments()
                     run(cmd)
                 catch error
                     success = false
-                    @warn "Experiment failed for seed=$seed, number_of_scenarios=$n, representative_periods=$rps with error: $error" exception = error
+                    @warn "Experiment failed for seed=$seed, number_of_scenarios=$n, representative_periods=$representative_periods with error: $error" exception = error
                 end
 
                 elapsed = time() - t
@@ -63,18 +63,21 @@ function run_experiments()
                 push!(log, (
                     seed=seed,
                     number_of_scenarios=n,
-                    representative_periods=string([rps]),
+                    representative_periods=string(representative_periods),
                     success=success,
                     elapsed=elapsed,
                 ))
-            end
-            if seed == last(seeds)
-                plot_comparison_runtime(joinpath(@__DIR__, "outputs", "results_CC_per_N$(n)_seed$(seed).csv"))
+                # if seed == last(seeds)
+                #     plot_comparison_runtime(joinpath(@__DIR__, "outputs", "results_ScSeRP_N$(n)_seed$(seed).csv"))
+                # end
             end
         end
+    finally
+        open(config_path, "w") do io
+            TOML.print(io, original_config)
+        end
     end
-
-    out = joinpath(@__DIR__, "outputs", "experiment_log_CC_per.csv")
+    out = joinpath(@__DIR__, "outputs", "experiment_log_ScSeRP.csv")
     mkpath(dirname(out))
     CSV.write(out, log)
 

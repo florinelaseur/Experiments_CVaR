@@ -1311,7 +1311,7 @@ function plot_comparison_runtime(results_path)
     for row in eachrow(df_plot)
 
         # Free hourly baseline solve
-        if row.base_name == "0_HourlyBenchmark" &&
+        if row.base_name == "0_HourlyBaseline" &&
            row.scenario_set == "full"
 
             push!(comparison, (
