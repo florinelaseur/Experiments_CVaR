@@ -826,6 +826,18 @@ function main()
                     error("Borrowed water has been used: $amount_water_borrowed_err")
                 end
 
+                time_to_resolve_benchmark = 0.0
+                objective_value_resolve_benchmark = 0.0
+                termination_status_resolve_benchmark = ""
+                n_lol_ens_resolve_benchmark = 0
+                lole_e_demand_resolve_benchmark = 0.0
+                n_lol_smr_ccs_resolve_benchmark = 0
+                lole_h2_demand_resolve_benchmark = 0.0
+                amount_water_borrowed_resolve_benchmark = 0.0
+                mu_value_resolve_benchmark = 0.0
+
+                outlier_found = false
+
                 if fix_benchmark
                     @info "Fixing investment from reduced scenario set in the benchmark case study: $rp RP on full set with $solver"
                     fix_variables_from_solution!(
@@ -862,6 +874,8 @@ function main()
 
                     @info "Resolving the benchmark case study: RP on full set with $solver"
                     time_to_resolve_benchmark = @elapsed TEM.solve_model!(energy_problem_benchmark)
+                    termination_status_resolve_benchmark = string(energy_problem_benchmark.termination_status)
+                    objective_value_resolve_benchmark = energy_problem_benchmark.objective_value
 
                     if energy_problem_benchmark.termination_status == JuMP.INFEASIBLE
                         JuMP.compute_conflict!(energy_problem_benchmark.model)
@@ -885,12 +899,23 @@ function main()
                         var_flow_df,
                     )
 
-                    # count steps with loss of load
-                    n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
-                    lole_e_demand = n_lol_ens / number_of_scenarios
-                    n_lol_smr_ccs = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
-                    lole_h2_demand = n_lol_smr_ccs / number_of_scenarios
+                    n_lol_ens_resolve_benchmark = count(row -> row.solution > 0.0, eachrow(flow_ens))
+                    lole_e_demand_resolve_benchmark = n_lol_ens_resolve_benchmark / number_of_scenarios
+                    n_lol_smr_ccs_resolve_benchmark = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
+                    lole_h2_demand_resolve_benchmark = n_lol_smr_ccs_resolve_benchmark / number_of_scenarios
+                    amount_water_borrowed_resolve_benchmark = sum(water_borrowed.solution)
 
+                    mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
+                    mu_value_resolve_benchmark = if nrow(mu_value_df) == 0
+                        NaN
+                    else
+                        only(mu_value_df.solution)
+                    end
+
+                    if !isnan(mu_value_resolve_benchmark)
+                        @info "mu_value of Resolve Benchmark (24 periods per scenario on full scenario set) is defined"
+                        @show mu_value_resolve_benchmark
+                    end
 
                     plot_normalized_asset_investment_differences(
                         benchmark_investment_df,
@@ -899,24 +924,11 @@ function main()
                         case_name=case_name,
                         benchmark_num_loss_of_load_e_demand=bm_n_lol_ens,
                         benchmark_num_loss_of_load_h2_demand=bm_n_lol_smr_ccs,
-                        approximation_num_loss_of_load_e_demand=n_lol_ens,
-                        approximation_num_loss_of_load_h2_demand=n_lol_smr_ccs,
+                        approximation_num_loss_of_load_e_demand=
+                        n_lol_ens_resolve_benchmark,
+                        approximation_num_loss_of_load_h2_demand=
+                        n_lol_smr_ccs_resolve_benchmark,
                     )
-                    # count how much water_borrowed
-                    amount_water_borrowed_b = sum(water_borrowed.solution)
-
-                    # get mu solution
-                    mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
-                    mu_value_benchmark = if nrow(mu_value_df) == 0
-                        NaN
-                    else
-                        only(mu_value_df.solution)
-                    end
-
-                    if !isnan(mu_value_benchmark)
-                        @info "mu_value of Resolve Benchmark (24 periods per scenario on full scenario set) is defined"
-                        @show mu_value_benchmark
-                    end
 
                     output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", case_name, "fixed_in_benchmark", string(solver))
                     mkpath(output_folder)
@@ -924,7 +936,6 @@ function main()
 
                     output_file = joinpath(output_folder, "rep_periods_mapping.csv")
                     DuckDB.execute(connection_benchmark, "COPY rep_periods_mapping TO '$output_file' (HEADER, DELIMITER ',')")
-
 
                     resolve_cost_df = export_total_operational_cost_per_scenario(energy_problem_benchmark, output_folder)
                     plot_cost_per_scenario(resolve_cost_df, output_folder, mu_value_df)
@@ -942,55 +953,62 @@ function main()
                         comparison,
                     )
 
-                    outlier_found = false
-
-                    new_results_row = (
-                        case_name=case_name,
-                        rp=rp,
-                        solver=solver,
-                        time_to_cluster=time_to_cluster,
-                        time_to_read=time_to_read,
-                        time_to_create=time_to_create,
-                        time_to_solve=time_to_solve,
-                        time_to_save=time_to_save,
-                        objective_value=energy_problem_red.objective_value,
-                        termination_status=string(energy_problem_red.termination_status),
-                        value_at_risk_threshold_mu_red=mu_value_red,
-                        num_constraints=JuMP.num_constraints(
-                            energy_problem_red.model;
-                            count_variable_in_set_constraints=false,
-                        ),
-                        num_variables=JuMP.num_variables(energy_problem_red.model),
-                        time_to_resolve_benchmark=time_to_resolve_benchmark,
-                        objective_value_resolve_benchmark=energy_problem_benchmark.objective_value,
-                        termination_status_resolve_benchmark=string(energy_problem_benchmark.termination_status,),
-                        num_loss_of_load_e_demand_benchmark=n_lol_ens,
-                        lole_e_demand_benchmark=lole_e_demand,
-                        num_loss_of_load_h2_demand_benchmark=n_lol_smr_ccs,
-                        lole_h2_demand_benchmark=lole_h2_demand,
-                        water_borrowed_benchmark=amount_water_borrowed_b,
-                        value_at_risk_threshold_mu_benchmark=mu_value_benchmark,
-                        time_to_resolve_baseline=0.0,
-                        objective_value_resolve_baseline=0.0,
-                        termination_status_resolve_baseline="",
-                        num_loss_of_load_e_demand_baseline=0,
-                        lole_e_demand_baseline=0.0,
-                        num_loss_of_load_h2_demand_baseline=0,
-                        lole_h2_demand_baseline=0.0,
-                        water_borrowed_baseline=0.0,
-                        value_at_risk_threshold_mu_baseline=0.0,
-                        scenario_set="reduced",
-                        seed=seed,
-                        number_of_scenarios=number_of_scenarios,
-                    )
-                    push!(results_df, new_results_row)
-
                     if !isempty(outlier_df)
+
+                        new_results_row = (
+                            case_name=case_name,
+                            rp=rp,
+                            solver=solver,
+                            time_to_cluster=time_to_cluster,
+                            time_to_read=time_to_read,
+                            time_to_create=time_to_create,
+                            time_to_solve=time_to_solve,
+                            time_to_save=time_to_save,
+                            objective_value=energy_problem_red.objective_value,
+                            termination_status=string(energy_problem_red.termination_status),
+                            value_at_risk_threshold_mu_red=mu_value_red,
+                            num_constraints=JuMP.num_constraints(
+                                energy_problem_red.model;
+                                count_variable_in_set_constraints=false,
+                            ),
+                            num_variables=JuMP.num_variables(energy_problem_red.model),
+                            time_to_resolve_benchmark=time_to_resolve_benchmark,
+                            objective_value_resolve_benchmark=objective_value_resolve_benchmark,
+                            termination_status_resolve_benchmark=termination_status_resolve_benchmark,
+                            num_loss_of_load_e_demand_benchmark=n_lol_ens_resolve_benchmark,
+                            lole_e_demand_benchmark=lole_e_demand_resolve_benchmark,
+                            num_loss_of_load_h2_demand_benchmark=n_lol_smr_ccs_resolve_benchmark,
+                            lole_h2_demand_benchmark=lole_h2_demand_resolve_benchmark,
+                            water_borrowed_benchmark=amount_water_borrowed_resolve_benchmark,
+                            value_at_risk_threshold_mu_benchmark=mu_value_resolve_benchmark,
+                            time_to_resolve_baseline=0.0,
+                            objective_value_resolve_baseline=0.0,
+                            termination_status_resolve_baseline="",
+                            num_loss_of_load_e_demand_baseline=0,
+                            lole_e_demand_baseline=0.0,
+                            num_loss_of_load_h2_demand_baseline=0,
+                            lole_h2_demand_baseline=0.0,
+                            water_borrowed_baseline=0.0,
+                            value_at_risk_threshold_mu_baseline=0.0,
+                            scenario_set="reduced",
+                            seed=seed,
+                            number_of_scenarios=number_of_scenarios,
+                        )
+                        push!(results_df, new_results_row)
+
                         case_name = base_name * "_rp_" * "$rp" * "_reduced_scenario_set_inc_outlier"
                         outlier_found = true
-                        #REPERFORM CC AND FIX THESE INVESTMENTS IN BASELINE, makes sure this is skipped for the next time in main that this happens 
 
-                        #insert scenario selection and create and solve energy_problem_red
+                        time_to_resolve_benchmark = 0.0
+                        objective_value_resolve_benchmark = 0.0
+                        termination_status_resolve_benchmark = ""
+                        n_lol_ens_resolve_benchmark = 0
+                        lole_e_demand_resolve_benchmark = 0.0
+                        n_lol_smr_ccs_resolve_benchmark = 0
+                        lole_h2_demand_resolve_benchmark = 0.0
+                        amount_water_borrowed_resolve_benchmark = 0.0
+                        mu_value_resolve_benchmark = 0.0
+
                         output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", case_name, "scenario_selection", string(solver))
                         mkpath(output_folder)
 
@@ -1000,10 +1018,10 @@ function main()
                             filter(
                                 row ->
                                     row.scenario in outlier_ids &&
-                                    !(row.scenario in df_tail_scenarios.scenario),
+                                        !(row.scenario in df_tail_scenarios.scenario),
                                 benchmark_cost_df,
                             )
-                        extra=select(extra, names(df_tail_scenarios))
+                        extra = select(extra, names(df_tail_scenarios))
                         append!(df_tail_scenarios, extra)
 
                         CSV.write(
@@ -1352,6 +1370,7 @@ function main()
                     @__DIR__,
                     "outputs",
                     "N$(number_of_scenarios)_seed$(seed)",
+                    case_name,
                     "investment_analysis",
                     "baseline",
                 )
@@ -1411,18 +1430,20 @@ function main()
                         count_variable_in_set_constraints=false,
                     ),
                     num_variables=JuMP.num_variables(energy_problem_red.model),
-                    time_to_resolve_benchmark=0.0,
-                    objective_value_resolve_benchmark=0.0,
-                    termination_status_resolve_benchmark="",
-                    num_loss_of_load_e_demand_benchmark=0.0,
-                    lole_e_demand_benchmark=0.0,
-                    num_loss_of_load_h2_demand_benchmark=0.0,
-                    lole_h2_demand_benchmark=0.0,
-                    water_borrowed_benchmark=0.0,
-                    value_at_risk_threshold_mu_benchmark=0.0,
+                    time_to_resolve_benchmark=time_to_resolve_benchmark,
+                    objective_value_resolve_benchmark=objective_value_resolve_benchmark,
+                    termination_status_resolve_benchmark=termination_status_resolve_benchmark,
+                    num_loss_of_load_e_demand_benchmark=n_lol_ens_resolve_benchmark,
+                    lole_e_demand_benchmark=lole_e_demand_resolve_benchmark,
+                    num_loss_of_load_h2_demand_benchmark=n_lol_smr_ccs_resolve_benchmark,
+                    lole_h2_demand_benchmark=lole_h2_demand_resolve_benchmark,
+                    water_borrowed_benchmark=amount_water_borrowed_resolve_benchmark,
+                    value_at_risk_threshold_mu_benchmark=mu_value_resolve_benchmark,
                     time_to_resolve_baseline=time_to_resolve_baseline,
                     objective_value_resolve_baseline=energy_problem_baseline.objective_value,
-                    termination_status_resolve_baseline=string(energy_problem_baseline.termination_status),
+                    termination_status_resolve_baseline=string(
+                        energy_problem_baseline.termination_status,
+                    ),
                     num_loss_of_load_e_demand_baseline=n_lol_ens,
                     lole_e_demand_baseline=lole_e_demand,
                     num_loss_of_load_h2_demand_baseline=n_lol_smr_ccs,
