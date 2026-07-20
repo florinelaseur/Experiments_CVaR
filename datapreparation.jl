@@ -1,32 +1,11 @@
 cd(@__DIR__)
-# using Pkg: Pkg
-# Pkg.activate(".")
-# Pkg.instantiate()
-
-# Load the required packages
-import TulipaEnergyModel as TEM
-import TulipaIO as TIO
-import TulipaClustering as TC
-using DuckDB: DuckDB
-using HiGHS: HiGHS
-using Gurobi: Gurobi
-using Distances: Distances
 using CSV: CSV
-using Statistics: Statistics
-using JuMP: JuMP
-using TOML: TOML
-using Plots
-using Random
 using DataFrames
 
-@info "Including helper functions"
-include("utils/functions.jl")
-include("utils/constants.jl")
-
-function main()
+function prepare_data()
 
     config = TOML.parsefile("config.toml")
-    input_data_path = config["simulation"]["scenario_data"]
+    input_data_path = joinpath(@homedir(), "create-sceanarios")
 
     profiles_list_full = Vector{DataFrame}(undef, 144)
     scenario_cols = ["WS" * lpad(string(j), 2, '0') for j in 1:36]
@@ -78,9 +57,4 @@ function main()
     CSV.write(joinpath(input_data_path, "profiles-wide-all-scenarios.csv"), all_profiles_df; writeheader=true)
 end
 
-main()
-
-# config = TOML.parsefile("C:/Users/fjlaseur/Tulipa/Experiments_CVaR/config.toml")
-# number_of_scenarios = config["simulation"]["number_of_scenarios"] #no more than 144
-# profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
-# CSV.write(joinpath(input_data_file, "profiles-wide.csv"), profiles_df; writeheader=true)
+prepare_data()

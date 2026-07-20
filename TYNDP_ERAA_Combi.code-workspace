@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../Nextcloud/ExperimentData"
+		},
+		{
+			"path": "../../TYNDP-26-to-Tulipa"
+		},
+		{
+			"path": "../CVaR/TulipaEnergyModel.jl"
+		}
+	],
+	"settings": {
+		"julia.environmentPath": "c:\\Users\\fjlaseur\\Tulipa\\Experiments_CVaR"
+	}
+}

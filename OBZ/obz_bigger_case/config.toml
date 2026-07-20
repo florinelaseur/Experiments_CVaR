@@ -1,0 +1,14 @@
+# to give information about the simulations that we are running
+
+[simulation]
+input_data = "input_tables/"
+n_runs = 1
+
+[clustering]
+heuristic_distance = false
+
+[extreme_periods]
+add_worst_every_hour = false
+add_best_every_hour = false # this can be true only if also the previous one is true
+add_worst_sum = false
+

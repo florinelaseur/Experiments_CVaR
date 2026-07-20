@@ -52,10 +52,11 @@ lambda = config["simulation"]["risk_aversion_weight_lambda"]
 alpha = config["simulation"]["risk_aversion_confidence_level"]
 number_of_scenarios = config["simulation"]["number_of_scenarios"]
 fix_benchmark = config["simulation"]["fix_benchmark"]
+data_root = config["simulation"]["data_root"]
 
 #for new scenarios
 
-profiles_path = joinpath(@__DIR__, "create-scenarios", "profiles-wide-all-scenarios.csv")
+profiles_path = joinpath(data_root, "profiles-wide-all-scenarios.csv")
 all_profiles_df = CSV.read(profiles_path, DataFrame)
 profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
 selected_scenarios = sort(unique(profiles_df.scenario))
@@ -1018,7 +1019,7 @@ function main()
                             filter(
                                 row ->
                                     row.scenario in outlier_ids &&
-                                        !(row.scenario in df_tail_scenarios.scenario),
+                                    !(row.scenario in df_tail_scenarios.scenario),
                                 benchmark_cost_df,
                             )
                         extra = select(extra, names(df_tail_scenarios))

@@ -1,17 +1,18 @@
 [simulation]
-fix_benchmark = false
+data_root = joinpath(homedir(), "Nextcloud", "ExperimentData")
+fix_benchmark = true
 risk_aversion_confidence_level = 0.9
-input_data_CC = "base-input-data/RIDM-case-study-CC"
-input_data = "base-input-data/RIDM-case-study"
+input_data_CC = joinpath(homedir(), "Nextcloud", "ExperimentData", "base-input-data", "RIDM-case-study-CC")
+input_data = joinpath(homedir(), "Nextcloud", "ExperimentData", "base-input-data", "RIDM-case-study")
 fix_level_storage = false
 solvers = ["Gurobi"]
-seeds = 2
-risk_aversion_weight_lambda = 0.1
-scenario_data = "create-scenarios"
+seeds = 1
+risk_aversion_weight_lambda = 0.2
+scenario_data = ExperimentData
 representative_periods = [12]
 run_benchmark = false
-scenarios_starting_set_sizes = [10]
-number_of_scenarios = 10
+scenarios_starting_set_sizes = [2]
+number_of_scenarios = 2
 
 [clustering]
 heuristic_distance = false
