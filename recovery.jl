@@ -23,8 +23,8 @@ using Statistics
 using DataFrames
 solver = Gurobi
 case_name = "0_HourlyBenchmark"
-balance_df = CSV.read(joinpath(@__DIR__, "outputs", "$case_name", string(solver), "cons_balance_consumer.csv"), DataFrame)
-flow_df = CSV.read(joinpath(@__DIR__, "outputs", "$case_name", string(solver), "var_flow.csv"), DataFrame)
+balance_df = CSV.read(joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "$case_name", string(solver), "cons_balance_consumer.csv"), DataFrame)
+flow_df = CSV.read(joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "$case_name", string(solver), "var_flow.csv"), DataFrame)
 
 using DataFrames
 

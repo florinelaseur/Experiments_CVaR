@@ -20,7 +20,7 @@ function run_experiments()
     seeds = collect(1:n_seeds)
     scenario_sizes = copy(original_config["simulation"]["scenarios_starting_set_sizes"],)
     representative_periods = copy(original_config["simulation"]["representative_periods"],)
-    main_cc_path = joinpath(@__DIR__, "main-CC-per-baseline-brute.jl")
+    main_cc_path = joinpath(@__DIR__, "main-CC-per-baseline-brute-NL.jl")
 
     log = DataFrame(
         seed=Int[],
@@ -68,7 +68,7 @@ function run_experiments()
                     elapsed=elapsed,
                 ))
                 # if seed == last(seeds)
-                #     plot_comparison_runtime(joinpath(@__DIR__, "outputs", "results_ScSeRP_N$(n)_seed$(seed).csv"))
+                #     plot_comparison_runtime(joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "results_ScSeRP_N$(n)_seed$(seed).csv"))
                 # end
             end
         end
@@ -77,7 +77,7 @@ function run_experiments()
             TOML.print(io, original_config)
         end
     end
-    out = joinpath(@__DIR__, "outputs", "experiment_log_ScSeRP.csv")
+    out = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "experiment_log_ScSeRP.csv")
     mkpath(dirname(out))
     CSV.write(out, log)
 

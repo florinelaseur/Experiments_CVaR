@@ -20,8 +20,8 @@ config = TOML.parsefile("config.toml")
 scenario_sizes = config["simulation"]["scenarios_starting_set_sizes"]
 representative_periods = config["simulation"]["representative_periods"]
 
-inputdir = joinpath(@__DIR__, "outputs")
-outdir = joinpath(@__DIR__, "outputs", "plots")
+inputdir = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data")
+outdir = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "plots")
 mkpath(outdir)
 
 col_cc = RGB(0.122, 0.471, 0.706)

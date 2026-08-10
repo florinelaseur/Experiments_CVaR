@@ -546,12 +546,12 @@ function main()
     @info "Beginning of Contribution C (CC)"
 
     profiles_df = CSV.read(
-        joinpath(@__DIR__, "base-input-data", "RIDM-case-study", "profiles-wide.csv"),
+        joinpath(@__DIR__, "NL-input-data", "RIDM-case-study", "profiles-wide.csv"),
         DataFrame,
     )
 
     df_stochastic_scenario = CSV.read(
-        joinpath(@__DIR__, "base-input-data", "RIDM-case-study", "stochastic-scenario.csv"),
+        joinpath(@__DIR__, "NL-input-data", "RIDM-case-study", "stochastic-scenario.csv"),
         DataFrame,
     )
 

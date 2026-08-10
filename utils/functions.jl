@@ -1369,6 +1369,10 @@ function plot_comparison_runtime(results_path)
 end
 
 function parse_n_seed(filename::String)
-    m = match(r"results_CC_per_N(\d+)_seed(\d+)\.csv$", filename)
+    m = match(r"results_(?:CC_per_)?N(\d+)_seed(\d+)\.csv$", filename)
+    if isnothing(m)
+        m = match(r"results_ScSeRP_N(\d+)_seed(\d+)\.csv$", filename)
+    end
+    isnothing(m) && return 0, 0
     return parse(Int, m[1]), parse(Int, m[2])
 end

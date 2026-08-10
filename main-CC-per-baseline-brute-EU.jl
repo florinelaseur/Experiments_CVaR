@@ -55,13 +55,17 @@ fix_benchmark = config["simulation"]["fix_benchmark"]
 
 #for new scenarios
 
-profiles_path = joinpath(@__DIR__, "create-scenarios", "profiles-wide-all-scenarios.csv")
-all_profiles_df = CSV.read(profiles_path, DataFrame)
-profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
-selected_scenarios = sort(unique(profiles_df.scenario))
-mapping = Dict(old => new for (new, old) in enumerate(selected_scenarios))
-profiles_df[!, :scenario] = [mapping[s] for s in profiles_df.scenario]
-CSV.write(joinpath(input_data_path, "profiles-wide.csv"), profiles_df; writeheader=true)
+# profiles_path = joinpath(@__DIR__, "create-scenarios", "profiles-wide-all-scenarios.csv")
+# all_profiles_df = CSV.read(profiles_path, DataFrame)
+# profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
+# selected_scenarios = sort(unique(profiles_df.scenario))
+# mapping = Dict(old => new for (new, old) in enumerate(selected_scenarios))
+# profiles_df[!, :scenario] = [mapping[s] for s in profiles_df.scenario]
+# CSV.write(joinpath(input_data_path, "profiles-wide.csv"), profiles_df; writeheader=true)
+
+# to keep scenarios
+
+profiles_df = CSV.read(joinpath(input_data_path, "profiles-rep-periods.csv"), DataFrame)
 
 df_stochastic_scenario = DataFrame(;
     scenario=sort(unique(profiles_df.scenario)),
@@ -69,10 +73,7 @@ df_stochastic_scenario = DataFrame(;
 )
 CSV.write(joinpath(input_data_path, "stochastic-scenario.csv"), df_stochastic_scenario; writeheader=true)
 
-# to keep scenarios
-
-# profiles_df = CSV.read(joinpath(input_data_path, "profiles-wide.csv"), DataFrame)
-# df_stochastic_scenario = CSV.read(joinpath(input_data_path, "stochastic-scenario.csv"), DataFrame)
+df_stochastic_scenario = CSV.read(joinpath(input_data_path, "stochastic-scenario.csv"), DataFrame)
 
 case_studies_info = CSV.read(
     "case-studies-info.csv",
@@ -188,7 +189,7 @@ function main()
             direct_model=direct_model,
         )
 
-        baseline_output_folder = joinpath(@__DIR__, "outputs", base_name, "N$(number_of_scenarios)_seed$(seed)", string(solver))
+        baseline_output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", base_name, "N$(number_of_scenarios)_seed$(seed)", string(solver))
         mkpath(baseline_output_folder)
 
         if !(isfile(joinpath(baseline_output_folder, "var_assets_investment.csv")) &&
@@ -429,7 +430,7 @@ function main()
                     enable_names=enable_names,
                 )
 
-                output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
+                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
                 mkpath(output_folder)
 
                 @info "Solving the model and saving the solution for the case study: $case_name with $solver"
@@ -528,7 +529,7 @@ function main()
                 @info "Starting Scenario selection"
 
                 #insert scenario selection and create and solve energy_problem_red
-                output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", case_name, "scenario_selection", string(solver))
+                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, "scenario_selection", string(solver))
                 mkpath(output_folder)
 
                 CSV.write(
@@ -566,7 +567,7 @@ function main()
                 )
 
                 profiles_df = CSV.read(
-                    joinpath(@__DIR__, "base-input-data", "RIDM-case-study", "profiles-wide.csv"),
+                    joinpath(@__DIR__, "NL-input-data", "RIDM-case-study", "profiles-wide.csv"),
                     DataFrame,
                 )
 
@@ -777,7 +778,7 @@ function main()
                     enable_names=enable_names,
                 )
 
-                output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
+                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
                 mkpath(output_folder)
 
                 @info "Solving the model and saving the solution for the case study: $case_name with $solver"
@@ -930,7 +931,7 @@ function main()
                         n_lol_smr_ccs_resolve_benchmark,
                     )
 
-                    output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", case_name, "fixed_in_benchmark", string(solver))
+                    output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, "fixed_in_benchmark", string(solver))
                     mkpath(output_folder)
                     TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
 
@@ -1009,7 +1010,7 @@ function main()
                         amount_water_borrowed_resolve_benchmark = 0.0
                         mu_value_resolve_benchmark = 0.0
 
-                        output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", case_name, "scenario_selection", string(solver))
+                        output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, "scenario_selection", string(solver))
                         mkpath(output_folder)
 
                         outlier_ids = outlier_df.scenario
@@ -1018,7 +1019,7 @@ function main()
                             filter(
                                 row ->
                                     row.scenario in outlier_ids &&
-                                        !(row.scenario in df_tail_scenarios.scenario),
+                                    !(row.scenario in df_tail_scenarios.scenario),
                                 benchmark_cost_df,
                             )
                         extra = select(extra, names(df_tail_scenarios))
@@ -1031,7 +1032,7 @@ function main()
                         )
 
                         profiles_df = CSV.read(
-                            joinpath(@__DIR__, "base-input-data", "RIDM-case-study", "profiles-wide.csv"),
+                            joinpath(@__DIR__, "NL-input-data", "RIDM-case-study", "profiles-wide.csv"),
                             DataFrame,
                         )
 
@@ -1248,7 +1249,7 @@ function main()
                             enable_names=enable_names,
                         )
 
-                        output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
+                        output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
                         mkpath(output_folder)
 
                         @info "Solving the model and saving the solution for the case study: $case_name with $solver"
@@ -1402,7 +1403,7 @@ function main()
                     @show mu_value_baseline
                 end
 
-                output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", case_name, "fixed_in_baseline", string(solver))
+                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, "fixed_in_baseline", string(solver))
                 mkpath(output_folder)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem_baseline)
 

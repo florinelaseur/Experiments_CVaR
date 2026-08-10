@@ -188,7 +188,7 @@ function main()
             direct_model=direct_model,
         )
 
-        baseline_output_folder = joinpath(@__DIR__, "outputs", base_name, "N$(number_of_scenarios)_seed$(seed)", string(solver))
+        baseline_output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", base_name, "N$(number_of_scenarios)_seed$(seed)", string(solver))
         mkpath(baseline_output_folder)
 
         if !(isfile(joinpath(baseline_output_folder, "var_assets_investment.csv")) &&
@@ -429,7 +429,7 @@ function main()
                     enable_names=enable_names,
                 )
 
-                output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
+                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
                 mkpath(output_folder)
 
                 @info "Solving the model and saving the solution for the case study: $case_name with $solver"
@@ -528,7 +528,7 @@ function main()
                 @info "Contribution C (CC): Scenario selection"
 
                 #insert scenario selection and create and solve energy_problem_red
-                output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", case_name, "scenario selection for CC")
+                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, "scenario selection for CC")
                 mkpath(output_folder)
 
                 CSV.write(
@@ -566,7 +566,7 @@ function main()
                 )
 
                 profiles_df = CSV.read(
-                    joinpath(@__DIR__, "base-input-data", "RIDM-case-study", "profiles-wide.csv"),
+                    joinpath(@__DIR__, "NL-input-data", "RIDM-case-study", "profiles-wide.csv"),
                     DataFrame,
                 )
 
@@ -779,7 +779,7 @@ function main()
                     enable_names=enable_names,
                 )
 
-                output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
+                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
                 mkpath(output_folder)
 
                 @info "Solving the model and saving the solution for the case study: $case_name with $solver"
@@ -919,7 +919,7 @@ function main()
                         @show mu_value_full
                     end
 
-                    output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", "fixed", case_name, string(solver))
+                    output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", "fixed", case_name, string(solver))
                     mkpath(output_folder)
                     TEM.export_solution_to_csv_files(output_folder, energy_problem_full)
 
@@ -1112,7 +1112,7 @@ function main()
                     @show mu_value_baseline
                 end
 
-                output_folder = joinpath(@__DIR__, "outputs", "N$(number_of_scenarios)_seed$(seed)", "fixed", "baseline", case_name, string(solver))
+                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", "fixed", "baseline", case_name, string(solver))
                 mkpath(output_folder)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem_baseline)
 
