@@ -572,7 +572,7 @@ function main()
                     max.(0.0, df_tail_scenarios.total_cost .- mu_value_benchmark)
 
                 df_tail_scenarios = filter(
-                    row -> row.total_cost > mu_value_benchmark - tol,
+                    row -> row.total_cost > mu_value_benchmark + tol,
                     df_tail_scenarios,
                 )
 
@@ -1041,21 +1041,21 @@ function main()
 
                         outlier_ids = outlier_df.scenario
 
-                        extra =
-                            filter(
-                                row ->
-                                    row.scenario in outlier_ids &&
-                                    !(row.scenario in df_tail_scenarios.scenario),
-                                benchmark_cost_df,
-                            )
-                        extra = select(extra, names(df_tail_scenarios))
-                        append!(df_tail_scenarios, extra)
+                        # extra =
+                        #     filter(
+                        #         row ->
+                        #             row.scenario in outlier_ids &&
+                        #                 !(row.scenario in df_tail_scenarios.scenario),
+                        #         benchmark_cost_df,
+                        #     )
+                        # extra = select(extra, names(df_tail_scenarios))
+                        # append!(df_tail_scenarios, extra)
 
-                        CSV.write(
-                            joinpath(output_folder, "tail_scenarios.csv"),
-                            df_tail_scenarios;
-                            writeheader=true,
-                        )
+                        # CSV.write(
+                        #     joinpath(output_folder, "tail_scenarios.csv"),
+                        #     df_tail_scenarios;
+                        #     writeheader=true,
+                        # )
 
                         profiles_df = CSV.read(
                             joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-input-data", "NL-case-study", "profiles-wide.csv"),
@@ -1072,12 +1072,40 @@ function main()
                             scenario=[average_case_row.scenario],
                             total_cost=[average_case_row.total_cost],
                         )
+                        expected_cost_scenario = only(df_expected_cost_scenario.scenario)
                         CSV.write(joinpath(@__DIR__, output_folder, "expected_cost_scenario.csv"), df_expected_cost_scenario; writeheader=true)
 
-                        plot_cost_per_scenario_inc_tail_inc_representative(
+                        # plot_cost_per_scenario_inc_tail_inc_representative(
+                        #     benchmark_cost_df,
+                        #     df_tail_scenarios,
+                        #     df_expected_cost_scenario,
+                        #     output_folder,
+                        #     mu_value_benchmark,
+                        #     "$case_name",
+                        # )
+
+                        new_outlier_ids = [
+                            s for s in outlier_ids
+                            if !(s in tail_scenarios_ids) &&
+                            s != expected_cost_scenario
+                        ]
+
+                        new_outlier_df = filter(
+                            row -> row.scenario in new_outlier_ids,
+                            outlier_df,
+                        )
+
+                        new_outlier_df = select(
+                            new_outlier_df,
+                            :scenario,
+                            :total_cost_benchmark => :total_cost,
+                        )
+
+                        plot_cost_per_scenario_inc_tail_inc_representative_inc_outliers(
                             benchmark_cost_df,
                             df_tail_scenarios,
                             df_expected_cost_scenario,
+                            new_outlier_df,
                             output_folder,
                             mu_value_benchmark,
                             "$case_name",
@@ -1089,23 +1117,27 @@ function main()
                         expected_cost_scenario = only(df_expected_cost_scenario.scenario)
 
                         if expected_cost_scenario in tail_scenarios_ids
-                            selected_scenarios_ids = copy(tail_scenarios_ids)
+                            selected_scenarios_ids = vcat(tail_scenarios_ids, new_outlier_ids)
                             probabilities = [
                                 scenario == expected_cost_scenario ?
-                                tail_probability + alpha :
-                                tail_probability
-                                for scenario in selected_scenarios_ids
+                                tail_probability + alpha - length(new_outlier_ids) / number_of_scenarios :
+                                tail_probability for scenario in tail_scenarios_ids
                             ]
+                            append!(probabilities, fill(1.0 / number_of_scenarios, length(new_outlier_ids)),)
                         else
                             selected_scenarios_ids = vcat(
                                 tail_scenarios_ids,
                                 expected_cost_scenario,
+                                new_outlier_ids,
                             )
                             probabilities = vcat(
                                 fill(tail_probability, n_tail),
-                                alpha,
+                                alpha - length(new_outlier_ids) / number_of_scenarios,
+                                fill(1.0 / number_of_scenarios, length(new_outlier_ids)),
                             )
                         end
+
+                        @assert isapprox(sum(probabilities), 1.0; atol=1e-10)
 
                         df_stochastic_scenario_CC = DataFrame(
                             scenario=selected_scenarios_ids,

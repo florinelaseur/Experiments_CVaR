@@ -37,13 +37,15 @@ function collect_result_files(prefix::String)
 
     for (root, _, dirfiles) in walkdir(inputdir)
         for f in dirfiles
-            if startswith(f, prefix) && endswith(f, ".csv")
+            if contains(f, prefix) && endswith(f, ".csv")
                 push!(files, joinpath(root, f))
             end
         end
     end
 
-    return sort(files)
+    files = sort(files)
+    @info "collect_result_files" prefix = prefix found = length(files)
+    return files
 end
 
 function plot_investment_difference_boxplots(; evaluation::Symbol=:baseline)
@@ -110,7 +112,7 @@ function plot_investment_difference_boxplots(; evaluation::Symbol=:baseline)
 
         n_values = sort(unique(asset_df.number_of_scenarios))
         diff_vectors = [
-            asset_df[asset_df.number_of_scenarios .== n, :diff]
+            asset_df[asset_df.number_of_scenarios.==n, :diff]
             for n in n_values
         ]
 
@@ -172,16 +174,33 @@ function plot_investment_difference_boxplots(; evaluation::Symbol=:baseline)
 end
 
 function plot_boxplot(; evaluation::Symbol=:baseline)
-    files = collect_result_files("results_ScSeRP_N")
-
     raw_dfs = DataFrame[]
 
-    for f in sort(files)
-        n, seed = parse_n_seed(basename(f))
-        df = CSV.read(f, DataFrame)
-        df[!, :number_of_scenarios] .= n
-        df[!, :seed] .= seed
-        push!(raw_dfs, df)
+    # keep track of which files we actually read
+    loaded_files = String[]
+
+    # deterministically load expected results files for each scenario size and seed
+    for n in scenario_sizes
+        for seed in 1:config["simulation"]["seeds"]
+            f = joinpath(inputdir, "N$(n)_seed$(seed)", "results_ScSeRP_N$(n)_seed$(seed).csv")
+            if isfile(f)
+                df = CSV.read(f, DataFrame)
+                # record source filename for debugging and later inspection
+                df[!, :source_file] .= basename(f)
+                df[!, :number_of_scenarios] .= n
+                df[!, :seed] .= seed
+                push!(raw_dfs, df)
+                push!(loaded_files, f)
+            else
+                @debug "Missing expected results file" file = f
+            end
+        end
+    end
+
+    # show which files were read
+    @info "Loaded result files" count = length(loaded_files)
+    for f in sort(loaded_files)
+        @info f
     end
 
     if isempty(raw_dfs)
@@ -195,13 +214,26 @@ function plot_boxplot(; evaluation::Symbol=:baseline)
     end
 
     all_df = vcat(raw_dfs...; cols=:union)
+    @show names(all_df)
+
+    # Normalize string columns (trim whitespace) so the filters match values from the CSVs
+    for col in [:case_name,
+        :scenario_set,
+        :termination_status,
+        :termination_status_resolve_baseline,
+        :termination_status_resolve_benchmark,
+        :solver]
+        if col in names(all_df)
+            all_df[!, col] = strip.(string.(all_df[!, col]))
+        end
+    end
 
     if evaluation == :baseline
         bench_df = select(
             filter(row ->
                     row.case_name == "0_HourlyBaseline" &&
-                    row.scenario_set == "full" &&
-                    string(row.termination_status) == "OPTIMAL",
+                        row.scenario_set == "full" &&
+                        string(row.termination_status) == "OPTIMAL",
                 all_df),
             :number_of_scenarios,
             :seed,
@@ -212,8 +244,8 @@ function plot_boxplot(; evaluation::Symbol=:baseline)
         reduced_df = select(
             filter(row ->
                     row.scenario_set == "reduced" &&
-                    row.case_name != "0_HourlyBaseline" &&
-                    string(row.termination_status_resolve_baseline) == "OPTIMAL",
+                        row.case_name != "0_HourlyBaseline" &&
+                        string(row.termination_status_resolve_baseline) == "OPTIMAL",
                 all_df),
             :number_of_scenarios,
             :seed,
@@ -224,7 +256,7 @@ function plot_boxplot(; evaluation::Symbol=:baseline)
         )
 
         title = "Relative gap: reduced solution evaluated on hourly baseline"
-        ylabel = "relative gap"
+        ylabel = "(reduced fixed in baseline - baseline) / baseline * 100%"
         outfile = "comparison_ScSeRP_rel_gap_baseline.csv"
         plotfile = "1_rel_gap_boxplot_ScSeRP_baseline.png"
 
@@ -232,8 +264,8 @@ function plot_boxplot(; evaluation::Symbol=:baseline)
         bench_df = select(
             filter(row ->
                     row.scenario_set == "full" &&
-                    row.case_name != "0_HourlyBaseline" &&
-                    string(row.termination_status) == "OPTIMAL",
+                        row.case_name != "0_HourlyBaseline" &&
+                        string(row.termination_status) == "OPTIMAL",
                 all_df),
             :number_of_scenarios,
             :seed,
@@ -245,8 +277,8 @@ function plot_boxplot(; evaluation::Symbol=:baseline)
         reduced_df = select(
             filter(row ->
                     row.scenario_set == "reduced" &&
-                    row.case_name != "0_HourlyBaseline" &&
-                    string(row.termination_status_resolve_benchmark) == "OPTIMAL",
+                        row.case_name != "0_HourlyBaseline" &&
+                        string(row.termination_status_resolve_benchmark) == "OPTIMAL",
                 all_df),
             :number_of_scenarios,
             :seed,
@@ -274,7 +306,7 @@ function plot_boxplot(; evaluation::Symbol=:baseline)
     transform!(
         comparison_df,
         [:objective_red, :objective_ref] =>
-            ByRow((red, ref) -> (red - ref) / ref) => :rel_gap,
+            ByRow((red, ref) -> 100 * (red - ref) / ref) => :rel_gap,
     )
 
     sort!(comparison_df, [:number_of_scenarios, :seed, :rp])
@@ -284,7 +316,7 @@ function plot_boxplot(; evaluation::Symbol=:baseline)
 
     n_values = sort(unique(comparison_df.number_of_scenarios))
     gap_vectors = [
-        comparison_df[comparison_df.number_of_scenarios .== n, :rel_gap]
+        comparison_df[comparison_df.number_of_scenarios.==n, :rel_gap]
         for n in n_values
     ]
 
@@ -356,7 +388,7 @@ function plot_regret_vs_rp()
     baseline_df = select(
         filter(row ->
                 row.case_name == "0_HourlyBaseline" &&
-                row.scenario_set == "full",
+                    row.scenario_set == "full",
             all_df),
         :number_of_scenarios,
         :seed,
@@ -367,7 +399,7 @@ function plot_regret_vs_rp()
     reduced_df = select(
         filter(row ->
                 row.scenario_set == "reduced" &&
-                string(row.termination_status_resolve_baseline) == "OPTIMAL",
+                    string(row.termination_status_resolve_baseline) == "OPTIMAL",
             all_df),
         :number_of_scenarios,
         :seed,
@@ -469,8 +501,8 @@ function plot_runtime_vs_rp()
         filter(
             row ->
                 row.case_name == "0_HourlyBaseline" &&
-                row.scenario_set == "full" &&
-                string(row.termination_status) == "OPTIMAL",
+                    row.scenario_set == "full" &&
+                    string(row.termination_status) == "OPTIMAL",
             all_df,
         ),
         :number_of_scenarios,
@@ -486,7 +518,7 @@ function plot_runtime_vs_rp()
         filter(
             row ->
                 row.scenario_set == "reduced" &&
-                string(row.termination_status_resolve_baseline) == "OPTIMAL",
+                    string(row.termination_status_resolve_baseline) == "OPTIMAL",
             all_df,
         ),
         :number_of_scenarios,

@@ -702,6 +702,73 @@ function plot_cost_per_scenario_inc_tail(
     return p
 end
 
+function plot_cost_per_scenario_inc_tail_inc_representative_inc_outliers(
+    total_operational_cost_per_scenario_df::DataFrame,
+    df_tail_scenarios::DataFrame,
+    df_representative_scenarios::DataFrame,
+    new_outlier_df::DataFrame,
+    output_folder,
+    mu_value::Float64,
+    case_name,
+)
+    p = scatter(
+        total_operational_cost_per_scenario_df.scenario,
+        total_operational_cost_per_scenario_df.total_cost;
+        xlabel="Scenario",
+        ylabel="Total Cost",
+        title="Tail scenarios, expected costs scenario and outliers of $case_name",
+        marker=:circle,
+        color=:blue,
+        label="All scenarios",
+    )
+
+    scatter!(
+        p,
+        df_tail_scenarios.scenario,
+        df_tail_scenarios.total_cost;
+        marker=:circle,
+        color=:red,
+        label="Tail scenarios",
+    )
+
+    scatter!(
+        p,
+        df_representative_scenarios.scenario,
+        df_representative_scenarios.total_cost;
+        marker=:circle,
+        color=:green,
+        label="Representative scenarios",
+    )
+
+    scatter!(
+        p,
+        new_outlier_df.scenario,
+        new_outlier_df.total_cost;
+        marker=:circle,
+        color=:yellow,
+        label="Outlier scenarios",
+    )
+
+    hline!(
+        p,
+        [mu_value];
+        linestyle=:dash,
+        linewidth=2,
+        color=:black,
+        label="VaR threshold μ",
+    )
+
+
+    savefig(
+        p,
+        joinpath(output_folder, "total_operational_cost_per_scenario_inc_tail_inc_rep_inc_outliers.png"),
+    )
+
+    @info "Plots saved in: $(joinpath(output_folder, "total_operational_cost_per_scenario_inc_tail_inc_rep_inc_outliers.png"))"
+
+    return p
+end
+
 function plot_cost_per_scenario_inc_tail_inc_representative(
     total_operational_cost_per_scenario_df::DataFrame,
     df_tail_scenarios::DataFrame,
