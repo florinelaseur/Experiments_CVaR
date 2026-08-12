@@ -28,7 +28,7 @@ LocalPreferences.toml
 JuliaLocalPreferences.toml
 
 # output folder
-outputs/
+outputs*/
 outputs copy*/
 
 # Configuration filees for VS Code Julia extension
