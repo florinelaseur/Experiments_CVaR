@@ -656,7 +656,8 @@ function plot_cost_per_scenario_inc_tail(
     total_operational_cost_per_scenario_df::DataFrame,
     df_tail_scenarios::DataFrame,
     output_folder,
-    mu_value_df::DataFrame,
+    df_mu_scenario::DataFrame,
+    mu_value::Float64,
     case_name,
 )
     p = scatter(
@@ -679,18 +680,23 @@ function plot_cost_per_scenario_inc_tail(
         label="Tail scenarios",
     )
 
-    if nrow(mu_value_df) > 0
-        mu_value = only(mu_value_df.solution)
+    scatter!(
+        p,
+        df_mu_scenario.scenario,
+        df_mu_scenario.total_cost;
+        marker=:circle,
+        color=:black,
+        label="VaR scenario",
+    )
 
-        hline!(
-            p,
-            [mu_value];
-            linestyle=:dash,
-            linewidth=2,
-            color=:black,
-            label="VaR threshold μ",
-        )
-    end
+    hline!(
+        p,
+        [mu_value];
+        linestyle=:dash,
+        linewidth=2,
+        color=:black,
+        label="VaR threshold μ",
+    )
 
     savefig(
         p,
@@ -708,6 +714,7 @@ function plot_cost_per_scenario_inc_tail_inc_representative_inc_outliers(
     df_representative_scenarios::DataFrame,
     new_outlier_df::DataFrame,
     output_folder,
+    df_mu_scenario::DataFrame,
     mu_value::Float64,
     case_name,
 )
@@ -749,6 +756,15 @@ function plot_cost_per_scenario_inc_tail_inc_representative_inc_outliers(
         label="Outlier scenarios",
     )
 
+    scatter!(
+        p,
+        df_mu_scenario.scenario,
+        df_mu_scenario.total_cost;
+        marker=:circle,
+        color=:black,
+        label="VaR scenario",
+    )
+
     hline!(
         p,
         [mu_value];
@@ -774,6 +790,7 @@ function plot_cost_per_scenario_inc_tail_inc_representative(
     df_tail_scenarios::DataFrame,
     df_representative_scenarios::DataFrame,
     output_folder,
+    df_mu_scenario::DataFrame,
     mu_value::Float64,
     case_name,
 )
@@ -804,6 +821,15 @@ function plot_cost_per_scenario_inc_tail_inc_representative(
         marker=:circle,
         color=:green,
         label="Representative scenarios",
+    )
+
+    scatter!(
+        p,
+        df_mu_scenario.scenario,
+        df_mu_scenario.total_cost;
+        marker=:circle,
+        color=:black,
+        label="VaR scenario",
     )
 
     hline!(

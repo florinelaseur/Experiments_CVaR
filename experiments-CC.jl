@@ -1,7 +1,10 @@
 cd(@__DIR__)
-# using Pkg: Pkg
-# Pkg.activate(".")
-# Pkg.instantiate()
+
+ENV["GKSwstype"] = "100"
+
+using Pkg: Pkg
+Pkg.activate(".")
+Pkg.instantiate()
 
 using CSV: CSV
 using TOML: TOML
@@ -20,7 +23,7 @@ function run_experiments()
     seeds = collect(1:n_seeds)
     scenario_sizes = copy(original_config["simulation"]["scenarios_starting_set_sizes"],)
     representative_periods = copy(original_config["simulation"]["representative_periods"],)
-    main_cc_path = joinpath(@__DIR__, "main-CC-per-baseline-brute-NL.jl")
+    main_cc_path = joinpath(@__DIR__, "main-NL-ScSeRP.jl")
 
     log = DataFrame(
         seed=Int[],

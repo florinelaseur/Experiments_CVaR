@@ -622,6 +622,6 @@ function plot_runtime_vs_rp()
 end
 
 plot_boxplot(evaluation=:baseline)
-plot_investment_difference_boxplots(evaluation=:baseline)
-plot_regret_vs_rp()
-plot_runtime_vs_rp()
+# plot_investment_difference_boxplots(evaluation=:baseline)
+# plot_regret_vs_rp()
+# plot_runtime_vs_rp()
