@@ -1469,3 +1469,76 @@ function parse_n_seed(filename::String)
     isnothing(m) && return 0, 0
     return parse(Int, m[1]), parse(Int, m[2])
 end
+
+"""
+    expand_rep_period_partitions!(con, number_of_representative_periods)
+
+Copy the partition assignments defined for rep_period = 1 to all
+representative periods in the current DuckDB connection.
+
+Call after TC.cluster! and before TEM.populate_with_defaults!.
+"""
+function expand_rep_period_partitions!(
+    con,
+    number_of_representative_periods::Integer,
+)
+    number_of_representative_periods >= 1 ||
+        throw(ArgumentError("number_of_representative_periods must be at least 1"))
+
+    rp_values_sql = join(
+        ["($(rp))" for rp in 1:number_of_representative_periods],
+        ", ",
+    )
+
+    DuckDB.query(
+        con,
+        """
+        CREATE OR REPLACE TABLE assets_rep_periods_partitions AS
+        WITH base AS (
+            SELECT
+                asset,
+                milestone_year,
+                partition,
+                specification
+            FROM assets_rep_periods_partitions
+            WHERE rep_period = 1
+        )
+        SELECT
+            b.asset,
+            b.milestone_year,
+            b.partition,
+            rp.rep_period,
+            b.specification
+        FROM base AS b
+        CROSS JOIN (VALUES $(rp_values_sql)) AS rp(rep_period)
+        """,
+    )
+
+    DuckDB.query(
+        con,
+        """
+        CREATE OR REPLACE TABLE flows_rep_periods_partitions AS
+        WITH base AS (
+            SELECT
+                from_asset,
+                to_asset,
+                milestone_year,
+                partition,
+                specification
+            FROM flows_rep_periods_partitions
+            WHERE rep_period = 1
+        )
+        SELECT
+            b.from_asset,
+            b.to_asset,
+            b.milestone_year,
+            b.partition,
+            rp.rep_period,
+            b.specification
+        FROM base AS b
+        CROSS JOIN (VALUES $(rp_values_sql)) AS rp(rep_period)
+        """,
+    )
+
+    return nothing
+end
