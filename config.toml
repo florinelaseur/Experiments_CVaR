@@ -1,12 +1,12 @@
 [simulation]
 fix_benchmark = true
 risk_aversion_confidence_level = 0.9
-input_data_EU = "ExperimentData/TYNDP/Outputs/tulipa_input_north_sea_TYNDP_NT_2030_ERAA_2035"
+input_data_EU = "ExperimentData/EU-input-data/TYNDP/Outputs/tulipa_input_north_sea_2026_2035_de"
 fix_level_storage = false
 input_data_EU_CC = "ExperimentData/TYNDP/Outputs/tulipa_input_north_sea_TYNDP_NT_2030_ERAA_2035_CC"
 solvers = ["Gurobi"]
 input_data_NL_CC = "ExperimentData/NL-input-data/NL-case-study-CC"
-seeds = 3
+seeds = 1
 risk_aversion_weight_lambda = 0.1
 input_data_NL = "ExperimentData/NL-input-data/NL-case-study"
 scenario_data = "create-scenarios"

@@ -621,7 +621,197 @@ function plot_runtime_vs_rp()
     return runtime_df
 end
 
+function plot_runtime_vs_N()
+    n_values = [10, 15, 20]
+    seed = 1
+
+    runtime_baseline = Float64[]
+    runtime_reduced = Float64[]
+
+    runtime_cols = [
+        :time_to_cluster,
+        :time_to_read,
+        :time_to_create,
+        :time_to_solve,
+        :time_to_save,
+    ]
+
+    for n in n_values
+        f = joinpath(
+            inputdir,
+            "N$(n)_seed$(seed)",
+            "results_ScSeRP_N$(n)_seed$(seed).csv",
+        )
+
+        if !isfile(f)
+            error("Results file not found: $f")
+        end
+
+        all_df = CSV.read(f, DataFrame)
+
+        if nrow(all_df) < 3
+            error(
+                "Expected at least 3 rows in $(basename(f)), " *
+                "but found $(nrow(all_df)).",
+            )
+        end
+
+        # Row 1: hourly baseline
+        baseline_runtime = sum(
+            Float64(all_df[1, col]) for col in runtime_cols
+        )
+
+        # Rows 2 + 3: complete reduced-model runtime
+        reduced_runtime = sum(
+            Float64(all_df[row, col])
+            for row in 2:3
+            for col in runtime_cols
+        )
+
+        push!(runtime_baseline, baseline_runtime)
+        push!(runtime_reduced, reduced_runtime)
+    end
+
+    runtime_matrix = hcat(runtime_baseline, runtime_reduced)
+
+    p = groupedbar(
+        string.(n_values),
+        runtime_matrix;
+        bar_position=:dodge,
+        label=["Hourly baseline" "Reduced model"],
+        xlabel="Number of scenarios",
+        ylabel="Runtime (seconds)",
+        title="Runtime hourly baseline vs reduced model, seed 1",
+        size=(700, 450),
+        grid=true,
+        gridalpha=0.3,
+        legend=:topleft,
+    )
+
+    savefig(
+        p,
+        joinpath(outdir, "runtime_vs_N_seed1.png"),
+    )
+
+    return p
+end
+
+function plot_investment_difference_N20_seed1()
+    baseline_file = joinpath(
+        inputdir,
+        "0_HourlyBaseline",
+        "N20_seed1",
+        "Gurobi",
+        "var_assets_investment.csv",
+    )
+
+    reduced_file = joinpath(
+        inputdir,
+        "N20_seed1",
+        "convex_convex_per_rp_36_reduced_scenario_set",
+        "Gurobi",
+        "var_assets_investment.csv",
+    )
+
+    isfile(baseline_file) || error("Baseline investment file not found: $baseline_file")
+    isfile(reduced_file) || error("Reduced investment file not found: $reduced_file")
+
+    baseline_df = CSV.read(baseline_file, DataFrame)
+    reduced_df = CSV.read(reduced_file, DataFrame)
+
+    @show names(baseline_df)
+    @show names(reduced_df)
+
+    # Adjust these two column names if your CSV uses different names.
+    asset_col = :asset
+    investment_col = :investment
+
+    # Keep only the columns required for comparison.
+    baseline_inv = select(
+        baseline_df,
+        asset_col,
+        investment_col => :investment_baseline,
+    )
+
+    reduced_inv = select(
+        reduced_df,
+        asset_col,
+        investment_col => :investment_reduced,
+    )
+
+    # outerjoin ensures assets occurring in only one solution are retained.
+    comparison_df = outerjoin(
+        baseline_inv,
+        reduced_inv;
+        on=asset_col,
+    )
+
+    # Missing means that the asset has no investment in that solution.
+    comparison_df.investment_baseline =
+        coalesce.(comparison_df.investment_baseline, 0.0)
+
+    comparison_df.investment_reduced =
+        coalesce.(comparison_df.investment_reduced, 0.0)
+
+    comparison_df[!, :investment_difference] =
+        comparison_df.investment_reduced .-
+        comparison_df.investment_baseline
+
+    # Only plot assets for which the investment actually differs.
+    plot_df = filter(
+        row -> abs(row.investment_difference) > 1e-8,
+        comparison_df,
+    )
+
+    sort!(plot_df, :investment_difference)
+
+    if isempty(plot_df)
+        @warn "No investment differences found for N=20, seed=1"
+        return comparison_df
+    end
+
+    p = bar(
+        string.(plot_df[!, asset_col]),
+        plot_df.investment_difference;
+        xlabel="Asset",
+        ylabel="Investment difference",
+        title="Investment differences: reduced - hourly baseline, N=20 seed 1",
+        legend=false,
+        size=(1000, 550),
+        grid=true,
+        gridalpha=0.3,
+        xrotation=45,
+    )
+
+    hline!(
+        p,
+        [0.0];
+        color=col_zero,
+        linestyle=:dash,
+        linewidth=1.5,
+    )
+
+    savefig(
+        p,
+        joinpath(
+            outdir,
+            "investment_difference_N20_seed1.png",
+        ),
+    )
+
+    CSV.write(
+        joinpath(
+            outdir,
+            "investment_difference_N20_seed1.csv",
+        ),
+        comparison_df,
+    )
+
+    return comparison_df
+end
+
 plot_boxplot(evaluation=:baseline)
-# plot_investment_difference_boxplots(evaluation=:baseline)
+plot_runtime_vs_N()
+plot_investment_difference_N20_seed1()
 # plot_regret_vs_rp()
 # plot_runtime_vs_rp()
