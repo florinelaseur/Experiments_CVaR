@@ -19,14 +19,14 @@ include("utils/constants.jl")
 function run_experiments()
     config_path = joinpath(@__DIR__, "config.toml")
     original_config = TOML.parsefile(config_path)
-    n_seeds = original_config["simulation"]["seeds"]
-    seeds = collect(1:n_seeds)
+    n_draws = original_config["simulation"]["draws"]
+    draws = collect(1:n_draws)
     scenario_sizes = copy(original_config["simulation"]["scenarios_starting_set_sizes"],)
     representative_periods = copy(original_config["simulation"]["representative_periods"],)
     main_cc_path = joinpath(@__DIR__, "main-NL-ScSeRP.jl")
 
     log = DataFrame(
-        seed=Int[],
+        draw=Int[],
         number_of_scenarios=Int[],
         representative_periods=String[],
         success=Bool[],
@@ -35,8 +35,8 @@ function run_experiments()
 
     try
         for n in scenario_sizes
-            for seed in seeds
-                @info "Running experiment with seed=$seed, number_of_scenarios=$n, representative_periods=$representative_periods"
+            for draw in draws
+                @info "Running experiment with draw=$draw, number_of_scenarios=$n, representative_periods=$representative_periods"
 
                 config = deepcopy(original_config)
                 config["simulation"]["number_of_scenarios"] = n
@@ -48,7 +48,7 @@ function run_experiments()
                 end
 
                 env = copy(ENV)
-                env["EXPERIMENT_SEED"] = string(seed)
+                env["EXPERIMENT_DRAW"] = string(draw)
                 t = time()
                 success = true
 
@@ -58,20 +58,20 @@ function run_experiments()
                     run(cmd)
                 catch error
                     success = false
-                    @warn "Experiment failed for seed=$seed, number_of_scenarios=$n, representative_periods=$representative_periods with error: $error" exception = error
+                    @warn "Experiment failed for draw=$draw, number_of_scenarios=$n, representative_periods=$representative_periods with error: $error" exception = error
                 end
 
                 elapsed = time() - t
 
                 push!(log, (
-                    seed=seed,
+                    draw=draw,
                     number_of_scenarios=n,
                     representative_periods=string(representative_periods),
                     success=success,
                     elapsed=elapsed,
                 ))
-                # if seed == last(seeds)
-                #     plot_comparison_runtime(joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "results_ScSeRP_N$(n)_seed$(seed).csv"))
+                # if draw == last(draws)
+                #     plot_comparison_runtime(joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "results_ScSeRP_N$(n)_draw$(draw).csv"))
                 # end
             end
         end

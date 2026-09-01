@@ -6,9 +6,9 @@
 cd(@__DIR__)
 
 ENV["GKSwstype"] = "100"
-# using Pkg: Pkg
-# Pkg.activate(".")
-# Pkg.instantiate()
+using Pkg: Pkg
+Pkg.activate(".")
+Pkg.instantiate()
 
 # Load the required packages
 import TulipaEnergyModel as TEM
@@ -28,15 +28,16 @@ using DataFrames
 
 base_seed = 19990907
 
-# Defaults to seed1 when main.jl is run directly
-seed = parse(Int, get(ENV, "EXPERIMENT_SEED", "1"))
+# Defaults to draw 1
+# draw = parse(Int, get(ENV, "EXPERIMENT_DRAW", "1"))
+draw = 2
 
-# Reproduce the seed-th draw from the fixed base seed
-rng = MersenneTwister(base_seed)
-random_seeds = rand(rng, 1:typemax(Int32), seed)
-random_seed = random_seeds[end]
+# Deterministic seed for this draw
+random_seed = base_seed + draw - 1
 
 Random.seed!(random_seed)
+
+@info "RNG setup" base_seed=base_seed draw=draw random_seed=random_seed
 
 @info "Including helper functions"
 include("utils/functions.jl")
@@ -79,6 +80,7 @@ profiles_path = joinpath(homedir(), "Nextcloud", "ExperimentData", "profiles-wid
 all_profiles_df = CSV.read(profiles_path, DataFrame)
 profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
 selected_scenarios = sort(unique(profiles_df.scenario))
+@info "Selected scenario starting set" println(selected_scenarios)
 mapping = Dict(old => new for (new, old) in enumerate(selected_scenarios))
 profiles_df[!, :scenario] = [mapping[s] for s in profiles_df.scenario]
 CSV.write(joinpath(input_data_path, "profiles-wide.csv"), profiles_df; writeheader=true)
@@ -1128,9 +1130,9 @@ function main()
 
                         new_outlier_ids = [
                             s for s in outlier_ids
-                            if !(s in tail_scenarios_ids) &&
-                            s != expected_cost_scenario &&
-                            !(s in mu_scenario_id)
+                                  if !(s in tail_scenarios_ids) &&
+                                  s != expected_cost_scenario &&
+                                  !(s in mu_scenario_id)
                         ]
 
                         new_outlier_df = filter(
