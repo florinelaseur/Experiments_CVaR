@@ -29,7 +29,8 @@ using DataFrames
 base_seed = 19990907
 
 # Defaults to seed1 when main.jl is run directly
-seed = parse(Int, get(ENV, "EXPERIMENT_SEED", "1"))
+# seed = parse(Int, get(ENV, "EXPERIMENT_SEED", "1"))
+seed = 2
 
 # Reproduce the seed-th draw from the fixed base seed
 rng = MersenneTwister(base_seed)
@@ -79,6 +80,7 @@ profiles_path = joinpath(homedir(), "Nextcloud", "ExperimentData", "profiles-wid
 all_profiles_df = CSV.read(profiles_path, DataFrame)
 profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
 selected_scenarios = sort(unique(profiles_df.scenario))
+@info "Selected scenario starting set" println(selected_scenarios)
 mapping = Dict(old => new for (new, old) in enumerate(selected_scenarios))
 profiles_df[!, :scenario] = [mapping[s] for s in profiles_df.scenario]
 CSV.write(joinpath(input_data_path, "profiles-wide.csv"), profiles_df; writeheader=true)
@@ -1046,9 +1048,9 @@ function main()
 
                         new_outlier_ids = [
                             s for s in outlier_ids
-                            if !(s in tail_scenarios_ids) &&
-                            s != expected_cost_scenario &&
-                            !(s in mu_scenario_id)
+                                  if !(s in tail_scenarios_ids) &&
+                                  s != expected_cost_scenario &&
+                                  !(s in mu_scenario_id)
                         ]
 
                         new_outlier_df = filter(

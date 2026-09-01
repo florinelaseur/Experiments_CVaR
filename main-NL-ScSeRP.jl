@@ -6,9 +6,9 @@
 cd(@__DIR__)
 
 ENV["GKSwstype"] = "100"
-using Pkg: Pkg
-Pkg.activate(".")
-Pkg.instantiate()
+# using Pkg: Pkg
+# Pkg.activate(".")
+# Pkg.instantiate()
 
 # Load the required packages
 import TulipaEnergyModel as TEM

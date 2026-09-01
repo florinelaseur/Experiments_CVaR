@@ -13,6 +13,7 @@ StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
 TulipaClustering = "314fac8b-c762-4aa3-9d12-851379729163"
 TulipaEnergyModel = "5d7bd171-d18e-45a5-9111-f1f11ac5d04d"
 TulipaIO = "7b3808b7-0819-42d4-885c-978ba173db11"
+juliaup_jll = "038fdbe3-3777-5af9-9568-3738956aeb97"
 
 [compat]
 TulipaClustering = "0.5.1"
