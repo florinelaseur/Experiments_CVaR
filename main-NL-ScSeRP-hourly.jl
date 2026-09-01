@@ -29,15 +29,16 @@ using DataFrames
 base_seed = 19990907
 
 # Defaults to seed1 when main.jl is run directly
-# seed = parse(Int, get(ENV, "EXPERIMENT_SEED", "1"))
-seed = 2
+draw = parse(Int, get(ENV, "EXPERIMENT_DRAW", "1"))
 
 # Reproduce the seed-th draw from the fixed base seed
-rng = MersenneTwister(base_seed)
-random_seeds = rand(rng, 1:typemax(Int32), seed)
+rng = Random.MersenneTwister(base_seed)
+random_seeds = rand(rng, 1:typemax(Int32), draw)
 random_seed = random_seeds[end]
 
 Random.seed!(random_seed)
+
+@info "RNG setup" base_seed=base_seed draw=draw random_seed=random_seed
 
 @info "Including helper functions"
 include("utils/functions.jl")
@@ -80,7 +81,7 @@ profiles_path = joinpath(homedir(), "Nextcloud", "ExperimentData", "profiles-wid
 all_profiles_df = CSV.read(profiles_path, DataFrame)
 profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
 selected_scenarios = sort(unique(profiles_df.scenario))
-@info "Selected scenario starting set" println(selected_scenarios)
+@info "Selected scenario starting set: $(join(selected_scenarios, ", "))"
 mapping = Dict(old => new for (new, old) in enumerate(selected_scenarios))
 profiles_df[!, :scenario] = [mapping[s] for s in profiles_df.scenario]
 CSV.write(joinpath(input_data_path, "profiles-wide.csv"), profiles_df; writeheader=true)
