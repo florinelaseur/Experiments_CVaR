@@ -1,5 +1,5 @@
 [simulation]
-fix_benchmark = true
+fix_benchmark = false
 risk_aversion_confidence_level = 0.9
 input_data_EU = "ExperimentData/EU-input-data/TYNDP/Outputs/tulipa_input_north_sea_2026_2035_de"
 fix_level_storage = false
