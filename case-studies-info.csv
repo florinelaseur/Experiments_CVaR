@@ -2,7 +2,7 @@ base_name,period_duration,method,distance,weight_type,niters,learning_rate,stoch
 convex_dirac_cross,24,convex_hull,Euclidean,dirac,2000,0.001,cross_scenario,false
 convex_dirac_per,24,convex_hull,Euclidean,dirac,2000,0.001,per_scenario,false
 convex_convex_cross,24,convex_hull,Euclidean,convex,2000,0.001,cross_scenario,false
-convex_convex_per,24,convex_hull,Euclidean,convex,2000,0.001,per_scenario,false
+convex_convex_per,24,convex_hull,Euclidean,convex,2000,0.001,per_scenario,true
 conical_dirac_cross,24,conical_hull,Euclidean,dirac,2000,0.001,cross_scenario,false
 conical_dirac_per,24,conical_hull,Euclidean,dirac,2000,0.001,per_scenario,false
 conical_conical_cross,24,conical_hull,Euclidean,conical,2000,0.001,cross_scenario,false
@@ -10,7 +10,10 @@ conical_conical_per,24,conical_hull,Euclidean,conical,2000,0.001,per_scenario,fa
 conicalb_dirac_cross,24,convex_hull_with_null,Euclidean,dirac,2000,0.001,cross_scenario,false
 conicalb_dirac_per,24,convex_hull_with_null,Euclidean,dirac,2000,0.001,per_scenario,false
 conicalb_conicalb_cross,24,convex_hull_with_null,Euclidean,conical_bounded,2000,0.001,cross_scenario,false
-conicalb_conicalb_per,24,convex_hull_with_null,Euclidean,conical_bounded,2000,0.001,per_scenario,false
+conicalb_conicalb_per,24, convex_hull_with_null,Euclidean,conical_bounded,2000,0.001,per_scenario,false
 convex_conicalb_per,24,convex_hull_with_null,Euclidean,conical_bounded,2000,0.001,per_scenario,false
 convex_conicalb_cross,24,convex_hull_with_null,Euclidean,conical_bounded,2000,0.001,cross_scenario,false
-
+florine,24,kmeans,Euclidean,dirac,2000,0.001,cross_scenario,false
+florinesecond,24,kmeans,Euclidean,convex,2000,0.001,cross_scenario,false
+convex_cross,24,convex_hull,Euclidean,convex,2000,0.001,cross_scenario,false
+kmedoids_cross_convex,24,k_medoids,Euclidean,convex,2000,0.001,cross_scenario,false

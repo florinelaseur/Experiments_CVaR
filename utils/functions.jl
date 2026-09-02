@@ -24,110 +24,110 @@ function fix_variables_from_solution!(benchmark_model, reduced_model, var_symbol
     end
 end
 
-function plot_mu_vs_rp(
-    results_df::DataFrame,
-    case_studies_df::DataFrame;
-    savepath="value_at_risk_threshold_mu.png",
-)
-    results_with_options =
-        outerjoin(case_studies_df, results_df; on="base_name", makeunique=true)
+# function plot_mu_vs_rp(
+#     results_df::DataFrame,
+#     case_studies_df::DataFrame;
+#     savepath="value_at_risk_threshold_mu.png",
+# )
+#     results_with_options =
+#         outerjoin(case_studies_df, results_df; on="base_name", makeunique=true)
 
-    results_with_options =
-        filter(row -> !ismissing(row.value_at_risk_threshold_mu), results_with_options)
+#     results_with_options =
+#         filter(row -> !ismissing(row.value_at_risk_threshold_mu), results_with_options)
 
-    benchmark_df = filter(row -> row.base_name == "0_HourlyBenchmark", results_with_options)
-    nonbenchmark_df = filter(row -> row.base_name != "0_HourlyBenchmark", results_with_options)
+#     benchmark_df = filter(row -> row.base_name == "0_HourlyBenchmark", results_with_options)
+#     nonbenchmark_df = filter(row -> row.base_name != "0_HourlyBenchmark", results_with_options)
 
-    rp_vals = sort(unique(nonbenchmark_df.rp))
-    rp_labels = string.(rp_vals)
-    rp_index = Dict(rp => i for (i, rp) in enumerate(rp_vals))
+#     rp_vals = sort(unique(nonbenchmark_df.rp))
+#     rp_labels = string.(rp_vals)
+#     rp_index = Dict(rp => i for (i, rp) in enumerate(rp_vals))
 
-    p = plot(;
-        xlabel="Number of representative_periods",
-        ylabel="Optimal value_at_risk_threshold_mu",
-        title="",
-        legend=:topright,
-        size=(800, 500),
-        xticks=(1:length(rp_vals), rp_labels),
-    )
+#     p = plot(;
+#         xlabel="Number of representative_periods",
+#         ylabel="Optimal value_at_risk_threshold_mu",
+#         title="",
+#         legend=:topright,
+#         size=(800, 500),
+#         xticks=(1:length(rp_vals), rp_labels),
+#     )
 
-    for g in groupby(nonbenchmark_df, :base_name)
-        g_sorted = sort(g, :rp)
+#     for g in groupby(nonbenchmark_df, :base_name)
+#         g_sorted = sort(g, :rp)
 
-        stochastic_method = g.stochastic_method[1]
-        mk = get(MARKER_MAP, stochastic_method, :circle)
+#         stochastic_method = g.stochastic_method[1]
+#         mk = get(MARKER_MAP, stochastic_method, :circle)
 
-        weight_type = g.weight_type[1]
-        mcol = get(COLOR_MAP_weight, weight_type, :black)
+#         weight_type = g.weight_type[1]
+#         mcol = get(COLOR_MAP_weight, weight_type, :black)
 
-        xidx = [rp_index[rp] for rp in g_sorted.rp]
+#         xidx = [rp_index[rp] for rp in g_sorted.rp]
 
-        scatter!(
-            p,
-            xidx,
-            g_sorted.value_at_risk_threshold_mu;
-            markershape=mk,
-            markersize=8,
-            markercolor=mcol,
-            label="",
-        )
+#         scatter!(
+#             p,
+#             xidx,
+#             g_sorted.value_at_risk_threshold_mu;
+#             markershape=mk,
+#             markersize=8,
+#             markercolor=mcol,
+#             label="",
+#         )
 
-        plot!(
-            p,
-            xidx,
-            g_sorted.value_at_risk_threshold_mu;
-            color=mcol,
-            linewidth=1.5,
-            label="",
-        )
-    end
+#         plot!(
+#             p,
+#             xidx,
+#             g_sorted.value_at_risk_threshold_mu;
+#             color=mcol,
+#             linewidth=1.5,
+#             label="",
+#         )
+#     end
 
-    # Benchmark as horizontal reference line
-    if nrow(benchmark_df) > 0
-        mu_benchmark = benchmark_df.value_at_risk_threshold_mu[1]
+#     # Benchmark as horizontal reference line
+#     if nrow(benchmark_df) > 0
+#         mu_benchmark = benchmark_df.value_at_risk_threshold_mu[1]
 
-        hline!(
-            p,
-            [mu_benchmark];
-            color=:black,
-            linestyle=:dash,
-            linewidth=2,
-            label="Hourly benchmark",
-        )
-    end
+#         hline!(
+#             p,
+#             [mu_benchmark];
+#             color=:black,
+#             linestyle=:dash,
+#             linewidth=2,
+#             label="Hourly benchmark",
+#         )
+#     end
 
-    # Legend for shapes (stochastic methods)
-    for (label, marker) in MARKER_MAP
-        short_label = replace(string(label), "_scenario" => "-scenario")
-        scatter!(
-            p,
-            [NaN],
-            [NaN];
-            markershape=marker,
-            markersize=8,
-            markercolor=:gray30,
-            label=short_label,
-        )
-    end
+#     # Legend for shapes (stochastic methods)
+#     for (label, marker) in MARKER_MAP
+#         short_label = replace(string(label), "_scenario" => "-scenario")
+#         scatter!(
+#             p,
+#             [NaN],
+#             [NaN];
+#             markershape=marker,
+#             markersize=8,
+#             markercolor=:gray30,
+#             label=short_label,
+#         )
+#     end
 
-    # Legend for colors (weight types)
-    for (label, color) in COLOR_MAP_weight
-        scatter!(
-            p,
-            [NaN],
-            [NaN];
-            markershape=:rect,
-            markersize=8,
-            markercolor=color,
-            label=get(LEGEND_METHOD_MAP, label) do
-                return error("Unknown method: $label")
-            end,
-        )
-    end
+#     # Legend for colors (weight types)
+#     for (label, color) in COLOR_MAP_weight
+#         scatter!(
+#             p,
+#             [NaN],
+#             [NaN];
+#             markershape=:rect,
+#             markersize=8,
+#             markercolor=color,
+#             label=get(LEGEND_METHOD_MAP, label) do
+#                 return error("Unknown method: $label")
+#             end,
+#         )
+#     end
 
-    savefig(p, savepath)
-    @info "Plot saved in: $savepath"
-end
+#     savefig(p, savepath)
+#     @info "Plot saved in: $savepath"
+# end
 
 function plot_values_stocmethod_weight( #considering different options: stochastic_method, weight_type
     results_df::DataFrame,
@@ -340,7 +340,7 @@ function plot_values_stocmethod_method( # considering options: method, stochasti
 end
 
 function parse_rep_period_name(name::String) # the vars were created as storage_level_rep_period[$(row.asset),$(row.year),$(row.rep_period),$(row.time_block_start):$(row.time_block_end)]
-    inside = name[findfirst('[', name)+1:end-1] # inside []
+    inside = name[(findfirst('[', name)+1):(end-1)] # inside []
     parts = split(inside, ",")
     return (
         asset=parts[1],
@@ -351,7 +351,7 @@ function parse_rep_period_name(name::String) # the vars were created as storage_
 end
 
 function parse_over_clustered_name(name::String) # storage_level_inter_period[$(row.asset),$(row.year),$(row.scenario),$(row.period_block_start):$(row.period_block_end)]
-    inside = name[findfirst('[', name)+1:end-1]
+    inside = name[(findfirst('[', name)+1):(end-1)]
     parts = split(inside, ",")
     return (
         asset=parts[1],
@@ -514,21 +514,1031 @@ function get_scenario_set(input_df::DataFrame, cardinality::Int)
     return filter(row -> row.scenario in selected, input_df)
 end
 
+function export_base_cost(energy_problem, output_folder)
+    base_cost = JuMP.AffExpr(0.0)
 
-function export_operational_cost_per_scenario(energy_problem, output_folder)
-    costs_per_scenario = energy_problem.expressions[:flows_operational_cost_per_scenario]
-    df = costs_per_scenario.indices |> DataFrame
-    costs = JuMP.value.(costs_per_scenario.expressions[:cost])
-    df[!, :operational_cost] = costs
-    CSV.write(joinpath(output_folder, "operational_cost_per_scenario.csv"), df)
+    for objective_name in (
+        :assets_investment_cost,
+        :assets_fixed_cost_compact_method,
+        :assets_fixed_cost_simple_method,
+        :storage_assets_energy_investment_cost,
+        :storage_assets_energy_fixed_cost,
+        :flows_investment_cost,
+        :flows_fixed_cost,
+    )
+        if haskey(energy_problem.model, objective_name)
+            JuMP.add_to_expression!(base_cost, energy_problem.model[objective_name])
+        end
+    end
+
+    df = DataFrame(base_cost=[JuMP.value(base_cost)])
+
+    CSV.write(joinpath(output_folder, "base_cost.csv"), df)
+
     return df
 end
 
-function plot_operational_cost_per_scenario(input_df::DataFrame, output_folder)
-    p = plot(input_df.scenario, input_df.operational_cost; xlabel="Scenario", ylabel="Operational Cost", title="Operational Cost per Scenario", marker=:circle)
-    sorted_scenario_costs = input_df.operational_cost |> sort
-    h = histogram(sorted_scenario_costs; bins=100, normalize=true, label="Operational Cost Distribution")
-    savefig(p, joinpath(output_folder, "operational_cost_per_scenario.png"))
-    savefig(h, joinpath(output_folder, "operational_cost_distribution.png"))
-    @info "Plots saved in: $(joinpath(output_folder, "operational_cost_per_scenario.png")) and $(joinpath(output_folder, "operational_cost_distribution.png"))"
+# function export_operational_cost_per_scenario(energy_problem, output_folder)
+#     costs_per_scenario = energy_problem.expressions[:flows_operational_cost_per_scenario] +
+#                          energy_problem.expressions[:vintage_flows_operational_cost_per_scenario] +
+#                          energy_problem.expressions[:units_on_operational_cost_per_scenario]
+#     df = costs_per_scenario.indices |> DataFrame
+#     costs = JuMP.value.(costs_per_scenario.expressions[:cost])
+#     df[!, :operational_cost] = costs
+#     CSV.write(joinpath(output_folder, "operational_cost_per_scenario.csv"), df)
+#     return df
+# end
+
+function export_investment_cost(energy_problem, output_folder)
+    expr = energy_problem.expressions[:scenario_tail_excess]
+    investment_cost = only(unique(JuMP.value.(expr.expressions[:base_cost])))
+    df = DataFrame(investment_cost=[investment_cost])
+    CSV.write(joinpath(output_folder, "investment_cost.csv"), df; writeheader=true,)
+    return df
+end
+
+
+function export_operational_cost_per_scenario(energy_problem, output_folder)
+    expr = energy_problem.expressions[:scenario_tail_excess]
+
+    df = expr.indices |> DataFrame
+
+    flows_cost =
+        energy_problem.expressions[:flows_operational_cost_per_scenario].expressions[:cost]
+
+    vintage_flows_cost =
+        energy_problem.expressions[:vintage_flows_operational_cost_per_scenario].expressions[:cost]
+
+    units_on_cost =
+        energy_problem.expressions[:units_on_operational_cost_per_scenario].expressions[:cost]
+
+    operational_costs = JuMP.value.(
+        flows_cost .+
+        vintage_flows_cost .+
+        units_on_cost
+    )
+
+    df[!, :operational_cost] = operational_costs
+
+    CSV.write(
+        joinpath(output_folder, "operational_cost_per_scenario.csv"),
+        df;
+        writeheader=true,
+    )
+
+    return df
+end
+
+function export_total_operational_cost_per_scenario(energy_problem, output_folder)
+    expr = energy_problem.expressions[:scenario_tail_excess]
+    df = expr.indices |> DataFrame
+    total_costs = JuMP.value.(
+        expr.expressions[:total_operational_cost_per_scenario]
+    )
+    df[!, :total_cost] = total_costs
+    CSV.write(
+        joinpath(output_folder, "total_operational_cost_per_scenario.csv"),
+        df;
+        writeheader=true,
+    )
+    return df
+end
+
+# function plot_operational_cost_per_scenario(input_df::DataFrame, output_folder)
+#     p = plot(input_df.scenario, input_df.operational_cost; xlabel="Scenario", ylabel="Operational Cost", title="Operational Cost per Scenario", marker=:circle)
+#     sorted_scenario_costs = input_df.operational_cost |> sort
+#     h = histogram(sorted_scenario_costs; bins=100, normalize=true, label="Operational Cost Distribution")
+#     savefig(p, joinpath(output_folder, "operational_cost_per_scenario.png"))
+#     savefig(h, joinpath(output_folder, "operational_cost_distribution.png"))
+#     @info "Plots saved in: $(joinpath(output_folder, "operational_cost_per_scenario.png")) and $(joinpath(output_folder, "operational_cost_distribution.png"))"
+# end
+
+function plot_cost_per_scenario(
+    input_df::DataFrame,
+    output_folder,
+    mu_value_df::DataFrame,
+)
+
+    folder_parts = splitpath(output_folder)
+    title_suffix = join(folder_parts[(end-1):end], Base.Filesystem.path_separator)
+
+    p = scatter(
+        input_df.scenario,
+        input_df.total_cost;
+        xlabel="Scenario",
+        ylabel="Total Cost",
+        title="Total Cost per Scenario - $title_suffix",
+        marker=:circle,
+        color=:blue,
+        label="Scenario cost",
+    )
+
+    if nrow(mu_value_df) > 0
+        mu_value = only(mu_value_df.solution)
+
+        hline!(
+            p,
+            [mu_value];
+            linestyle=:dash,
+            linewidth=2,
+            label="VaR threshold μ",
+        )
+    end
+
+    savefig(p, joinpath(output_folder, "total_operational_cost_per_scenario.png"))
+
+    @info "Plots saved in: $(joinpath(output_folder, "total_operational_cost_per_scenario.png"))"
+
+    return p
+end
+
+function plot_cost_per_scenario_inc_tail(
+    total_operational_cost_per_scenario_df::DataFrame,
+    df_tail_scenarios::DataFrame,
+    output_folder,
+    df_mu_scenario::DataFrame,
+    mu_value::Float64,
+    case_name,
+)
+    p = scatter(
+        total_operational_cost_per_scenario_df.scenario,
+        total_operational_cost_per_scenario_df.total_cost;
+        xlabel="Scenario",
+        ylabel="Total Cost",
+        title="Tail scenarios of $case_name",
+        marker=:circle,
+        color=:blue,
+        label="All scenarios",
+    )
+
+    scatter!(
+        p,
+        df_tail_scenarios.scenario,
+        df_tail_scenarios.total_cost;
+        marker=:circle,
+        color=:red,
+        label="Tail scenarios",
+    )
+
+    scatter!(
+        p,
+        df_mu_scenario.scenario,
+        df_mu_scenario.total_cost;
+        marker=:circle,
+        color=:black,
+        label="VaR scenario",
+    )
+
+    hline!(
+        p,
+        [mu_value];
+        linestyle=:dash,
+        linewidth=2,
+        color=:black,
+        label="VaR threshold μ",
+    )
+
+    savefig(
+        p,
+        joinpath(output_folder, "total_operational_cost_per_scenario.png"),
+    )
+
+    @info "Plots saved in: $(joinpath(output_folder, "total_operational_cost_per_scenario.png"))"
+
+    return p
+end
+
+function plot_cost_per_scenario_inc_tail_inc_representative_inc_outliers(
+    total_operational_cost_per_scenario_df::DataFrame,
+    df_tail_scenarios::DataFrame,
+    df_representative_scenarios::DataFrame,
+    new_outlier_df::DataFrame,
+    output_folder,
+    df_mu_scenario::DataFrame,
+    mu_value::Float64,
+    case_name,
+)
+    p = scatter(
+        total_operational_cost_per_scenario_df.scenario,
+        total_operational_cost_per_scenario_df.total_cost;
+        xlabel="Scenario",
+        ylabel="Total Cost",
+        title="Tail scenarios, expected costs scenario and outliers of $case_name",
+        marker=:circle,
+        color=:blue,
+        label="All scenarios",
+    )
+
+    scatter!(
+        p,
+        df_tail_scenarios.scenario,
+        df_tail_scenarios.total_cost;
+        marker=:circle,
+        color=:red,
+        label="Tail scenarios",
+    )
+
+    scatter!(
+        p,
+        df_representative_scenarios.scenario,
+        df_representative_scenarios.total_cost;
+        marker=:circle,
+        color=:green,
+        label="Representative scenarios",
+    )
+
+    scatter!(
+        p,
+        new_outlier_df.scenario,
+        new_outlier_df.total_cost;
+        marker=:circle,
+        color=:yellow,
+        label="Outlier scenarios",
+    )
+
+    scatter!(
+        p,
+        df_mu_scenario.scenario,
+        df_mu_scenario.total_cost;
+        marker=:circle,
+        color=:black,
+        label="VaR scenario",
+    )
+
+    hline!(
+        p,
+        [mu_value];
+        linestyle=:dash,
+        linewidth=2,
+        color=:black,
+        label="VaR threshold μ",
+    )
+
+
+    savefig(
+        p,
+        joinpath(output_folder, "total_operational_cost_per_scenario_inc_tail_inc_rep_inc_outliers.png"),
+    )
+
+    @info "Plots saved in: $(joinpath(output_folder, "total_operational_cost_per_scenario_inc_tail_inc_rep_inc_outliers.png"))"
+
+    return p
+end
+
+function plot_cost_per_scenario_inc_tail_inc_representative(
+    total_operational_cost_per_scenario_df::DataFrame,
+    df_tail_scenarios::DataFrame,
+    df_representative_scenarios::DataFrame,
+    output_folder,
+    df_mu_scenario::DataFrame,
+    mu_value::Float64,
+    case_name,
+)
+    p = scatter(
+        total_operational_cost_per_scenario_df.scenario,
+        total_operational_cost_per_scenario_df.total_cost;
+        xlabel="Scenario",
+        ylabel="Total Cost",
+        title="Tail scenarios of $case_name",
+        marker=:circle,
+        color=:blue,
+        label="All scenarios",
+    )
+
+    scatter!(
+        p,
+        df_tail_scenarios.scenario,
+        df_tail_scenarios.total_cost;
+        marker=:circle,
+        color=:red,
+        label="Tail scenarios",
+    )
+
+    scatter!(
+        p,
+        df_representative_scenarios.scenario,
+        df_representative_scenarios.total_cost;
+        marker=:circle,
+        color=:green,
+        label="Representative scenarios",
+    )
+
+    scatter!(
+        p,
+        df_mu_scenario.scenario,
+        df_mu_scenario.total_cost;
+        marker=:circle,
+        color=:black,
+        label="VaR scenario",
+    )
+
+    hline!(
+        p,
+        [mu_value];
+        linestyle=:dash,
+        linewidth=2,
+        color=:black,
+        label="VaR threshold μ",
+    )
+
+
+    savefig(
+        p,
+        joinpath(output_folder, "total_operational_cost_per_scenario_inc_tail_inc_rep.png"),
+    )
+
+    @info "Plots saved in: $(joinpath(output_folder, "total_operational_cost_per_scenario_inc_tail_inc_rep.png"))"
+
+    return p
+end
+
+function plot_normalized_asset_investment_differences(
+    benchmark_df::DataFrame,
+    approximation_df::DataFrame;
+    output_folder,
+    case_name,
+    benchmark_num_loss_of_load_e_demand=0.0,
+    benchmark_num_loss_of_load_h2_demand=0.0,
+    approximation_num_loss_of_load_e_demand=0.0,
+    approximation_num_loss_of_load_h2_demand=0.0,)
+
+    assets = benchmark_df[!, :asset]
+    benchmark_solution = benchmark_df[!, :solution]
+    approximation_solution = approximation_df[!, :solution]
+
+    inv_diff = zeros(length(benchmark_solution))
+
+    for i in eachindex(benchmark_solution)
+        if benchmark_solution[i] > 0
+            inv_diff[i] =
+                (approximation_solution[i] - benchmark_solution[i]) /
+                benchmark_solution[i]
+        else
+            inv_diff[i] = approximation_solution[i] - benchmark_solution[i]
+        end
+    end
+
+    inv_diff_df = DataFrame(
+        asset=assets,
+        benchmark_solution=benchmark_solution,
+        approximation_solution=approximation_solution,
+        diff=inv_diff,
+    )
+
+    push!(inv_diff_df, (
+        asset="e_demand_lol",
+        benchmark_solution=benchmark_num_loss_of_load_e_demand,
+        approximation_solution=approximation_num_loss_of_load_e_demand,
+        diff=approximation_num_loss_of_load_e_demand - benchmark_num_loss_of_load_e_demand,
+    ))
+
+    push!(inv_diff_df, (
+        asset="h2_demand_lol",
+        benchmark_solution=benchmark_num_loss_of_load_h2_demand,
+        approximation_solution=approximation_num_loss_of_load_h2_demand,
+        diff=approximation_num_loss_of_load_h2_demand - benchmark_num_loss_of_load_h2_demand,
+    ))
+
+    p_investment = bar(
+        inv_diff_df.asset,
+        inv_diff_df.diff;
+        xlabel="Asset",
+        ylabel="Normalized Investment Difference",
+        title="Normalized Investment Differences of $case_name Compared to Benchmark",
+        titlefontsize=8,
+    )
+    savefig(
+        p_investment,
+        joinpath(output_folder, "normalized_investment_differences.png"),
+    )
+
+    CSV.write(
+        joinpath(output_folder, "normalized_investment_differences.csv"),
+        inv_diff_df;
+        writeheader=true,
+    )
+
+    @info "Plots saved in: $(joinpath(output_folder, "normalized_investment_differences.png"))"
+
+    return p_investment
+end
+
+function zoom_limits(v; margin_fraction=0.08)
+    vmin = minimum(v)
+    vmax = maximum(v)
+
+    if vmin == vmax
+        margin = abs(vmin) > 0 ? margin_fraction * abs(vmin) : 1.0
+    else
+        margin = margin_fraction * (vmax - vmin)
+    end
+
+    return (vmin - margin, vmax + margin)
+end
+
+function create_case_label(base_name, rp)
+    if occursin("HourlyBenchmark_CC", base_name)
+        return "Hourly CC"
+
+    elseif occursin("HourlyBenchmark", base_name)
+        return "Hourly Benchmark"
+
+    elseif rp > 1
+        return "$(rp) RPs"
+
+    else
+        return base_name
+    end
+end
+
+function plot_comparison(output_folder, number_of_scenarios)
+
+    results = joinpath(output_folder, "results.csv")
+    df_results = CSV.read(results, DataFrame)
+
+    plots_folder = joinpath(output_folder, "plots")
+    mkpath(plots_folder)
+
+    df_plot = copy(df_results)
+
+    # Dynamic labels
+    df_plot[!, :case_label] = [
+        create_case_label(row.base_name, row.rp)
+        for row in eachrow(df_plot)
+    ]
+
+    runtime_case_labels = copy(df_plot.case_label)
+
+    # Find important rows dynamically
+    idx_rp_reference = findfirst(df_plot.rp .> 1 .&& .!occursin.("CC", df_plot.base_name))
+
+    idx_cc = findfirst(occursin.("CC", df_plot.base_name))
+
+    # More descriptive runtime label for CC
+    if idx_cc !== nothing && idx_rp_reference !== nothing
+        rp_reference = df_plot[idx_rp_reference, :rp]
+
+        runtime_case_labels[idx_cc] = "CC ($(rp_reference) RPs + hourly reduced scenario set)"
+    end
+
+    # Runtime
+    df_plot[!, :runtime_own] =
+        df_plot.time_to_read .+
+        df_plot.time_to_create .+
+        df_plot.time_to_solve .+
+        df_plot.time_to_save
+
+    rp_rows = df_plot.rp .> 1
+
+    df_plot[!, :runtime_total] = copy(df_plot.runtime_own)
+
+    df_plot[rp_rows, :runtime_total] =
+        df_plot[rp_rows, :runtime_own] .+
+        df_plot[rp_rows, :time_to_resolve_hourly]
+
+    runtime_comparison = copy(df_plot.runtime_total)
+
+    # CC runtime logic
+    if idx_cc !== nothing && idx_rp_reference !== nothing
+
+        runtime_reference_total =
+            df_plot[idx_rp_reference, :runtime_total]
+
+        runtime_cc_own =
+            df_plot[idx_cc, :runtime_own]
+
+        runtime_comparison[idx_cc] =
+            runtime_reference_total + runtime_cc_own
+
+        @show runtime_reference_total
+        @show runtime_cc_own
+        @show runtime_comparison[idx_cc]
+    end
+
+    p_runtime = bar(
+        runtime_case_labels,
+        runtime_comparison;
+        xlabel="Case",
+        ylabel="Runtime [s]",
+        title="Runtime Comparison",
+        label=false,
+        xrotation=20,
+        legend=false,
+    )
+
+    savefig(
+        p_runtime,
+        joinpath(plots_folder, "runtime_comparison.png"),
+    )
+
+    # System costs
+    df_plot[!, :system_cost] = df_plot.objective_value
+
+    df_plot[rp_rows, :system_cost] =
+        df_plot[rp_rows, :objective_value_resolve_hourly]
+
+    p_costs = bar(
+        df_plot.case_label,
+        df_plot.system_cost;
+        xlabel="Case",
+        ylabel="System Cost",
+        title="System Costs Comparison",
+        label=false,
+        xrotation=30,
+        ylim=zoom_limits(df_plot.system_cost),
+    )
+
+    savefig(
+        p_costs,
+        joinpath(plots_folder, "system_costs_comparison.png"),
+    )
+
+    # LOLE
+    df_plot[!, :lole_e_demand] =
+        df_plot.num_loss_of_load_e_demand ./ number_of_scenarios
+
+    df_plot[!, :lole_h2_demand] =
+        df_plot.num_loss_of_load_h2_demand ./ number_of_scenarios
+
+    x = collect(1:nrow(df_plot))
+    w = 0.35
+
+    p_lole = bar(
+        x .- w / 2,
+        df_plot.lole_e_demand;
+        bar_width=w,
+        xlabel="Case",
+        ylabel="LOLE [expected events per scenario]",
+        title="Loss of Load Expected Comparison",
+        label="Electricity demand",
+        xticks=(x, df_plot.case_label),
+        xrotation=30,
+        legend=:topright,
+    )
+
+    bar!(
+        p_lole,
+        x .+ w / 2,
+        df_plot.lole_h2_demand;
+        bar_width=w,
+        label="Hydrogen demand",
+    )
+
+    savefig(
+        p_lole,
+        joinpath(plots_folder, "lole_comparison.png"),
+    )
+
+    # VaR
+    p_var = bar(
+        df_plot.case_label,
+        df_plot.value_at_risk_threshold_mu;
+        xlabel="Case",
+        ylabel="VaR threshold μ",
+        title="Value at Risk Threshold Comparison",
+        label=false,
+        xrotation=30,
+        ylim=zoom_limits(df_plot.value_at_risk_threshold_mu),
+    )
+
+    savefig(
+        p_var,
+        joinpath(plots_folder, "var_threshold_comparison.png"),
+    )
+
+    @info "Comparison plots saved in: $plots_folder"
+
+    return df_plot
+end
+
+function plot_comparison_copy(output_folder, number_of_scenarios)
+
+    results = joinpath(output_folder, "results.csv")
+    df_results = CSV.read(results, DataFrame)
+
+    plots_folder = joinpath(output_folder, "plots")
+    mkpath(plots_folder)
+
+    df_plot = copy(df_results)
+
+    # RP model runtime, excluding clustering
+    df_plot[!, :runtime_rp] =
+        df_plot.time_to_cluster .+
+        df_plot.time_to_read .+
+        df_plot.time_to_create .+
+        df_plot.time_to_solve .+
+        df_plot.time_to_save
+
+    comparison = DataFrame(
+        case_label=String[],
+        runtime=Float64[],
+        system_cost=Float64[],
+        var_mu=Float64[],
+        lole_e_demand=Union{Missing,Float64}[],
+        lole_h2_demand=Union{Missing,Float64}[],
+    )
+
+    for row in eachrow(df_plot)
+
+        if row.scenario_set == "full"
+            push!(comparison, (
+                "$(row.rp) periods full set",
+                row.runtime_rp,
+                row.objective_value,
+                row.value_at_risk_threshold_mu,
+                row.num_loss_of_load_e_demand / number_of_scenarios,
+                row.num_loss_of_load_h2_demand / number_of_scenarios,
+            ))
+
+        elseif row.scenario_set == "reduced"
+            # RP reduced model
+            push!(comparison, (
+                "$(row.rp) RPs reduced set",
+                row.runtime_rp,
+                row.objective_value,
+                row.value_at_risk_threshold_mu,
+                missing,
+                missing,
+            ))
+
+            # Hourly resolve on reduced set
+            push!(comparison, (
+                "$(row.rp) RPs + hourly reduced set",
+                row.runtime_rp + row.time_to_resolve_hourly,
+                row.objective_value_resolve_hourly,
+                row.value_at_risk_threshold_mu_hourly,
+                row.num_loss_of_load_e_demand / number_of_scenarios,
+                row.num_loss_of_load_h2_demand / number_of_scenarios,
+            ))
+        end
+    end
+
+    p_runtime = bar(
+        comparison.case_label,
+        comparison.runtime;
+        xlabel="Case",
+        ylabel="Runtime [s]",
+        title="Runtime Comparison",
+        label=false,
+        xrotation=30,
+    )
+
+    savefig(p_runtime, joinpath(plots_folder, "runtime_comparison.png"))
+
+    p_costs = bar(
+        comparison.case_label,
+        comparison.system_cost;
+        xlabel="Case",
+        ylabel="System Cost",
+        title="System Costs Comparison",
+        label=false,
+        xrotation=30,
+        ylim=zoom_limits(comparison.system_cost),
+    )
+
+    savefig(p_costs, joinpath(plots_folder, "system_costs_comparison.png"))
+
+    p_var = bar(
+        comparison.case_label,
+        comparison.var_mu;
+        xlabel="Case",
+        ylabel="VaR threshold μ",
+        title="Value at Risk Threshold Comparison",
+        label=false,
+        xrotation=30,
+        ylim=zoom_limits(comparison.var_mu),
+    )
+
+    savefig(p_var, joinpath(plots_folder, "var_threshold_comparison.png"))
+
+    df_lole = dropmissing(comparison, [:lole_e_demand, :lole_h2_demand])
+
+    x = collect(1:nrow(df_lole))
+    w = 0.35
+
+    p_lole = bar(
+        x .- w / 2,
+        df_lole.lole_e_demand;
+        bar_width=w,
+        xlabel="Case",
+        ylabel="LOLE [expected events per scenario]",
+        title="Loss of Load Expected Comparison",
+        label="Electricity demand",
+        xticks=(x, df_lole.case_label),
+        xrotation=30,
+        legend=:topright,
+    )
+
+    bar!(
+        p_lole,
+        x .+ w / 2,
+        df_lole.lole_h2_demand;
+        bar_width=w,
+        label="Hydrogen demand",
+    )
+
+    savefig(p_lole, joinpath(plots_folder, "lole_comparison.png"))
+end
+
+function recovery_analysis(input_data_path::String, rep_periods_mapping::DataFrame, energy_problem, output_folder)
+    balance_df = CSV.read(joinpath(output_folder, "cons_balance_consumer.csv"), DataFrame)
+    flow_df = CSV.read(joinpath(output_folder, "var_flow.csv"), DataFrame)
+    stochastic_scenario = CSV.read(
+        joinpath(input_data_path, "stochastic-scenario.csv"),
+        DataFrame,
+    )
+
+    rep_weights = combine(
+        groupby(rep_periods_mapping, [
+            :scenario,
+            :milestone_year,
+            :rep_period,
+        ]),
+        :weight => sum => :weight,
+    )
+
+    rep_weights = leftjoin(
+        rep_weights,
+        rename(stochastic_scenario, :probability => :scenario_probability),
+        on=:scenario,
+    )
+
+    join_cols = [
+        :milestone_year,
+        :rep_period,
+        :time_block_start,
+        :time_block_end,
+        :to_asset,
+    ]
+
+    prices = select(
+        balance_df,
+        :asset => :to_asset,
+        :milestone_year,
+        :rep_period,
+        :time_block_start,
+        :time_block_end,
+        :dual_balance_consumer => :price,
+    )
+
+    flows = select(
+        flow_df,
+        :from_asset,
+        :to_asset,
+        :milestone_year,
+        :rep_period,
+        :time_block_start,
+        :time_block_end,
+        :solution => :capacity,
+    )
+
+    joined = innerjoin(flows, prices, on=join_cols)
+
+    joined = leftjoin(joined, rep_weights, on=[:milestone_year, :rep_period],)
+
+    joined[!, :revenue_component] = joined.price .* joined.capacity .* joined.weight .* joined.scenario_probability
+
+    recovery_df = combine(
+        groupby(joined, [
+            :scenario,
+            :milestone_year,
+            :rep_period,
+            :time_block_start,
+            :time_block_end,
+        ]),
+        :weight => first => :weight,
+        :scenario_probability => first => :scenario_probability,
+        :revenue_component => sum => :revenue,
+    )
+
+    operational_cost_df = export_operational_cost_per_scenario(energy_problem, output_folder)
+
+    operational_cost_df = leftjoin(
+        operational_cost_df,
+        rename(stochastic_scenario, :probability => :scenario_probability),
+        on=:scenario,
+    )
+
+    total_operational_cost = sum(operational_cost_df.operational_cost .* operational_cost_df.scenario_probability)
+    total_revenue = sum(recovery_df.revenue)
+    net_revenue_df = DataFrame(
+        revenue=[total_revenue],
+        operational_cost=[total_operational_cost],
+        net_revenue=[total_revenue - total_operational_cost],
+    )
+    CSV.write(
+        joinpath(output_folder, "net_revenue.csv"),
+        net_revenue_df;
+        writeheader=true,
+    )
+
+    investment_cost_df = export_investment_cost(energy_problem, output_folder)
+    investment_cost = only(investment_cost_df.investment_cost)
+    net_revenue = only(net_revenue_df.net_revenue)
+    profit = net_revenue - investment_cost
+    profit_df = DataFrame(profit=[profit])
+
+    CSV.write(
+        joinpath(output_folder, "profit.csv"),
+        profit_df;
+        writeheader=true,
+    )
+
+    kpi_names = [
+        "Revenue",
+        "Operational cost",
+        "Investment cost",
+        "Net revenue",
+        "Profit",
+    ]
+
+    kpi_values = [
+        total_revenue,
+        total_operational_cost,
+        investment_cost,
+        net_revenue,
+        profit,
+    ]
+
+    bar_colors = fill(:blue, length(kpi_values))
+    bar_colors[end] = profit < 0 ? :red : :green
+
+    p = bar(
+        kpi_names,
+        kpi_values;
+        color=bar_colors,
+        legend=false,
+        ylabel="Value",
+        title="Recovery analysis",
+        xrotation=30,
+    )
+
+    savefig(p, joinpath(output_folder, "recovery_analysis_bars.png"))
+
+    return recovery_df, joined
+end
+
+function plot_comparison_runtime(results_path)
+    df_results = CSV.read(results_path, DataFrame)
+
+    plots_folder = joinpath(dirname(results_path), "plots", "runtime")
+    mkpath(plots_folder)
+
+    df_plot = copy(df_results)
+
+    # Runtime of the model itself, including clustering
+    df_plot[!, :runtime_model] =
+        df_plot.time_to_cluster .+
+        df_plot.time_to_read .+
+        df_plot.time_to_create .+
+        df_plot.time_to_solve .+
+        df_plot.time_to_save
+
+    comparison = DataFrame(
+        case_label=String[],
+        runtime=Float64[],
+        rp=Int[],
+        case_type=String[],
+    )
+
+    for row in eachrow(df_plot)
+
+        # Free hourly baseline solve
+        if row.base_name == "0_HourlyBaseline" &&
+           row.scenario_set == "full"
+
+            push!(comparison, (
+                case_label="Hourly baseline",
+                runtime=row.runtime_model,
+                rp=0,
+                case_type="baseline",
+            ))
+
+            # CC solve plus hourly OOS resolve with CC investments fixed
+        elseif row.scenario_set == "reduced" &&
+               string(row.termination_status_resolve_baseline) == "OPTIMAL"
+
+            runtime_cc_and_resolve =
+                row.runtime_model +
+                row.time_to_resolve_baseline
+
+            push!(comparison, (
+                case_label="$(row.rp) RPs: CC + hourly resolve",
+                runtime=runtime_cc_and_resolve,
+                rp=row.rp,
+                case_type="CC + resolve baseline",
+            ))
+        end
+    end
+
+    sort!(
+        comparison,
+        [:case_type, :rp],
+        by=[
+            x -> x == "baseline" ? 0 : 1,
+            identity,
+        ],
+    )
+
+    CSV.write(
+        joinpath(plots_folder, "runtime_comparison.csv"),
+        comparison;
+        writeheader=true,
+    )
+
+    p = bar(
+        comparison.case_label,
+        comparison.runtime;
+        ylabel="Runtime (seconds)",
+        xlabel="Method",
+        title="Hourly baseline versus CC + hourly OOS resolve",
+        legend=false,
+        xrotation=25,
+        size=(850, 500),
+    )
+
+    savefig(p, joinpath(plots_folder, "runtime_comparison_N$(df_plot.number_of_scenarios[1]).png"))
+    return comparison
+end
+
+function parse_n_seed(filename::String)
+    m = match(r"results_(?:CC_per_)?N(\d+)_seed(\d+)\.csv$", filename)
+    if isnothing(m)
+        m = match(r"results_ScSeRP_N(\d+)_seed(\d+)\.csv$", filename)
+    end
+    isnothing(m) && return 0, 0
+    return parse(Int, m[1]), parse(Int, m[2])
+end
+
+"""
+    expand_rep_period_partitions!(con, number_of_representative_periods)
+
+Copy the partition assignments defined for rep_period = 1 to all
+representative periods in the current DuckDB connection.
+
+Call after TC.cluster! and before TEM.populate_with_defaults!.
+"""
+function expand_rep_period_partitions!(
+    con,
+    number_of_representative_periods::Integer,
+)
+    number_of_representative_periods >= 1 ||
+        throw(ArgumentError("number_of_representative_periods must be at least 1"))
+
+    rp_values_sql = join(
+        ["($(rp))" for rp in 1:number_of_representative_periods],
+        ", ",
+    )
+
+    DuckDB.query(
+        con,
+        """
+        CREATE OR REPLACE TABLE assets_rep_periods_partitions AS
+        WITH base AS (
+            SELECT
+                asset,
+                milestone_year,
+                partition,
+                specification
+            FROM assets_rep_periods_partitions
+            WHERE rep_period = 1
+        )
+        SELECT
+            b.asset,
+            b.milestone_year,
+            b.partition,
+            rp.rep_period,
+            b.specification
+        FROM base AS b
+        CROSS JOIN (VALUES $(rp_values_sql)) AS rp(rep_period)
+        """,
+    )
+
+    DuckDB.query(
+        con,
+        """
+        CREATE OR REPLACE TABLE flows_rep_periods_partitions AS
+        WITH base AS (
+            SELECT
+                from_asset,
+                to_asset,
+                milestone_year,
+                partition,
+                specification
+            FROM flows_rep_periods_partitions
+            WHERE rep_period = 1
+        )
+        SELECT
+            b.from_asset,
+            b.to_asset,
+            b.milestone_year,
+            b.partition,
+            rp.rep_period,
+            b.specification
+        FROM base AS b
+        CROSS JOIN (VALUES $(rp_values_sql)) AS rp(rep_period)
+        """,
+    )
+
+    return nothing
 end
