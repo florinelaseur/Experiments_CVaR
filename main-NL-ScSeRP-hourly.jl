@@ -765,6 +765,7 @@ function main()
                     optimizer_parameters=parameters,
                     model_file_name="",
                     enable_names=enable_names,
+                    direct_model=direct_model,
                 )
 
                 output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)", case_name, string(solver))
@@ -1049,9 +1050,9 @@ function main()
 
                         new_outlier_ids = [
                             s for s in outlier_ids
-                            if !(s in tail_scenarios_ids) &&
-                            s != expected_cost_scenario &&
-                            !(s in mu_scenario_id)
+                                  if !(s in tail_scenarios_ids) &&
+                                  s != expected_cost_scenario &&
+                                  !(s in mu_scenario_id)
                         ]
 
                         new_outlier_df = filter(

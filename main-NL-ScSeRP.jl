@@ -29,11 +29,15 @@ using DataFrames
 base_seed = 19990907
 
 # Defaults to draw 1
-# draw = parse(Int, get(ENV, "EXPERIMENT_DRAW", "1"))
-draw = 2
+draw = parse(Int, get(ENV, "EXPERIMENT_DRAW", "1"))
+# draw = 2
 
 # Deterministic seed for this draw
-random_seed = base_seed + draw - 1
+# random_seed = base_seed + draw - 1
+
+rng = Random.MersenneTwister(base_seed)
+random_seeds = rand(rng, 1:typemax(Int32), draw)
+random_seed = random_seeds[end]
 
 Random.seed!(random_seed)
 
@@ -156,7 +160,7 @@ results_df = DataFrame(;
     water_borrowed_baseline=Float64[],
     value_at_risk_threshold_mu_baseline=Float64[],
     scenario_set=String[],
-    seed=Int[],
+    draw=Int[],
     number_of_scenarios=Int[],
 )
 
@@ -219,7 +223,7 @@ function main()
             direct_model=direct_model,
         )
 
-        baseline_output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", base_name, "N$(number_of_scenarios)_seed$(seed)", string(solver))
+        baseline_output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", base_name, "N$(number_of_scenarios)_draw$(draw)", string(solver))
         mkpath(baseline_output_folder)
 
         if !(isfile(joinpath(baseline_output_folder, "var_assets_investment.csv")) &&
@@ -324,7 +328,7 @@ function main()
             water_borrowed_baseline=amount_water_borrowed_b,
             value_at_risk_threshold_mu_baseline=mu_value,
             scenario_set="full",
-            seed=seed,
+            draw=draw,
             number_of_scenarios=number_of_scenarios,
         )
         push!(results_df, new_results_row)
@@ -460,7 +464,7 @@ function main()
                     enable_names=enable_names,
                 )
 
-                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
+                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)", case_name, string(solver))
                 mkpath(output_folder)
 
                 @info "Solving the model and saving the solution for the case study: $case_name with $solver"
@@ -557,7 +561,7 @@ function main()
                     water_borrowed_baseline=0.0,
                     value_at_risk_threshold_mu_baseline=0.0,
                     scenario_set="full",
-                    seed=seed,
+                    draw=draw,
                     number_of_scenarios=number_of_scenarios,
                 )
                 push!(results_df, new_results_row)
@@ -565,7 +569,7 @@ function main()
                 @info "Starting Scenario selection"
 
                 #insert scenario selection and create and solve energy_problem_red
-                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, "scenario_selection", string(solver))
+                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)", case_name, "scenario_selection", string(solver))
                 mkpath(output_folder)
 
                 CSV.write(
@@ -676,7 +680,7 @@ function main()
                     probability=probabilities,
                 )
 
-                stochpath = joinpath(input_data_path_CC, "N$(number_of_scenarios)_seed$(seed)", case_name)
+                stochpath = joinpath(input_data_path_CC, "N$(number_of_scenarios)_draw$(draw)", case_name)
                 mkpath(stochpath)
 
                 CSV.write(
@@ -848,7 +852,7 @@ function main()
                     enable_names=enable_names,
                 )
 
-                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
+                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)", case_name, string(solver))
                 mkpath(output_folder)
 
                 @info "Solving the model and saving the solution for the case study: $case_name with $solver"
@@ -864,7 +868,7 @@ function main()
                 investment_output_folder_benchmark = joinpath(
                     @__DIR__,
                     "outputs",
-                    "N$(number_of_scenarios)_seed$(seed)",
+                    "N$(number_of_scenarios)_draw$(draw)",
                     case_name,
                     "investment_analysis",
                     "benchmark",
@@ -1001,7 +1005,7 @@ function main()
                         n_lol_smr_ccs_resolve_benchmark,
                     )
 
-                    output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, "fixed_in_benchmark", string(solver))
+                    output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)", case_name, "fixed_in_benchmark", string(solver))
                     mkpath(output_folder)
                     TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
 
@@ -1064,7 +1068,7 @@ function main()
                             water_borrowed_baseline=0.0,
                             value_at_risk_threshold_mu_baseline=0.0,
                             scenario_set="reduced",
-                            seed=seed,
+                            draw=draw,
                             number_of_scenarios=number_of_scenarios,
                         )
                         push!(results_df, new_results_row)
@@ -1082,7 +1086,7 @@ function main()
                         amount_water_borrowed_resolve_benchmark = 0.0
                         mu_value_resolve_benchmark = 0.0
 
-                        output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, "scenario_selection", string(solver))
+                        output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)", case_name, "scenario_selection", string(solver))
                         mkpath(output_folder)
 
                         # extra =
@@ -1202,7 +1206,7 @@ function main()
                             profiles_df,
                         )
 
-                        stochpath_twice = joinpath(input_data_path_CC, "N$(number_of_scenarios)_seed$(seed)", case_name, "twice")
+                        stochpath_twice = joinpath(input_data_path_CC, "N$(number_of_scenarios)_draw$(draw)", case_name, "twice")
                         mkpath(stochpath_twice)
 
                         CSV.write(
@@ -1212,7 +1216,7 @@ function main()
                         )
 
                         CSV.write(
-                            joinpath(input_data_path_CC, "twice", "profiles-wide.csv"),
+                            joinpath(input_data_path_CC, "N$(number_of_scenarios)_draw$(draw)", case_name, "twice", "profiles-wide.csv"),
                             profiles_df_CC;
                             writeheader=true,
                         )
@@ -1224,7 +1228,7 @@ function main()
                         )
 
                         CSV.write(
-                            joinpath(input_data_path_CC, "twice", "stochastic-scenario.csv"),
+                            joinpath(input_data_path_CC, "N$(number_of_scenarios)_draw$(draw)", case_name, "twice", "stochastic-scenario.csv"),
                             df_stochastic_scenario_CC;
                             writeheader=true,
                         )
@@ -1239,7 +1243,7 @@ function main()
                         @info "Processing case study: $case_name"
 
                         connection = DuckDB.DBInterface.connect(DuckDB.DB)
-                        TIO.read_csv_folder(connection, joinpath(input_data_path_CC, "twice"))
+                        TIO.read_csv_folder(connection, joinpath(input_data_path_CC, "N$(number_of_scenarios)_draw$(draw)", case_name, "twice"))
 
                         DuckDB.query(
                             connection,
@@ -1375,7 +1379,7 @@ function main()
                             enable_names=enable_names,
                         )
 
-                        output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
+                        output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)", case_name, string(solver))
                         mkpath(output_folder)
 
                         @info "Solving the model and saving the solution for the case study: $case_name with $solver"
@@ -1391,7 +1395,7 @@ function main()
                         investment_output_folder_benchmark = joinpath(
                             @__DIR__,
                             "outputs",
-                            "N$(number_of_scenarios)_seed$(seed)",
+                            "N$(number_of_scenarios)_draw$(draw)",
                             case_name,
                             "investment_analysis",
                             "benchmark",
@@ -1496,7 +1500,7 @@ function main()
                 investment_output_folder_baseline = joinpath(
                     @__DIR__,
                     "outputs",
-                    "N$(number_of_scenarios)_seed$(seed)",
+                    "N$(number_of_scenarios)_draw$(draw)",
                     case_name,
                     "investment_analysis",
                     "baseline",
@@ -1529,7 +1533,7 @@ function main()
                     @show mu_value_baseline
                 end
 
-                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, "fixed_in_baseline", string(solver))
+                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)", case_name, "fixed_in_baseline", string(solver))
                 mkpath(output_folder)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem_baseline)
 
@@ -1578,7 +1582,7 @@ function main()
                     water_borrowed_baseline=amount_water_borrowed_b,
                     value_at_risk_threshold_mu_baseline=mu_value_baseline,
                     scenario_set="reduced",
-                    seed=seed,
+                    draw=draw,
                     number_of_scenarios=number_of_scenarios,
                 )
                 push!(results_df, new_results_row)
@@ -1586,8 +1590,8 @@ function main()
         end
     end
 
-    output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)")
-    results_df |> CSV.write(joinpath(output_folder, "results_ScSeRP_N$(number_of_scenarios)_seed$(seed).csv"); writeheader=true)
+    output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)")
+    results_df |> CSV.write(joinpath(output_folder, "results_ScSeRP_N$(number_of_scenarios)_draw$(draw).csv"); writeheader=true)
 
     return nothing
 end
