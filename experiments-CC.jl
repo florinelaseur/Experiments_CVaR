@@ -23,7 +23,7 @@ function run_experiments()
     draws = collect(1:n_draws)
     scenario_sizes = copy(original_config["simulation"]["scenarios_starting_set_sizes"],)
     representative_periods = copy(original_config["simulation"]["representative_periods"],)
-    main_cc_path = joinpath(@__DIR__, "main-NL-ScSeRP.jl")
+    main_cc_path = joinpath(@__DIR__, "main-NL-ScSeRP-hourly.jl")
 
     log = DataFrame(
         draw=Int[],

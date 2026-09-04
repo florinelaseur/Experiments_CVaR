@@ -28,10 +28,13 @@ using DataFrames
 
 base_seed = 19990907
 
-# Defaults to seed1 when main.jl is run directly
+# Defaults to draw 1
 draw = parse(Int, get(ENV, "EXPERIMENT_DRAW", "1"))
+# draw = 2
 
-# Reproduce the seed-th draw from the fixed base seed
+# Deterministic seed for this draw
+# random_seed = base_seed + draw - 1
+
 rng = Random.MersenneTwister(base_seed)
 random_seeds = rand(rng, 1:typemax(Int32), draw)
 random_seed = random_seeds[end]
@@ -81,7 +84,7 @@ profiles_path = joinpath(homedir(), "Nextcloud", "ExperimentData", "profiles-wid
 all_profiles_df = CSV.read(profiles_path, DataFrame)
 profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
 selected_scenarios = sort(unique(profiles_df.scenario))
-@info "Selected scenario starting set: $(join(selected_scenarios, ", "))"
+@info "Selected scenario starting set" println(selected_scenarios)
 mapping = Dict(old => new for (new, old) in enumerate(selected_scenarios))
 profiles_df[!, :scenario] = [mapping[s] for s in profiles_df.scenario]
 CSV.write(joinpath(input_data_path, "profiles-wide.csv"), profiles_df; writeheader=true)
@@ -709,7 +712,9 @@ function main()
                     writeheader=true,
                 )
 
-                case_name = base_name * "_0_HourlyBaseline_reduced_scenario_set"
+                rp = 240
+
+                case_name = base_name * "_rp_" * "$rp" * "_reduced_scenario_set"
 
                 @info "Processing case study: $case_name"
 
@@ -747,15 +752,97 @@ function main()
                     exclude_columns=["scenario", "milestone_year", "timestep"],
                 )
 
-                layout = TC.ProfilesTableLayout(;
-                    year=:milestone_year,
-                    cols_to_groupby=[:milestone_year, :scenario],
-                )
+                if stochastic_method == :per_scenario
+                    layout = TC.ProfilesTableLayout(;
+                        year=:milestone_year,
+                        cols_to_groupby=[:milestone_year, :scenario],
+                    )
+                    time_to_cluster = @elapsed TC.cluster!(
+                        connection,
+                        period_duration,
+                        rp; #round(Int, rp / n_scenarios);
+                        method=method,
+                        distance=distance,
+                        weight_type=weight_type,
+                        layout=layout,
+                        clustering_kwargs,
+                        weight_fitting_kwargs,
+                    )
+                    if use_ratio == true
+                        DuckDB.query(
+                            connection,
+                            "UPDATE profiles_rep_periods AS x
+                                SET value =
+                                    CASE
+                                        WHEN x.profile_name = 'demand' THEN x.value
+                                        ELSE x.value * d.value
+                                    END
+                                FROM profiles_rep_periods AS d
+                                WHERE d.timestep   = x.timestep
+                                AND d.rep_period       = x.rep_period
+                                AND d.milestone_year       = x.milestone_year
+                                AND d.scenario   = x.scenario
+                                AND d.profile_name = 'demand';
+                                    ",
+                        )
+                    end
 
-                time_to_cluster = @elapsed TC.dummy_cluster!(connection; layout=layout)
-
+                elseif stochastic_method == :cross_scenario
+                    layout = TC.ProfilesTableLayout(;
+                        year=:milestone_year,
+                        cols_to_groupby=[:milestone_year],
+                        cols_to_crossby=[:scenario],
+                    )
+                    time_to_cluster = @elapsed TC.cluster!(
+                        connection,
+                        period_duration,
+                        rp;
+                        method=method,
+                        distance=distance,
+                        weight_type=weight_type,
+                        layout=layout,
+                        clustering_kwargs,
+                        weight_fitting_kwargs,
+                    )
+                    if use_ratio == true
+                        DuckDB.query(
+                            connection,
+                            "UPDATE profiles_rep_periods AS x
+                                SET value =
+                                    CASE
+                                        WHEN x.profile_name = 'demand' THEN x.value
+                                        ELSE x.value * d.value
+                                    END
+                                FROM profiles_rep_periods AS d
+                                WHERE d.timestep   = x.timestep
+                                AND d.rep_period       = x.rep_period
+                                AND d.milestone_year       = x.milestone_year
+                                AND d.profile_name = 'demand';
+                                    ",
+                        )
+                    end
+                else
+                    error("Unknown stochastic method: $stochastic_method")
+                end
+                if use_ratio == true
+                    DuckDB.query(
+                        connection,
+                        "UPDATE profiles AS x
+                            SET value =
+                                CASE
+                                    WHEN x.profile_name = 'demand' THEN x.value
+                                    ELSE x.value * d.value
+                                END
+                            FROM profiles AS d
+                            WHERE d.timestep   = x.timestep
+                            AND d.milestone_year       = x.milestone_year
+                            AND d.scenario   = x.scenario
+                            AND d.profile_name = 'demand';
+                                ",
+                    )
+                end
                 TEM.populate_with_defaults!(connection)
-                DuckDB.query(connection, "UPDATE asset SET is_seasonal = false")
+
                 time_to_read = @elapsed energy_problem_red = TEM.EnergyProblem(connection)
 
                 @info "Creating the model for the case study: $case_name"
@@ -765,7 +852,6 @@ function main()
                     optimizer_parameters=parameters,
                     model_file_name="",
                     enable_names=enable_names,
-                    direct_model=direct_model,
                 )
 
                 output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)", case_name, string(solver))
@@ -1132,7 +1218,7 @@ function main()
                         )
 
                         CSV.write(
-                            joinpath(input_data_path_CC, "twice", "profiles-wide.csv"),
+                            joinpath(input_data_path_CC, "N$(number_of_scenarios)_draw$(draw)", case_name, "twice", "profiles-wide.csv"),
                             profiles_df_CC;
                             writeheader=true,
                         )
@@ -1144,7 +1230,7 @@ function main()
                         )
 
                         CSV.write(
-                            joinpath(input_data_path_CC, "twice", "stochastic-scenario.csv"),
+                            joinpath(input_data_path_CC, "N$(number_of_scenarios)_draw$(draw)", case_name, "twice", "stochastic-scenario.csv"),
                             df_stochastic_scenario_CC;
                             writeheader=true,
                         )
@@ -1159,7 +1245,7 @@ function main()
                         @info "Processing case study: $case_name"
 
                         connection = DuckDB.DBInterface.connect(DuckDB.DB)
-                        TIO.read_csv_folder(connection, joinpath(input_data_path_CC, "twice"))
+                        TIO.read_csv_folder(connection, joinpath(input_data_path_CC, "N$(number_of_scenarios)_draw$(draw)", case_name, "twice"))
 
                         DuckDB.query(
                             connection,
@@ -1193,14 +1279,97 @@ function main()
                             exclude_columns=["scenario", "milestone_year", "timestep"],
                         )
 
-                        layout = TC.ProfilesTableLayout(;
-                            year=:milestone_year,
-                            cols_to_groupby=[:milestone_year, :scenario],
-                        )
-                        time_to_cluster = @elapsed TC.dummy_cluster!(connection; layout=layout)
+                        if stochastic_method == :per_scenario
+                            layout = TC.ProfilesTableLayout(;
+                                year=:milestone_year,
+                                cols_to_groupby=[:milestone_year, :scenario],
+                            )
+                            time_to_cluster = @elapsed TC.cluster!(
+                                connection,
+                                period_duration,
+                                rp; #round(Int, rp / n_scenarios);
+                                method=method,
+                                distance=distance,
+                                weight_type=weight_type,
+                                layout=layout,
+                                clustering_kwargs,
+                                weight_fitting_kwargs,
+                            )
+                            if use_ratio == true
+                                DuckDB.query(
+                                    connection,
+                                    "UPDATE profiles_rep_periods AS x
+                                        SET value =
+                                            CASE
+                                                WHEN x.profile_name = 'demand' THEN x.value
+                                                ELSE x.value * d.value
+                                            END
+                                        FROM profiles_rep_periods AS d
+                                        WHERE d.timestep   = x.timestep
+                                        AND d.rep_period       = x.rep_period
+                                        AND d.milestone_year       = x.milestone_year
+                                        AND d.scenario   = x.scenario
+                                        AND d.profile_name = 'demand';
+                                            ",
+                                )
+                            end
 
+                        elseif stochastic_method == :cross_scenario
+                            layout = TC.ProfilesTableLayout(;
+                                year=:milestone_year,
+                                cols_to_groupby=[:milestone_year],
+                                cols_to_crossby=[:scenario],
+                            )
+                            time_to_cluster = @elapsed TC.cluster!(
+                                connection,
+                                period_duration,
+                                rp;
+                                method=method,
+                                distance=distance,
+                                weight_type=weight_type,
+                                layout=layout,
+                                clustering_kwargs,
+                                weight_fitting_kwargs,
+                            )
+                            if use_ratio == true
+                                DuckDB.query(
+                                    connection,
+                                    "UPDATE profiles_rep_periods AS x
+                                        SET value =
+                                            CASE
+                                                WHEN x.profile_name = 'demand' THEN x.value
+                                                ELSE x.value * d.value
+                                            END
+                                        FROM profiles_rep_periods AS d
+                                        WHERE d.timestep   = x.timestep
+                                        AND d.rep_period       = x.rep_period
+                                        AND d.milestone_year       = x.milestone_year
+                                        AND d.profile_name = 'demand';
+                                            ",
+                                )
+                            end
+                        else
+                            error("Unknown stochastic method: $stochastic_method")
+                        end
+                        if use_ratio == true
+                            DuckDB.query(
+                                connection,
+                                "UPDATE profiles AS x
+                                    SET value =
+                                        CASE
+                                            WHEN x.profile_name = 'demand' THEN x.value
+                                            ELSE x.value * d.value
+                                        END
+                                    FROM profiles AS d
+                                    WHERE d.timestep   = x.timestep
+                                    AND d.milestone_year       = x.milestone_year
+                                    AND d.scenario   = x.scenario
+                                    AND d.profile_name = 'demand';
+                                        ",
+                            )
+                        end
                         TEM.populate_with_defaults!(connection)
-                        DuckDB.query(connection, "UPDATE asset SET is_seasonal = false")
+
                         time_to_read = @elapsed energy_problem_red = TEM.EnergyProblem(connection)
 
                         @info "Creating the model for the case study: $case_name"
@@ -1340,16 +1509,16 @@ function main()
                 )
                 mkpath(investment_output_folder_baseline)
 
-                # plot_normalized_asset_investment_differences(
-                #     baseline_investment_df,
-                #     CC_investment_df;
-                #     output_folder=investment_output_folder_baseline,
-                #     case_name=case_name,
-                #     benchmark_num_loss_of_load_e_demand=baseline_n_lol_ens,
-                #     benchmark_num_loss_of_load_h2_demand=baseline_n_lol_smr_ccs,
-                #     approximation_num_loss_of_load_e_demand=n_lol_ens,
-                #     approximation_num_loss_of_load_h2_demand=n_lol_smr_ccs,
-                # )
+                plot_normalized_asset_investment_differences(
+                    baseline_investment_df,
+                    CC_investment_df;
+                    output_folder=investment_output_folder_baseline,
+                    case_name=case_name,
+                    benchmark_num_loss_of_load_e_demand=baseline_n_lol_ens,
+                    benchmark_num_loss_of_load_h2_demand=baseline_n_lol_smr_ccs,
+                    approximation_num_loss_of_load_e_demand=n_lol_ens,
+                    approximation_num_loss_of_load_h2_demand=n_lol_smr_ccs,
+                )
                 # count how much water_borrowed
                 amount_water_borrowed_b = sum(water_borrowed.solution)
 
