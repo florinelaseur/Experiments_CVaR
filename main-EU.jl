@@ -4,6 +4,8 @@
 # in the LICENSE.md file or at https://opensource.org/license/apache-2-0.
 
 cd(@__DIR__)
+
+ENV["GKSwstype"] = "100"
 # using Pkg: Pkg
 # Pkg.activate(".")
 # Pkg.instantiate()
@@ -24,8 +26,19 @@ using Plots
 using Random
 using DataFrames
 
-seed = parse(Int, get(ENV, "EXPERIMENT_SEED", "19990907"))
-Random.seed!(seed)
+base_seed = 19990907
+
+# Defaults to seed1 when main.jl is run directly
+draw = parse(Int, get(ENV, "EXPERIMENT_DRAW", "1"))
+
+# Reproduce the seed-th draw from the fixed base seed
+rng = Random.MersenneTwister(base_seed)
+random_seeds = rand(rng, 1:typemax(Int32), draw)
+random_seed = random_seeds[end]
+
+Random.seed!(random_seed)
+
+@info "RNG setup" base_seed = base_seed draw = draw random_seed = random_seed
 
 @info "Including helper functions"
 include("utils/functions.jl")
@@ -41,8 +54,17 @@ distance_map = Dict(
 
 # Read and transform user input files to Tulipa input files
 config = TOML.parsefile("config.toml")
-input_data_path = config["simulation"]["input_data"]
-input_data_path_CC = config["simulation"]["input_data_CC"]
+input_data_path = joinpath(
+    homedir(),
+    "Nextcloud",
+    config["simulation"]["input_data_NL"],
+)
+
+input_data_path_CC = joinpath(
+    homedir(),
+    "Nextcloud",
+    config["simulation"]["input_data_NL_CC"],
+)
 use_ratio = config["clustering"]["use_ratio"]
 heuristic_distance = config["clustering"]["heuristic_distance"]
 fix_level_storage = config["simulation"]["fix_level_storage"]
@@ -54,14 +76,23 @@ number_of_scenarios = config["simulation"]["number_of_scenarios"]
 fix_benchmark = config["simulation"]["fix_benchmark"]
 
 #for new scenarios
-
-profiles_path = joinpath(@__DIR__, "create-scenarios", "profiles-wide-all-scenarios.csv")
+profiles_path = joinpath(homedir(), "Nextcloud", "ExperimentData", "EU-input-data", "TYNDP-ERAA-datapreparation", "profiles-wide-all-scenarios.csv")
 all_profiles_df = CSV.read(profiles_path, DataFrame)
 profiles_df = get_scenario_set(all_profiles_df, number_of_scenarios)
 selected_scenarios = sort(unique(profiles_df.scenario))
+@info "Selected scenario starting set: $(join(selected_scenarios, ", "))"
 mapping = Dict(old => new for (new, old) in enumerate(selected_scenarios))
 profiles_df[!, :scenario] = [mapping[s] for s in profiles_df.scenario]
 CSV.write(joinpath(input_data_path, "profiles-wide.csv"), profiles_df; writeheader=true)
+
+model_parameters_df = DataFrame(
+    risk_aversion_weight_lambda=[lambda],
+    risk_aversion_confidence_level_alpha=[alpha],
+)
+for data_path in (input_data_path, input_data_path_CC)
+    mkpath(data_path)
+    CSV.write(joinpath(data_path, "model-parameters.csv"), model_parameters_df; writeheader=true)
+end
 
 df_stochastic_scenario = DataFrame(;
     scenario=sort(unique(profiles_df.scenario)),
@@ -93,7 +124,7 @@ case_studies_info = CSV.read(
 enable_names = true
 direct_model = false
 results_df = DataFrame(;
-    base_name=String[],
+    case_name=String[],
     rp=Int[],
     solver=Symbol[],
     time_to_cluster=Float64[],
@@ -125,7 +156,7 @@ results_df = DataFrame(;
     water_borrowed_baseline=Float64[],
     value_at_risk_threshold_mu_baseline=Float64[],
     scenario_set=String[],
-    seed=Int[],
+    draw=Int[],
     number_of_scenarios=Int[],
 )
 
@@ -136,8 +167,8 @@ function main()
     profiles_wide = TIO.get_table(connection_benchmark, "profiles_wide")
     n_scenarios = length(unique(profiles_wide.scenario))
 
-    @info "Running the base case study (0_HourlyBenchmark)"
-    base_name = "0_HourlyBenchmark"
+    @info "Running the base case study (0_HourlyBaseline)"
+    base_name = "0_HourlyBaseline"
 
     # set up the connection and read the data
     connection_baseline = DuckDB.DBInterface.connect(DuckDB.DB)
@@ -178,7 +209,7 @@ function main()
     for solver in solvers
         optimizer, parameters = get_solver_parameters(solver)
 
-        @info "Creating the model for the base case study (0_HourlyBenchmark) with $solver"
+        @info "Creating the model for the base case study $base_name with $solver"
         time_to_create = @elapsed TEM.create_model!(
             energy_problem_baseline;
             optimizer=optimizer,
@@ -188,7 +219,7 @@ function main()
             direct_model=direct_model,
         )
 
-        baseline_output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", base_name, "N$(number_of_scenarios)_seed$(seed)", string(solver))
+        baseline_output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", base_name, "N$(number_of_scenarios)_draw$(draw)", string(solver))
         mkpath(baseline_output_folder)
 
         if !(isfile(joinpath(baseline_output_folder, "var_assets_investment.csv")) &&
@@ -197,7 +228,7 @@ function main()
              isfile(joinpath(baseline_output_folder, "var_value_at_risk_threshold_mu.csv",)) &&
              isfile(joinpath(baseline_output_folder, "total_operational_cost_per_scenario.csv",)))
 
-            @info "Solving the model and saving the solution for the base case study (0_HourlyBenchmark) with $solver"
+            @info "Solving the model and saving the solution for the base case study $base_name with $solver"
             time_to_solve = @elapsed TEM.solve_model!(energy_problem_baseline)
             #        mu_value =
             #            JuMP.value(energy_problem_baseline.variables[:value_at_risk_threshold_mu].container)
@@ -258,7 +289,7 @@ function main()
         baseline_objective_by_solver[solver] = baseline_objective
 
         new_results_row = (
-            base_name=base_name,
+            case_name=base_name,
             rp=1,
             solver=solver,
             time_to_cluster=0.0,
@@ -293,7 +324,7 @@ function main()
             water_borrowed_baseline=amount_water_borrowed_b,
             value_at_risk_threshold_mu_baseline=mu_value,
             scenario_set="full",
-            seed=seed,
+            draw=draw,
             number_of_scenarios=number_of_scenarios,
         )
         push!(results_df, new_results_row)
@@ -320,15 +351,15 @@ function main()
         end
 
         for rp in representative_periods
-            case_name = base_name * "_rp_" * "$rp"
+            case_name = base_name * "_rp_" * "$rp" * "_benchmark"
 
             @info "Processing case study: $case_name"
 
-            connection_full = DuckDB.DBInterface.connect(DuckDB.DB)
-            TIO.read_csv_folder(connection_full, input_data_path)
+            connection_benchmark = DuckDB.DBInterface.connect(DuckDB.DB)
+            TIO.read_csv_folder(connection_benchmark, input_data_path)
 
             DuckDB.query(
-                connection_full,
+                connection_benchmark,
                 "
                 UPDATE model_parameters -- tables are with underscore in DuckDB world
                 SET
@@ -339,7 +370,7 @@ function main()
             # to use the ratio availability/demand
             if use_ratio == true # be careful: this works now that we have only one demand location, so we divide each availability and inflow by that only demand
                 DuckDB.query(
-                    connection_full,
+                    connection_benchmark,
                     "
                     UPDATE profiles_wide
                     SET
@@ -353,7 +384,7 @@ function main()
 
             # transform the profiles data from wide to long
             TC.transform_wide_to_long!(
-                connection_full,
+                connection_benchmark,
                 "profiles_wide",
                 "profiles";
                 exclude_columns=["scenario", "milestone_year", "timestep"],
@@ -365,7 +396,7 @@ function main()
                     cols_to_groupby=[:milestone_year, :scenario],
                 )
                 time_to_cluster = @elapsed TC.cluster!(
-                    connection_full,
+                    connection_benchmark,
                     period_duration,
                     rp; #round(Int, rp / n_scenarios);
                     method=method,
@@ -383,7 +414,7 @@ function main()
                     cols_to_crossby=[:scenario],
                 )
                 time_to_cluster = @elapsed TC.cluster!(
-                    connection_full,
+                    connection_benchmark,
                     period_duration,
                     rp;
                     method=method,
@@ -398,7 +429,7 @@ function main()
             end
             if use_ratio == true
                 DuckDB.query(
-                    connection_full,
+                    connection_benchmark,
                     "UPDATE profiles AS x
                         SET value =
                             CASE
@@ -413,50 +444,56 @@ function main()
                             ",
                 )
             end
-            TEM.populate_with_defaults!(connection_full)
+            TEM.populate_with_defaults!(connection_benchmark)
 
-            time_to_read = @elapsed energy_problem_full = TEM.EnergyProblem(connection_full)
+            time_to_read = @elapsed energy_problem_benchmark = TEM.EnergyProblem(connection_benchmark)
 
             for solver in solvers
                 optimizer, parameters = get_solver_parameters(solver)
 
                 @info "Creating the model for the case study: $case_name"
                 time_to_create = @elapsed TEM.create_model!(
-                    energy_problem_full;
+                    energy_problem_benchmark;
                     optimizer=optimizer,
                     optimizer_parameters=parameters,
                     model_file_name="",
                     enable_names=enable_names,
                 )
 
-                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
+                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)", case_name, string(solver))
                 mkpath(output_folder)
 
                 @info "Solving the model and saving the solution for the case study: $case_name with $solver"
-                time_to_solve = @elapsed TEM.solve_model!(energy_problem_full)
-                time_to_save = @elapsed TEM.save_solution!(energy_problem_full)
-                TEM.export_solution_to_csv_files(output_folder, energy_problem_full)
+                time_to_solve = @elapsed TEM.solve_model!(energy_problem_benchmark)
+                time_to_save = @elapsed TEM.save_solution!(energy_problem_benchmark)
+                TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
 
                 output_file = joinpath(output_folder, "rep_periods_mapping.csv")
-                DuckDB.execute(connection_full, "COPY rep_periods_mapping TO '$output_file' (HEADER, DELIMITER ',')")
+                DuckDB.execute(connection_benchmark, "COPY rep_periods_mapping TO '$output_file' (HEADER, DELIMITER ',')")
 
-                benchmark_investment_df = TIO.get_table(connection_full, "var_assets_investment")
+                benchmark_investment_df = TIO.get_table(connection_benchmark, "var_assets_investment")
 
-                mu_value_df = TIO.get_table(connection_full, "var_value_at_risk_threshold_mu")
-                mu_value = if nrow(mu_value_df) == 0
+                mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
+                mu_value_benchmark = if nrow(mu_value_df) == 0
                     NaN
                 else
                     only(mu_value_df.solution)
                 end
-                if !isnan(mu_value)
+                if !isnan(mu_value_benchmark)
                     @info "mu_value of Benchmark (24 periods per scenario on full scenario set) is defined"
-                    @show mu_value
+                    @show mu_value_benchmark
                 end
 
-                df_cost_per_scenario = export_total_operational_cost_per_scenario(energy_problem_full, output_folder)
-                plot_cost_per_scenario(df_cost_per_scenario, output_folder, mu_value_df)
 
-                var_flow_df = TIO.get_table(connection_full, "var_flow")
+                benchmark_cost_df = export_total_operational_cost_per_scenario(energy_problem_benchmark, output_folder)
+                plot_cost_per_scenario(benchmark_cost_df, output_folder, mu_value_df)
+
+                sorted_cost_df = sort(benchmark_cost_df, :total_cost)
+
+                var_index = ceil(Int, alpha * number_of_scenarios)
+                var_empirical = sorted_cost_df.total_cost[var_index]
+
+                var_flow_df = TIO.get_table(connection_benchmark, "var_flow")
                 flow_ens = filter(row -> row.from_asset == "ens" && row.to_asset == "e_demand", var_flow_df)
                 flow_smr_ccs =
                     filter(row -> row.from_asset == "smr_ccs" && row.to_asset == "h2_demand", var_flow_df)
@@ -485,22 +522,22 @@ function main()
                 baseline_objective = baseline_objective_by_solver[solver]
 
                 new_results_row = (
-                    base_name=base_name,
+                    case_name=case_name,
                     rp=rp,
                     solver=solver,
-                    time_to_cluster=0.0,
+                    time_to_cluster=time_to_cluster,
                     time_to_read=time_to_read,
                     time_to_create=time_to_create,
                     time_to_solve=time_to_solve,
                     time_to_save=time_to_save,
-                    objective_value=energy_problem_full.objective_value,
-                    termination_status=string(energy_problem_full.termination_status),
+                    objective_value=energy_problem_benchmark.objective_value,
+                    termination_status=string(energy_problem_benchmark.termination_status),
                     value_at_risk_threshold_mu_red=0.0,
                     num_constraints=JuMP.num_constraints(
-                        energy_problem_full.model;
+                        energy_problem_benchmark.model;
                         count_variable_in_set_constraints=false,
                     ),
-                    num_variables=JuMP.num_variables(energy_problem_full.model),
+                    num_variables=JuMP.num_variables(energy_problem_benchmark.model),
                     time_to_resolve_benchmark=0.0,
                     objective_value_resolve_benchmark=0.0,
                     termination_status_resolve_benchmark="",
@@ -509,7 +546,7 @@ function main()
                     num_loss_of_load_h2_demand_benchmark=bm_n_lol_smr_ccs,
                     lole_h2_demand_benchmark=lole_h2_demand,
                     water_borrowed_benchmark=amount_water_borrowed_b,
-                    value_at_risk_threshold_mu_benchmark=mu_value,
+                    value_at_risk_threshold_mu_benchmark=mu_value_benchmark,
                     time_to_resolve_baseline=0.0,
                     objective_value_resolve_baseline=0.0,
                     termination_status_resolve_baseline="",
@@ -520,42 +557,49 @@ function main()
                     water_borrowed_baseline=0.0,
                     value_at_risk_threshold_mu_baseline=0.0,
                     scenario_set="full",
-                    seed=seed,
+                    draw=draw,
                     number_of_scenarios=number_of_scenarios,
                 )
                 push!(results_df, new_results_row)
 
-                @info "Contribution C (CC): Scenario selection"
+                @info "Starting Scenario selection"
 
                 #insert scenario selection and create and solve energy_problem_red
-                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, "scenario selection for CC")
+                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)", case_name, "scenario_selection", string(solver))
                 mkpath(output_folder)
 
                 CSV.write(
                     joinpath(output_folder, "total_operational_cost_per_scenario.csv"),
-                    df_cost_per_scenario;
+                    benchmark_cost_df;
                     writeheader=true,
                 )
 
                 tol = 1e-5
 
-                df_tail_scenarios = copy(df_cost_per_scenario)
+                df_tail_scenarios = copy(benchmark_cost_df)
 
                 df_tail_scenarios[!, :solution] =
-                    max.(0.0, df_tail_scenarios.total_cost .- mu_value)
+                    max.(0.0, df_tail_scenarios.total_cost .- var_empirical)
 
                 df_tail_scenarios = filter(
-                    row -> row.total_cost > mu_value - tol,
+                    row -> row.total_cost > var_empirical + tol,
                     df_tail_scenarios,
                 )
 
+                df_mu_scenario = filter(
+                    row -> abs(row.total_cost - var_empirical) <= tol,
+                    benchmark_cost_df,
+                )
+
                 df_tail_scenarios = df_tail_scenarios[:, [:id, :scenario, :probability, :total_cost]]
+                df_mu_scenario = df_mu_scenario[:, [:id, :scenario, :probability, :total_cost]]
 
                 plot_cost_per_scenario_inc_tail(
-                    df_cost_per_scenario,
+                    benchmark_cost_df,
                     df_tail_scenarios,
                     output_folder,
-                    mu_value_df,
+                    df_mu_scenario,
+                    var_empirical,
                     case_name,
                 )
 
@@ -566,70 +610,79 @@ function main()
                 )
 
                 profiles_df = CSV.read(
-                    joinpath(@__DIR__, "NL-input-data", "RIDM-case-study", "profiles-wide.csv"),
+                    joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-input-data", "NL-case-study", "profiles-wide.csv"),
                     DataFrame,
                 )
 
-                tail_scenarios_ids = df_tail_scenarios[!, 2]
+                tail_scenarios_ids = unique(df_tail_scenarios.scenario)
+                mu_scenario_id = unique(df_mu_scenario.scenario)
 
-                df_sorted = sort(df_cost_per_scenario, :total_cost)
-                middle_idx = ceil(Int, nrow(df_sorted) / 2)
-                average_case_row = df_sorted[middle_idx, :]
+                explicit_ids = unique(vcat(
+                    tail_scenarios_ids,
+                    mu_scenario_id,
+                ))
 
-                if average_case_row.scenario in tail_scenarios_ids
-                    df_non_tail = filter(
-                        row -> !(row.scenario in tail_scenarios_ids),
-                        df_cost_per_scenario,
-                    )
+                expected_cost = sum(benchmark_cost_df.probability .* benchmark_cost_df.total_cost)
+                expected_idx = argmin(abs.(benchmark_cost_df.total_cost .- expected_cost))
+                average_case_row = benchmark_cost_df[expected_idx, :]
 
-                    df_sorted_non_tail = sort(df_non_tail, :total_cost)
-                    middle_idx_non_tail = ceil(Int, nrow(df_sorted_non_tail) / 2)
-                    average_case_row = df_sorted_non_tail[middle_idx_non_tail, :]
-                end
-
-                df_representative_non_tail_scenario = DataFrame(
+                df_expected_cost_scenario = DataFrame(
                     scenario=[average_case_row.scenario],
                     total_cost=[average_case_row.total_cost],
                 )
-                CSV.write(joinpath(@__DIR__, output_folder, "average_case_scenario.csv"), df_representative_non_tail_scenario; writeheader=true)
+                CSV.write(joinpath(@__DIR__, output_folder, "expected_cost_scenario.csv"), df_expected_cost_scenario; writeheader=true)
 
                 plot_cost_per_scenario_inc_tail_inc_representative(
-                    df_cost_per_scenario,
+                    benchmark_cost_df,
                     df_tail_scenarios,
-                    df_representative_non_tail_scenario,
+                    df_expected_cost_scenario,
                     output_folder,
-                    mu_value_df,
+                    df_mu_scenario,
+                    var_empirical,
                     "$case_name",
                 )
 
-                representative_non_tail_scenario =
-                    df_representative_non_tail_scenario.scenario
-
-                selected_scenarios_ids = vcat(
-                    tail_scenarios_ids,
-                    representative_non_tail_scenario,
-                )
-
-                profiles_df_CC = filter(
-                    row -> row.scenario in selected_scenarios_ids,
-                    profiles_df,
-                )
-
-                CSV.write(
-                    joinpath(input_data_path_CC, "profiles-wide.csv"),
-                    profiles_df_CC;
-                    writeheader=true,
-                )
-
                 n_tail = length(tail_scenarios_ids)
-                tail_probability = (1.0 - alpha) / n_tail
+                # tail_probability = (1.0 - alpha) / n_tail
+                tail_probability = 1 / number_of_scenarios
+
+                mu_probability = 1 / number_of_scenarios
+
+                expected_cost_scenario = only(df_expected_cost_scenario.scenario)
+
+                if expected_cost_scenario in explicit_ids
+                    selected_scenarios_ids = copy(explicit_ids)
+                    probabilities = [
+                        scenario == expected_cost_scenario ?
+                        1.0 - (length(explicit_ids) - 1) / number_of_scenarios :
+                        1.0 / number_of_scenarios
+                        for scenario in selected_scenarios_ids
+                    ]
+                else
+                    selected_scenarios_ids = vcat(
+                        explicit_ids,
+                        expected_cost_scenario,
+                    )
+                    probabilities = vcat(
+                        fill(1 / number_of_scenarios, length(explicit_ids),),
+                        1 - length(explicit_ids) / number_of_scenarios,
+                    )
+                end
+
+                @assert isapprox(sum(probabilities), 1.0; atol=1e-10)
 
                 df_stochastic_scenario_CC = DataFrame(
                     scenario=selected_scenarios_ids,
-                    probability=[
-                        fill(tail_probability, n_tail);
-                        alpha
-                    ],
+                    probability=probabilities,
+                )
+
+                stochpath = joinpath(input_data_path_CC, "N$(number_of_scenarios)_draw$(draw)", case_name)
+                mkpath(stochpath)
+
+                CSV.write(
+                    joinpath(stochpath, "stochastic-scenario.csv"),
+                    df_stochastic_scenario_CC;
+                    writeheader=true,
                 )
 
                 CSV.write(
@@ -638,13 +691,29 @@ function main()
                     writeheader=true,
                 )
 
-                case_name = base_name * "_rp_" * "$rp" * "CC"
+                profiles_df_CC = filter(
+                    row -> row.scenario in selected_scenarios_ids,
+                    profiles_df,
+                )
+
+                CSV.write(
+                    joinpath(stochpath, "profiles-wide.csv"),
+                    profiles_df_CC;
+                    writeheader=true,
+                )
+
+                CSV.write(
+                    joinpath(input_data_path_CC, "profiles-wide.csv"),
+                    profiles_df_CC;
+                    writeheader=true,
+                )
+
+                case_name = base_name * "_0_HourlyBaseline_reduced_scenario_set"
 
                 @info "Processing case study: $case_name"
 
                 connection = DuckDB.DBInterface.connect(DuckDB.DB)
                 TIO.read_csv_folder(connection, input_data_path_CC)
-
                 DuckDB.query(
                     connection,
                     "
@@ -677,97 +746,15 @@ function main()
                     exclude_columns=["scenario", "milestone_year", "timestep"],
                 )
 
-                if stochastic_method == :per_scenario
-                    layout = TC.ProfilesTableLayout(;
-                        year=:milestone_year,
-                        cols_to_groupby=[:milestone_year, :scenario],
-                    )
-                    time_to_cluster = @elapsed TC.cluster!(
-                        connection,
-                        period_duration,
-                        rp; #round(Int, rp / n_scenarios);
-                        method=method,
-                        distance=distance,
-                        weight_type=weight_type,
-                        layout=layout,
-                        clustering_kwargs,
-                        weight_fitting_kwargs,
-                    )
-                    if use_ratio == true
-                        DuckDB.query(
-                            connection,
-                            "UPDATE profiles_rep_periods AS x
-                                SET value =
-                                    CASE
-                                        WHEN x.profile_name = 'demand' THEN x.value
-                                        ELSE x.value * d.value
-                                    END
-                                FROM profiles_rep_periods AS d
-                                WHERE d.timestep   = x.timestep
-                                AND d.rep_period       = x.rep_period
-                                AND d.milestone_year       = x.milestone_year
-                                AND d.scenario   = x.scenario
-                                AND d.profile_name = 'demand';
-                                    ",
-                        )
-                    end
+                layout = TC.ProfilesTableLayout(;
+                    year=:milestone_year,
+                    cols_to_groupby=[:milestone_year, :scenario],
+                )
 
-                elseif stochastic_method == :cross_scenario
-                    layout = TC.ProfilesTableLayout(;
-                        year=:milestone_year,
-                        cols_to_groupby=[:milestone_year],
-                        cols_to_crossby=[:scenario],
-                    )
-                    time_to_cluster = @elapsed TC.cluster!(
-                        connection,
-                        period_duration,
-                        rp;
-                        method=method,
-                        distance=distance,
-                        weight_type=weight_type,
-                        layout=layout,
-                        clustering_kwargs,
-                        weight_fitting_kwargs,
-                    )
-                    if use_ratio == true
-                        DuckDB.query(
-                            connection,
-                            "UPDATE profiles_rep_periods AS x
-                                SET value =
-                                    CASE
-                                        WHEN x.profile_name = 'demand' THEN x.value
-                                        ELSE x.value * d.value
-                                    END
-                                FROM profiles_rep_periods AS d
-                                WHERE d.timestep   = x.timestep
-                                AND d.rep_period       = x.rep_period
-                                AND d.milestone_year       = x.milestone_year
-                                AND d.profile_name = 'demand';
-                                    ",
-                        )
-                    end
-                else
-                    error("Unknown stochastic method: $stochastic_method")
-                end
-                if use_ratio == true
-                    DuckDB.query(
-                        connection,
-                        "UPDATE profiles AS x
-                            SET value =
-                                CASE
-                                    WHEN x.profile_name = 'demand' THEN x.value
-                                    ELSE x.value * d.value
-                                END
-                            FROM profiles AS d
-                            WHERE d.timestep   = x.timestep
-                            AND d.milestone_year       = x.milestone_year
-                            AND d.scenario   = x.scenario
-                            AND d.profile_name = 'demand';
-                                ",
-                    )
-                end
+                time_to_cluster = @elapsed TC.dummy_cluster!(connection; layout=layout)
+
                 TEM.populate_with_defaults!(connection)
-
+                DuckDB.query(connection, "UPDATE asset SET is_seasonal = false")
                 time_to_read = @elapsed energy_problem_red = TEM.EnergyProblem(connection)
 
                 @info "Creating the model for the case study: $case_name"
@@ -777,9 +764,10 @@ function main()
                     optimizer_parameters=parameters,
                     model_file_name="",
                     enable_names=enable_names,
+                    direct_model=direct_model,
                 )
 
-                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", case_name, string(solver))
+                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)", case_name, string(solver))
                 mkpath(output_folder)
 
                 @info "Solving the model and saving the solution for the case study: $case_name with $solver"
@@ -795,7 +783,8 @@ function main()
                 investment_output_folder_benchmark = joinpath(
                     @__DIR__,
                     "outputs",
-                    "N$(number_of_scenarios)_seed$(seed)",
+                    "N$(number_of_scenarios)_draw$(draw)",
+                    case_name,
                     "investment_analysis",
                     "benchmark",
                 )
@@ -827,15 +816,27 @@ function main()
                     error("Borrowed water has been used: $amount_water_borrowed_err")
                 end
 
+                time_to_resolve_benchmark = 0.0
+                objective_value_resolve_benchmark = 0.0
+                termination_status_resolve_benchmark = ""
+                n_lol_ens_resolve_benchmark = 0
+                lole_e_demand_resolve_benchmark = 0.0
+                n_lol_smr_ccs_resolve_benchmark = 0
+                lole_h2_demand_resolve_benchmark = 0.0
+                amount_water_borrowed_resolve_benchmark = 0.0
+                mu_value_resolve_benchmark = 0.0
+
+                outlier_found = false
+
                 if fix_benchmark
-                    @info "Fixing variables in the benchmark case study: RP on full set with $solver"
+                    @info "Fixing investment from reduced scenario set in the benchmark case study: $rp RP on full set with $solver"
                     fix_variables_from_solution!(
-                        energy_problem_full,
+                        energy_problem_benchmark,
                         energy_problem_red,
                         :assets_investment,
                     )
                     fix_variables_from_solution!(
-                        energy_problem_full,
+                        energy_problem_benchmark,
                         energy_problem_red,
                         :assets_investment_energy,
                     )
@@ -846,14 +847,14 @@ function main()
                         scenarios = unique(df_profiles.scenario)
                         scenario_to_rep_period_map = Dict(i => val for (i, val) in enumerate(scenarios))
                         fix_storage_levels!(
-                            energy_problem_full,
+                            energy_problem_benchmark,
                             energy_problem_red,
                             scenario_to_rep_period_map,
                             period_duration,
                             "hydro_reservoir",
                         )
                         fix_storage_levels!(
-                            energy_problem_full,
+                            energy_problem_benchmark,
                             energy_problem_red,
                             scenario_to_rep_period_map,
                             period_duration,
@@ -862,16 +863,18 @@ function main()
                     end
 
                     @info "Resolving the benchmark case study: RP on full set with $solver"
-                    time_to_resolve_full = @elapsed TEM.solve_model!(energy_problem_full)
+                    time_to_resolve_benchmark = @elapsed TEM.solve_model!(energy_problem_benchmark)
+                    termination_status_resolve_benchmark = string(energy_problem_benchmark.termination_status)
+                    objective_value_resolve_benchmark = energy_problem_benchmark.objective_value
 
-                    if energy_problem_full.termination_status == JuMP.INFEASIBLE
-                        JuMP.compute_conflict!(energy_problem_full.model)
-                        iis_model, reference_map = JuMP.copy_conflict(energy_problem_full.model)
+                    if energy_problem_benchmark.termination_status == JuMP.INFEASIBLE
+                        JuMP.compute_conflict!(energy_problem_benchmark.model)
+                        iis_model, reference_map = JuMP.copy_conflict(energy_problem_benchmark.model)
                         print(iis_model)
                     end
 
-                    TEM.save_solution!(energy_problem_full)
-                    var_flow_df = TIO.get_table(connection_full, "var_flow")
+                    TEM.save_solution!(energy_problem_benchmark)
+                    var_flow_df = TIO.get_table(connection_benchmark, "var_flow")
                     flow_ens = filter(
                         row -> row.from_asset == "ens" && row.to_asset == "e_demand",
                         var_flow_df,
@@ -886,12 +889,23 @@ function main()
                         var_flow_df,
                     )
 
-                    # count steps with loss of load
-                    n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
-                    lole_e_demand = n_lol_ens / number_of_scenarios
-                    n_lol_smr_ccs = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
-                    lole_h2_demand = n_lol_smr_ccs / number_of_scenarios
+                    n_lol_ens_resolve_benchmark = count(row -> row.solution > 0.0, eachrow(flow_ens))
+                    lole_e_demand_resolve_benchmark = n_lol_ens_resolve_benchmark / number_of_scenarios
+                    n_lol_smr_ccs_resolve_benchmark = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
+                    lole_h2_demand_resolve_benchmark = n_lol_smr_ccs_resolve_benchmark / number_of_scenarios
+                    amount_water_borrowed_resolve_benchmark = sum(water_borrowed.solution)
 
+                    mu_value_df = TIO.get_table(connection_benchmark, "var_value_at_risk_threshold_mu")
+                    mu_value_resolve_benchmark = if nrow(mu_value_df) == 0
+                        NaN
+                    else
+                        only(mu_value_df.solution)
+                    end
+
+                    if !isnan(mu_value_resolve_benchmark)
+                        @info "mu_value of Resolve Benchmark (24 periods per scenario on full scenario set) is defined"
+                        @show mu_value_resolve_benchmark
+                    end
 
                     plot_normalized_asset_investment_differences(
                         benchmark_investment_df,
@@ -900,120 +914,358 @@ function main()
                         case_name=case_name,
                         benchmark_num_loss_of_load_e_demand=bm_n_lol_ens,
                         benchmark_num_loss_of_load_h2_demand=bm_n_lol_smr_ccs,
-                        approximation_num_loss_of_load_e_demand=n_lol_ens,
-                        approximation_num_loss_of_load_h2_demand=n_lol_smr_ccs,
+                        approximation_num_loss_of_load_e_demand=
+                        n_lol_ens_resolve_benchmark,
+                        approximation_num_loss_of_load_h2_demand=
+                        n_lol_smr_ccs_resolve_benchmark,
                     )
-                    # count how much water_borrowed
-                    amount_water_borrowed_b = sum(water_borrowed.solution)
 
-                    # get mu solution
-                    mu_value_df = TIO.get_table(connection_full, "var_value_at_risk_threshold_mu")
-                    mu_value_full = if nrow(mu_value_df) == 0
-                        NaN
-                    else
-                        only(mu_value_df.solution)
-                    end
-
-                    if !isnan(mu_value_full)
-                        @info "mu_value of Resolve Benchmark (24 periods per scenario on full scenario set) is defined"
-                        @show mu_value_full
-                    end
-
-                    output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", "fixed", case_name, string(solver))
+                    output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)", case_name, "fixed_in_benchmark", string(solver))
                     mkpath(output_folder)
-                    TEM.export_solution_to_csv_files(output_folder, energy_problem_full)
+                    TEM.export_solution_to_csv_files(output_folder, energy_problem_benchmark)
 
                     output_file = joinpath(output_folder, "rep_periods_mapping.csv")
-                    DuckDB.execute(connection_full, "COPY rep_periods_mapping TO '$output_file' (HEADER, DELIMITER ',')")
+                    DuckDB.execute(connection_benchmark, "COPY rep_periods_mapping TO '$output_file' (HEADER, DELIMITER ',')")
 
+                    resolve_cost_df = export_total_operational_cost_per_scenario(energy_problem_benchmark, output_folder)
+                    plot_cost_per_scenario(resolve_cost_df, output_folder, mu_value_df)
 
-                    df_cost_per_scenario = export_total_operational_cost_per_scenario(energy_problem_full, output_folder)
-                    plot_cost_per_scenario(df_cost_per_scenario, output_folder, mu_value_df)
-
-                    new_results_row = (
-                        base_name=case_name,
-                        rp=rp,
-                        solver=solver,
-                        time_to_cluster=time_to_cluster,
-                        time_to_read=time_to_read,
-                        time_to_create=time_to_create,
-                        time_to_solve=time_to_solve,
-                        time_to_save=time_to_save,
-                        objective_value=energy_problem_red.objective_value,
-                        termination_status=string(energy_problem_red.termination_status),
-                        value_at_risk_threshold_mu_red=mu_value_red,
-                        num_constraints=JuMP.num_constraints(
-                            energy_problem_red.model;
-                            count_variable_in_set_constraints=false,
-                        ),
-                        num_variables=JuMP.num_variables(energy_problem_red.model),
-                        time_to_resolve_benchmark=time_to_resolve_full,
-                        objective_value_resolve_benchmark=energy_problem_full.objective_value,
-                        termination_status_resolve_benchmark=string(energy_problem_full.termination_status,),
-                        num_loss_of_load_e_demand_benchmark=n_lol_ens,
-                        lole_e_demand_benchmark=lole_e_demand,
-                        num_loss_of_load_h2_demand_benchmark=n_lol_smr_ccs,
-                        lole_h2_demand_benchmark=lole_h2_demand,
-                        water_borrowed_benchmark=amount_water_borrowed_b,
-                        value_at_risk_threshold_mu_benchmark=mu_value_full,
-                        time_to_resolve_baseline=0.0,
-                        objective_value_resolve_baseline=0.0,
-                        termination_status_resolve_baseline="",
-                        num_loss_of_load_e_demand_baseline=0,
-                        lole_e_demand_baseline=0.0,
-                        num_loss_of_load_h2_demand_baseline=0,
-                        lole_h2_demand_baseline=0.0,
-                        water_borrowed_baseline=0.0,
-                        value_at_risk_threshold_mu_baseline=0.0,
-                        scenario_set="reduced",
-                        seed=seed,
-                        number_of_scenarios=number_of_scenarios,
+                    comparison = innerjoin(
+                        benchmark_cost_df,
+                        resolve_cost_df;
+                        on=:scenario,
+                        renamecols="_benchmark" => "_resolve",
                     )
-                    # else
-                    #     new_results_row =
-                    #         new_results_row = (
-                    #             base_name=case_name,
-                    #             rp=rp,
-                    #             solver=solver,
-                    #             time_to_cluster=time_to_cluster,
-                    #             time_to_read=time_to_read,
-                    #             time_to_create=time_to_create,
-                    #             time_to_solve=time_to_solve,
-                    #             time_to_save=time_to_save,
-                    #             objective_value=energy_problem_red.objective_value,
-                    #             termination_status=string(energy_problem_red.termination_status),
-                    #             value_at_risk_threshold_mu_red=mu_value_red,
-                    #             num_constraints=JuMP.num_constraints(
-                    #                 energy_problem_red.model;
-                    #                 count_variable_in_set_constraints=false,
-                    #             ),
-                    #             num_variables=JuMP.num_variables(energy_problem_red.model),
-                    #             time_to_resolve_benchmark=0.0,
-                    #             objective_value_resolve_benchmark=0.0,
-                    #             termination_status_resolve_benchmark="",
-                    #             num_loss_of_load_e_demand=0.0,
-                    #             lole_e_demand=lole_e_demand,
-                    #             num_loss_of_load_h2_demand=n_lol_smr_ccs,
-                    #             lole_h2_demand=lole_h2_demand,
-                    #             water_borrowed=amount_water_borrowed_b,
-                    #             value_at_risk_threshold_mu_full=mu_value_full,
-                    #             time_to_resolve_baseline=0.0,
-                    #             objective_value_resolve_baseline=0.0,
-                    #             termination_status_resolve_baseline="",
-                    #             num_loss_of_load_e_demand_baseline=0.0,
-                    #             lole_e_demand_baseline=0.0,
-                    #             num_loss_of_load_h2_demand_baseline=0.0,
-                    #             lole_h2_demand_baseline=0.0,
-                    #             water_borrowed_baseline=0.0,
-                    #             value_at_risk_threshold_mu_baseline=0.0,
-                    #             scenario_set="reduced",
-                    #             seed=seed,
-                    #             number_of_scenarios=number_of_scenarios,)
-                    push!(results_df, new_results_row)
+                    @info "showing comparison"
+                    @show comparison
+                    outlier_df = filter(
+                        row -> row.total_cost_resolve > 2.0 * row.total_cost_benchmark,
+                        comparison,
+                    )
+
+                    outlier_ids = unique(outlier_df.scenario)
+
+                    if !isempty(outlier_df)
+
+                        new_results_row = (
+                            case_name=case_name,
+                            rp=rp,
+                            solver=solver,
+                            time_to_cluster=time_to_cluster,
+                            time_to_read=time_to_read,
+                            time_to_create=time_to_create,
+                            time_to_solve=time_to_solve,
+                            time_to_save=time_to_save,
+                            objective_value=energy_problem_red.objective_value,
+                            termination_status=string(energy_problem_red.termination_status),
+                            value_at_risk_threshold_mu_red=mu_value_red,
+                            num_constraints=JuMP.num_constraints(
+                                energy_problem_red.model;
+                                count_variable_in_set_constraints=false,
+                            ),
+                            num_variables=JuMP.num_variables(energy_problem_red.model),
+                            time_to_resolve_benchmark=time_to_resolve_benchmark,
+                            objective_value_resolve_benchmark=objective_value_resolve_benchmark,
+                            termination_status_resolve_benchmark=termination_status_resolve_benchmark,
+                            num_loss_of_load_e_demand_benchmark=n_lol_ens_resolve_benchmark,
+                            lole_e_demand_benchmark=lole_e_demand_resolve_benchmark,
+                            num_loss_of_load_h2_demand_benchmark=n_lol_smr_ccs_resolve_benchmark,
+                            lole_h2_demand_benchmark=lole_h2_demand_resolve_benchmark,
+                            water_borrowed_benchmark=amount_water_borrowed_resolve_benchmark,
+                            value_at_risk_threshold_mu_benchmark=mu_value_resolve_benchmark,
+                            time_to_resolve_baseline=0.0,
+                            objective_value_resolve_baseline=0.0,
+                            termination_status_resolve_baseline="",
+                            num_loss_of_load_e_demand_baseline=0,
+                            lole_e_demand_baseline=0.0,
+                            num_loss_of_load_h2_demand_baseline=0,
+                            lole_h2_demand_baseline=0.0,
+                            water_borrowed_baseline=0.0,
+                            value_at_risk_threshold_mu_baseline=0.0,
+                            scenario_set="reduced",
+                            draw=draw,
+                            number_of_scenarios=number_of_scenarios,
+                        )
+                        push!(results_df, new_results_row)
+
+                        case_name = base_name * "_rp_" * "$rp" * "_reduced_scenario_set_inc_outlier"
+                        outlier_found = true
+
+                        time_to_resolve_benchmark = 0.0
+                        objective_value_resolve_benchmark = 0.0
+                        termination_status_resolve_benchmark = ""
+                        n_lol_ens_resolve_benchmark = 0
+                        lole_e_demand_resolve_benchmark = 0.0
+                        n_lol_smr_ccs_resolve_benchmark = 0
+                        lole_h2_demand_resolve_benchmark = 0.0
+                        amount_water_borrowed_resolve_benchmark = 0.0
+                        mu_value_resolve_benchmark = 0.0
+
+                        output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)", case_name, "scenario_selection", string(solver))
+                        mkpath(output_folder)
+
+                        # extra =
+                        #     filter(
+                        #         row ->
+                        #             row.scenario in outlier_ids &&
+                        #                 !(row.scenario in df_tail_scenarios.scenario),
+                        #         benchmark_cost_df,
+                        #     )
+                        # extra = select(extra, names(df_tail_scenarios))
+                        # append!(df_tail_scenarios, extra)
+
+                        # CSV.write(
+                        #     joinpath(output_folder, "tail_scenarios.csv"),
+                        #     df_tail_scenarios;
+                        #     writeheader=true,
+                        # )
+
+                        profiles_df = CSV.read(
+                            joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-input-data", "NL-case-study", "profiles-wide.csv"),
+                            DataFrame,
+                        )
+
+                        tail_scenarios_ids = unique(df_tail_scenarios.scenario)
+
+                        expected_cost = sum(benchmark_cost_df.probability .* benchmark_cost_df.total_cost)
+                        expected_idx = argmin(abs.(benchmark_cost_df.total_cost .- expected_cost))
+                        average_case_row = benchmark_cost_df[expected_idx, :]
+
+                        df_expected_cost_scenario = DataFrame(
+                            scenario=[average_case_row.scenario],
+                            total_cost=[average_case_row.total_cost],
+                        )
+                        expected_cost_scenario = only(df_expected_cost_scenario.scenario)
+                        CSV.write(joinpath(@__DIR__, output_folder, "expected_cost_scenario.csv"), df_expected_cost_scenario; writeheader=true)
+
+                        # plot_cost_per_scenario_inc_tail_inc_representative(
+                        #     benchmark_cost_df,
+                        #     df_tail_scenarios,
+                        #     df_expected_cost_scenario,
+                        #     output_folder,
+                        #     mu_value_benchmark,
+                        #     "$case_name",
+                        # )
+
+                        new_outlier_ids = [
+                            s for s in outlier_ids
+                            if !(s in tail_scenarios_ids) &&
+                            s != expected_cost_scenario &&
+                            !(s in mu_scenario_id)
+                        ]
+
+                        new_outlier_df = filter(
+                            row -> row.scenario in new_outlier_ids,
+                            outlier_df,
+                        )
+
+                        new_outlier_df = select(
+                            new_outlier_df,
+                            :scenario,
+                            :total_cost_benchmark => :total_cost,
+                        )
+
+                        n_new_outliers = length(new_outlier_ids)
+
+                        explicit_ids = unique(vcat(
+                            tail_scenarios_ids,
+                            mu_scenario_id,
+                            new_outlier_ids,
+                        ))
+
+                        plot_cost_per_scenario_inc_tail_inc_representative_inc_outliers(
+                            benchmark_cost_df,
+                            df_tail_scenarios,
+                            df_expected_cost_scenario,
+                            new_outlier_df,
+                            output_folder,
+                            df_mu_scenario,
+                            var_empirical,
+                            "$case_name",
+                        )
+
+                        n_tail = length(tail_scenarios_ids)
+                        #tail_probability = (1.0 - alpha) / n_tail
+                        tail_probability = 1 / number_of_scenarios
+
+                        expected_cost_scenario = only(df_expected_cost_scenario.scenario)
+
+                        if expected_cost_scenario in explicit_ids
+                            selected_scenarios_ids = vcat(explicit_ids)
+                            probabilities = [
+                                scenario == expected_cost_scenario ?
+                                1 - (length(explicit_ids) - 1) / number_of_scenarios :
+                                1 / number_of_scenarios for scenario in selected_scenarios_ids
+                            ]
+                            #append!(probabilities, fill(1.0 / number_of_scenarios, length(explicit_ids) - 1),)
+                        else
+                            selected_scenarios_ids = vcat(
+                                explicit_ids,
+                                expected_cost_scenario,
+                            )
+                            probabilities = vcat(
+                                fill(1 / number_of_scenarios, length(explicit_ids)),
+                                1 - length(explicit_ids) / number_of_scenarios,
+                            )
+                        end
+
+                        @assert isapprox(sum(probabilities), 1.0; atol=1e-10)
+
+                        df_stochastic_scenario_CC = DataFrame(
+                            scenario=selected_scenarios_ids,
+                            probability=probabilities,
+                        )
+
+                        profiles_df_CC = filter(
+                            row -> row.scenario in selected_scenarios_ids,
+                            profiles_df,
+                        )
+
+                        stochpath_twice = joinpath(input_data_path_CC, "N$(number_of_scenarios)_draw$(draw)", case_name, "twice")
+                        mkpath(stochpath_twice)
+
+                        CSV.write(
+                            joinpath(stochpath_twice, "profiles-wide.csv"),
+                            profiles_df_CC;
+                            writeheader=true,
+                        )
+
+                        CSV.write(
+                            joinpath(input_data_path_CC, "twice", "profiles-wide.csv"),
+                            profiles_df_CC;
+                            writeheader=true,
+                        )
+
+                        CSV.write(
+                            joinpath(stochpath_twice, "stochastic-scenario.csv"),
+                            df_stochastic_scenario_CC;
+                            writeheader=true,
+                        )
+
+                        CSV.write(
+                            joinpath(input_data_path_CC, "twice", "stochastic-scenario.csv"),
+                            df_stochastic_scenario_CC;
+                            writeheader=true,
+                        )
+
+                        mkpath(joinpath(output_folder, "input_profiles_inc_outlier"))
+                        CSV.write(
+                            joinpath(output_folder, "input_profiles_inc_outlier", "profiles-wide.csv"),
+                            profiles_df_CC;
+                            writeheader=true,
+                        )
+
+                        @info "Processing case study: $case_name"
+
+                        connection = DuckDB.DBInterface.connect(DuckDB.DB)
+                        TIO.read_csv_folder(connection, joinpath(input_data_path_CC, "twice"))
+
+                        DuckDB.query(
+                            connection,
+                            "
+                            UPDATE model_parameters -- tables are with underscore in DuckDB world
+                            SET
+                                risk_aversion_weight_lambda = $(lambda) ,
+                                risk_aversion_confidence_level_alpha = $(alpha);
+                            ",
+                        )
+                        # to use the ratio availability/demand
+                        if use_ratio == true # be careful: this works now that we have only one demand location, so we divide each availability and inflow by that only demand
+                            DuckDB.query(
+                                connection,
+                                "
+                                UPDATE profiles_wide
+                                SET
+                                    solar = solar / demand,
+                                    wind_offshore = wind_offshore / demand,
+                                    wind_onshore = wind_onshore / demand,
+                                    hydro_inflow = hydro_inflow / demand;
+                                ",
+                            )
+                        end
+
+                        # transform the profiles data from wide to long
+                        TC.transform_wide_to_long!(
+                            connection,
+                            "profiles_wide",
+                            "profiles";
+                            exclude_columns=["scenario", "milestone_year", "timestep"],
+                        )
+
+                        layout = TC.ProfilesTableLayout(;
+                            year=:milestone_year,
+                            cols_to_groupby=[:milestone_year, :scenario],
+                        )
+                        time_to_cluster = @elapsed TC.dummy_cluster!(connection; layout=layout)
+
+                        TEM.populate_with_defaults!(connection)
+                        DuckDB.query(connection, "UPDATE asset SET is_seasonal = false")
+                        time_to_read = @elapsed energy_problem_red = TEM.EnergyProblem(connection)
+
+                        @info "Creating the model for the case study: $case_name"
+                        time_to_create = @elapsed TEM.create_model!(
+                            energy_problem_red;
+                            optimizer=optimizer,
+                            optimizer_parameters=parameters,
+                            model_file_name="",
+                            enable_names=enable_names,
+                        )
+
+                        output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)", case_name, string(solver))
+                        mkpath(output_folder)
+
+                        @info "Solving the model and saving the solution for the case study: $case_name with $solver"
+                        time_to_solve = @elapsed TEM.solve_model!(energy_problem_red)
+                        time_to_save = @elapsed TEM.save_solution!(energy_problem_red)
+                        TEM.export_solution_to_csv_files(output_folder, energy_problem_red)
+
+                        output_file = joinpath(output_folder, "rep_periods_mapping.csv")
+                        DuckDB.execute(connection, "COPY rep_periods_mapping TO '$output_file' (HEADER, DELIMITER ',')")
+
+
+                        CC_investment_df = TIO.get_table(connection, "var_assets_investment")
+                        investment_output_folder_benchmark = joinpath(
+                            @__DIR__,
+                            "outputs",
+                            "N$(number_of_scenarios)_draw$(draw)",
+                            case_name,
+                            "investment_analysis",
+                            "benchmark",
+                        )
+                        mkpath(investment_output_folder_benchmark)
+
+                        mu_value_df = TIO.get_table(connection, "var_value_at_risk_threshold_mu")
+                        mu_value_red = if nrow(mu_value_df) == 0
+                            NaN
+                        else
+                            only(mu_value_df.solution)
+                        end
+
+                        if !isnan(mu_value_red)
+                            @info "mu_value of CC ($rp periods per scenario on reduced scenario set) is defined"
+                            @show mu_value_red
+                        end
+
+                        df_cost_per_scenario = export_total_operational_cost_per_scenario(energy_problem_red, output_folder)
+                        plot_cost_per_scenario(df_cost_per_scenario, output_folder, mu_value_df)
+
+                        var_flow_df = TIO.get_table(connection, "var_flow")
+                        water_borrowed = filter(
+                            row ->
+                                row.from_asset == "water_borrower" && row.to_asset == "hydro_reservoir",
+                            var_flow_df,
+                        )
+                        amount_water_borrowed_err = sum(water_borrowed.solution)
+                        if amount_water_borrowed_err > 0.0
+                            error("Borrowed water has been used: $amount_water_borrowed_err")
+                        end
+                    end
                 end
 
+                @info outlier_found ?
+                      "Fixing variables in the baseline: reduced scenario set including outliers from resolving benchmark solved hourly with $solver" :
+                      "Fixing variables in the baseline: reduced scenario set solved hourly with $solver"
 
-                @info "Fixing variables in the baseline: reduced scenario solved hourly with $solver"
                 fix_variables_from_solution!(
                     energy_problem_baseline,
                     energy_problem_red,
@@ -1046,7 +1298,7 @@ function main()
                     )
                 end
 
-                @info "Resolving the benchmark case study: RP on full set with $solver"
+                @info "Resolving the hourly baseline: hourly on full set with $solver"
                 time_to_resolve_baseline = @elapsed TEM.solve_model!(energy_problem_baseline)
 
                 if energy_problem_baseline.termination_status == JuMP.INFEASIBLE
@@ -1080,22 +1332,23 @@ function main()
                 investment_output_folder_baseline = joinpath(
                     @__DIR__,
                     "outputs",
-                    "N$(number_of_scenarios)_seed$(seed)",
+                    "N$(number_of_scenarios)_draw$(draw)",
+                    case_name,
                     "investment_analysis",
                     "baseline",
                 )
                 mkpath(investment_output_folder_baseline)
 
-                plot_normalized_asset_investment_differences(
-                    baseline_investment_df,
-                    CC_investment_df;
-                    output_folder=investment_output_folder_baseline,
-                    case_name=case_name,
-                    benchmark_num_loss_of_load_e_demand=baseline_n_lol_ens,
-                    benchmark_num_loss_of_load_h2_demand=baseline_n_lol_smr_ccs,
-                    approximation_num_loss_of_load_e_demand=n_lol_ens,
-                    approximation_num_loss_of_load_h2_demand=n_lol_smr_ccs,
-                )
+                # plot_normalized_asset_investment_differences(
+                #     baseline_investment_df,
+                #     CC_investment_df;
+                #     output_folder=investment_output_folder_baseline,
+                #     case_name=case_name,
+                #     benchmark_num_loss_of_load_e_demand=baseline_n_lol_ens,
+                #     benchmark_num_loss_of_load_h2_demand=baseline_n_lol_smr_ccs,
+                #     approximation_num_loss_of_load_e_demand=n_lol_ens,
+                #     approximation_num_loss_of_load_h2_demand=n_lol_smr_ccs,
+                # )
                 # count how much water_borrowed
                 amount_water_borrowed_b = sum(water_borrowed.solution)
 
@@ -1112,7 +1365,7 @@ function main()
                     @show mu_value_baseline
                 end
 
-                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_seed$(seed)", "fixed", "baseline", case_name, string(solver))
+                output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)", case_name, "fixed_in_baseline", string(solver))
                 mkpath(output_folder)
                 TEM.export_solution_to_csv_files(output_folder, energy_problem_baseline)
 
@@ -1124,7 +1377,7 @@ function main()
                 plot_cost_per_scenario(df_cost_per_scenario, output_folder, mu_value_df)
 
                 new_results_row = (
-                    base_name=case_name,
+                    case_name=case_name,
                     rp=rp,
                     solver=solver,
                     time_to_cluster=time_to_cluster,
@@ -1140,18 +1393,20 @@ function main()
                         count_variable_in_set_constraints=false,
                     ),
                     num_variables=JuMP.num_variables(energy_problem_red.model),
-                    time_to_resolve_benchmark=0.0,
-                    objective_value_resolve_benchmark=0.0,
-                    termination_status_resolve_benchmark="",
-                    num_loss_of_load_e_demand_benchmark=0.0,
-                    lole_e_demand_benchmark=0.0,
-                    num_loss_of_load_h2_demand_benchmark=0.0,
-                    lole_h2_demand_benchmark=0.0,
-                    water_borrowed_benchmark=0.0,
-                    value_at_risk_threshold_mu_benchmark=0.0,
+                    time_to_resolve_benchmark=time_to_resolve_benchmark,
+                    objective_value_resolve_benchmark=objective_value_resolve_benchmark,
+                    termination_status_resolve_benchmark=termination_status_resolve_benchmark,
+                    num_loss_of_load_e_demand_benchmark=n_lol_ens_resolve_benchmark,
+                    lole_e_demand_benchmark=lole_e_demand_resolve_benchmark,
+                    num_loss_of_load_h2_demand_benchmark=n_lol_smr_ccs_resolve_benchmark,
+                    lole_h2_demand_benchmark=lole_h2_demand_resolve_benchmark,
+                    water_borrowed_benchmark=amount_water_borrowed_resolve_benchmark,
+                    value_at_risk_threshold_mu_benchmark=mu_value_resolve_benchmark,
                     time_to_resolve_baseline=time_to_resolve_baseline,
                     objective_value_resolve_baseline=energy_problem_baseline.objective_value,
-                    termination_status_resolve_baseline=string(energy_problem_baseline.termination_status),
+                    termination_status_resolve_baseline=string(
+                        energy_problem_baseline.termination_status,
+                    ),
                     num_loss_of_load_e_demand_baseline=n_lol_ens,
                     lole_e_demand_baseline=lole_e_demand,
                     num_loss_of_load_h2_demand_baseline=n_lol_smr_ccs,
@@ -1159,7 +1414,7 @@ function main()
                     water_borrowed_baseline=amount_water_borrowed_b,
                     value_at_risk_threshold_mu_baseline=mu_value_baseline,
                     scenario_set="reduced",
-                    seed=seed,
+                    draw=draw,
                     number_of_scenarios=number_of_scenarios,
                 )
                 push!(results_df, new_results_row)
@@ -1167,7 +1422,8 @@ function main()
         end
     end
 
-    results_df |> CSV.write("outputs/results_CC_per_N$(number_of_scenarios)_seed$(seed).csv"; writeheader=true)
+    output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "NL-output-data", "N$(number_of_scenarios)_draw$(draw)")
+    results_df |> CSV.write(joinpath(output_folder, "results_ScSeRP_N$(number_of_scenarios)_draw$(draw).csv"); writeheader=true)
 
     return nothing
 end
