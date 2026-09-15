@@ -15,5 +15,5 @@ convex_conicalb_per,24,convex_hull_with_null,Euclidean,conical_bounded,2000,0.00
 convex_conicalb_cross,24,convex_hull_with_null,Euclidean,conical_bounded,2000,0.001,cross_scenario,false
 florine,24,kmeans,Euclidean,dirac,2000,0.001,cross_scenario,false
 florinesecond,24,kmeans,Euclidean,convex,2000,0.001,cross_scenario,false
-convex_cross,24,convex_hull,Euclidean,convex,2000,0.001,cross_scenario,false
+convex_cross,24,convex_hull,Euclidean,convex,2000,0.001,cross_scenario,true
 kmedoids_cross_convex,24,k_medoids,Euclidean,convex,2000,0.001,cross_scenario,false
