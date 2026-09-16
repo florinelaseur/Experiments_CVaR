@@ -207,7 +207,7 @@ function prepare_demand_data()
             push!(
                 profiles_list_full,
                 DataFrame(
-                    year=fill(
+                    milestone_year=fill(
                         2035,
                         n_timesteps,
                     ),
@@ -248,7 +248,7 @@ function prepare_demand_data()
     sort!(
         all_profiles_df,
         [
-            :year,
+            :milestone_year,
             :scenario,
             :profile_name,
             :timestep,

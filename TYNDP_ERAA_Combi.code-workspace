@@ -1,15 +1,15 @@
 {
     "folders": [
         {
-            "path": "../../TYNDP-26-to-Tulipa"
-        },
-        {
-            "path": "."
-        },
-        {
+            "name": "ExperimentData",
             "path": "../../Nextcloud/ExperimentData"
         },
         {
+            "name": "Experiments_CVaR",
+            "path": "."
+        },
+        {
+            "name": "TulipaEnergyModel.jl",
             "path": "../CVaR/TulipaEnergyModel.jl"
         }
     ]

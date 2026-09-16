@@ -269,29 +269,20 @@ function main()
             only(mu_value_df.solution)
         end
 
-        flow_ens = filter(row ->
-                occursin("ens", lowercase(row.from_asset)) && occursin("e_demand", lowercase(row.to_asset)),
-            var_flow_df
+        flow_ens = filter(row -> row.from_asset == "ens" && row.to_asset == "e_demand", var_flow_df)
+        flow_smr_ccs =
+            filter(row -> row.from_asset == "smr_ccs" && row.to_asset == "h2_demand", var_flow_df)
+        water_borrowed = filter(
+            row -> row.from_asset == "water_borrower" && row.to_asset == "hydro_reservoir",
+            var_flow_df,
         )
-        flow_smr_ccs = filter(row ->
-                occursin("ens", lowercase(row.from_asset)) && occursin("h2_demand", lowercase(row.to_asset)),
-            var_flow_df
-        )
-        # water_borrowed = filter(
-        #     row -> row.from_asset == "water_borrower" && row.to_asset == "hydro_reservoir",
-        #     var_flow_df,
-        # )
 
-        # count steps with loss of load
-        baseline_n_lol_ens = count(row -> row.solution > 1e-8, eachrow(flow_ens))
+        baseline_n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
         baseline_lole_e_demand = baseline_n_lol_ens / number_of_scenarios
-        baseline_n_lol_smr_ccs = count(row -> row.solution > 1e-8, eachrow(flow_smr_ccs))
+        baseline_n_lol_smr_ccs = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
         baseline_lole_h2_demand = baseline_n_lol_smr_ccs / number_of_scenarios
-        baseline_lol_ens = sum(flow_ens.solution)
-        baseline_lol_smr = sum(flow_smr_ccs.solution)
 
-        # amount_water_borrowed_b = sum(water_borrowed.solution)
-        amount_water_borrowed_b = 0.0
+        amount_water_borrowed_b = sum(water_borrowed.solution)
 
         baseline_investment_by_solver[solver] = copy(baseline_investment_df)
         baseline_n_lol_ens_by_solver[solver] = baseline_n_lol_ens
@@ -504,35 +495,27 @@ function main()
                 var_empirical = sorted_cost_df.total_cost[var_index]
 
                 var_flow_df = TIO.get_table(connection_benchmark, "var_flow")
-                flow_ens = filter(row ->
-                        occursin("ens", lowercase(row.from_asset)) && occursin("e_demand", lowercase(row.to_asset)),
-                    var_flow_df
+                flow_ens = filter(row -> row.from_asset == "ens" && row.to_asset == "e_demand", var_flow_df)
+                flow_smr_ccs =
+                    filter(row -> row.from_asset == "smr_ccs" && row.to_asset == "h2_demand", var_flow_df)
+                water_borrowed = filter(
+                    row ->
+                        row.from_asset == "water_borrower" && row.to_asset == "hydro_reservoir",
+                    var_flow_df,
                 )
-                flow_smr_ccs = filter(row ->
-                        occursin("ens", lowercase(row.from_asset)) && occursin("h2_demand", lowercase(row.to_asset)),
-                    var_flow_df
-                )
-                # water_borrowed = filter(
-                #     row ->
-                #         row.from_asset == "water_borrower" && row.to_asset == "hydro_reservoir",
-                #     var_flow_df,
-                # )
                 # count steps with loss of load
-                bm_n_lol_ens = count(row -> row.solution > 1e-8, eachrow(flow_ens))
+                bm_n_lol_ens = count(row -> row.solution > 0.0, eachrow(flow_ens))
                 lole_e_demand = bm_n_lol_ens / number_of_scenarios
-                bm_n_lol_smr_ccs = count(row -> row.solution > 1e-8, eachrow(flow_smr_ccs))
+                bm_n_lol_smr_ccs = count(row -> row.solution > 0.0, eachrow(flow_smr_ccs))
                 lole_h2_demand = bm_n_lol_smr_ccs / number_of_scenarios
-                bm_lol_ens = sum(flow_ens.solution)
-                bm_lol_smr = sum(flow_smr_ccs.solution)
 
                 # count how much water_borrowed
-                # amount_water_borrowed_b = sum(water_borrowed.solution)
-                amount_water_borrowed_b = 0.0
+                amount_water_borrowed_b = sum(water_borrowed.solution)
 
-                # amount_water_borrowed_err = sum(water_borrowed.solution)
-                # if amount_water_borrowed_err > 0.0
-                #     error("Borrowed water has been used: $amount_water_borrowed_err")
-                # end
+                amount_water_borrowed_err = sum(water_borrowed.solution)
+                if amount_water_borrowed_err > 0.0
+                    error("Borrowed water has been used: $amount_water_borrowed_err")
+                end
 
                 baseline_investment_df = baseline_investment_by_solver[solver]
                 baseline_n_lol_ens = baseline_n_lol_ens_by_solver[solver]

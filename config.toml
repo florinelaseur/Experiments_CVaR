@@ -12,8 +12,8 @@ input_data_NL = "ExperimentData/NL-input-data/NL-case-study"
 scenario_data = "create-scenarios"
 representative_periods = [36]
 run_benchmark = false
-scenarios_starting_set_sizes = [5]
-number_of_scenarios = 5
+scenarios_starting_set_sizes = [1]
+number_of_scenarios = 1
 
 [clustering]
 heuristic_distance = false

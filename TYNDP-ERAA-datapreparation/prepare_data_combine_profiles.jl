@@ -77,7 +77,7 @@ function combine_profiles()
     sort!(
         all_profiles_df,
         [
-            :year,
+            :milestone_year,
             :scenario,
             :profile_name,
             :timestep,
@@ -93,7 +93,7 @@ function combine_profiles()
         groupby(
             all_profiles_df,
             [
-                :year,
+                :milestone_year,
                 :scenario,
                 :profile_name,
                 :timestep,
@@ -113,7 +113,7 @@ function combine_profiles()
             Duplicate profile entries found.
 
             Each combination of
-            year / scenario / profile_name / timestep
+            milestone_year / scenario / profile_name / timestep
             must occur exactly once.
 
             First duplicates:
@@ -146,7 +146,7 @@ function combine_profiles()
     df_wide = unstack(
         all_profiles_df,
         [
-            :year,
+            :milestone_year,
             :timestep,
             :scenario,
         ],

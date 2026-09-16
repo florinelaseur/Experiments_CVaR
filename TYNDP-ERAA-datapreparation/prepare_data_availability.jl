@@ -93,7 +93,7 @@ function prepare_availability_data()
             push!(
                 profiles_list_full,
                 DataFrame(
-                    year=fill(2035, n_timesteps),
+                    milestone_year=fill(2035, n_timesteps),
                     timestep=1:n_timesteps,
                     scenario=fill(s, n_timesteps),
                     profile_name=fill(asset_name, n_timesteps),
@@ -482,7 +482,7 @@ function prepare_availability_data()
     sort!(
         all_profiles_df,
         [
-            :year,
+            :milestone_year,
             :scenario,
             :profile_name,
             :timestep,
