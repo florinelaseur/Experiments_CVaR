@@ -52,7 +52,7 @@ function prepare_inflow_data()
     # ============================================================
 
     n_timesteps = 8760
-    n_scenarios = 5
+    n_scenarios = 36
 
     # Use all 36 ERAA weather scenarios to determine one common
     # normalization factor for each hydro asset.
@@ -362,17 +362,7 @@ function prepare_inflow_data()
 
 
     # ============================================================
-    # CHECK FOR UNSUPPORTED TYNDP HYDRO INFLOW TYPES
-    # ============================================================
-
-    # TYNDP contains Hydro_Pondage assets with inflow profiles,
-    # but the old ERAA preparation script does not define which
-    # ERAA inflow source (HRR/HRI/HOL) should be used for them.
-    #
-    # Do not silently invent this mapping.
-
-    # ============================================================
-    # PONDAGE
+    # PONDAGE / HPI
     # ============================================================
 
     pondage_profiles = filter(
@@ -396,91 +386,20 @@ function prepare_inflow_data()
             )
         )
 
-        # Preferred ERAA inflow source for pondage:
-        #
-        # 1. HPI: dedicated pondage inflow
-        # 2. HRI: reservoir inflow
-        # 3. HOL: open-loop pumped-storage inflow
-        # 4. HRR: run-of-river inflow
-        #
-        # Prefer 2035 data where available; otherwise fall back to 2025.
 
-        inflow_priority = [
-            ("HPI", 2035),
-            ("HPI", 2025),
-            ("HRI", 2035),
-            ("HRI", 2025),
-            ("HOL", 2035),
-            ("HOL", 2025),
-            ("HRR", 2035),
-            ("HRR", 2025),
-        ]
-
-        selected_file = nothing
-        selected_type = nothing
-        selected_year = nothing
-
-        for (inflow_type, year) in inflow_priority
-
-            candidate_file = joinpath(
-                hydro_inflow_folder,
-                "$(zone)_Hydro_Inflows_$(inflow_type)_$(year).csv",
-            )
-
-            if isfile(candidate_file)
-                selected_file = candidate_file
-                selected_type = inflow_type
-                selected_year = year
-                break
-            end
-        end
-
-        if selected_file === nothing
-            error(
-                """
-                No ERAA inflow profile was found for pondage asset:
-                $asset
-
-                Tried HPI, HRI, HOL, and HRR for 2035 and 2025
-                in:
-                $hydro_inflow_folder
-                """
-            )
-        end
-
-        println(
-            "Pondage $asset: using ERAA $selected_type $selected_year inflow."
+        inflow_data = read_inflow(
+            zone,
+            "HPI",
+            asset,
         )
-
-        inflow_data = CSV.read(
-            selected_file,
-            DataFrame,
-        )
-
-        missing_scenario_cols = [
-            ws
-            for ws in scenario_cols
-            if Symbol(ws) ∉ propertynames(inflow_data)
-        ]
-
-        if !isempty(missing_scenario_cols)
-            error(
-                """
-                Missing ERAA scenario columns in:
-                $(basename(selected_file))
-
-                Missing:
-                $(join(missing_scenario_cols, ", "))
-                """
-            )
-        end
 
         normalize_inflow!(
             inflow_data,
             asset,
         )
 
-        # Pondage inflow series are treated as weekly.
+
+        # ERAA HPI input is weekly.
         add_hourly_profile!(
             inflow_data,
             profile_name,

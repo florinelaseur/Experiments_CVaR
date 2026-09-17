@@ -163,182 +163,177 @@ results_df = DataFrame(;
 
 
 function main()
-    connection_benchmark = DuckDB.DBInterface.connect(DuckDB.DB)
-    TIO.read_csv_folder(connection_benchmark, input_data_path)
-    profiles_wide = TIO.get_table(connection_benchmark, "profiles_wide")
-    n_scenarios = length(unique(profiles_wide.scenario))
+    # @info "Running the base case study (0_HourlyBaseline)"
+    # base_name = "0_HourlyBaseline"
 
-    @info "Running the base case study (0_HourlyBaseline)"
-    base_name = "0_HourlyBaseline"
+    # # set up the connection and read the data
+    # connection_baseline = DuckDB.DBInterface.connect(DuckDB.DB)
+    # TIO.read_csv_folder(connection_baseline, input_data_path)
+    # # update the CSV input data for Tulipa from the config file info
+    # DuckDB.query(
+    #     connection_baseline,
+    #     "
+    #     UPDATE model_parameters -- tables are with underscore in DuckDB world
+    #     SET
+    #         risk_aversion_weight_lambda = $(lambda) ,
+    #         risk_aversion_confidence_level_alpha = $(alpha);
+    #     ",
+    # )
+    # # transform the profiles data from wide to long
+    # TC.transform_wide_to_long!(
+    #     connection_baseline,
+    #     "profiles_wide",
+    #     "profiles";
+    #     exclude_columns=["scenario", "milestone_year", "timestep"],
+    # )
 
-    # set up the connection and read the data
-    connection_baseline = DuckDB.DBInterface.connect(DuckDB.DB)
-    TIO.read_csv_folder(connection_baseline, input_data_path)
-    # update the CSV input data for Tulipa from the config file info
-    DuckDB.query(
-        connection_baseline,
-        "
-        UPDATE model_parameters -- tables are with underscore in DuckDB world
-        SET
-            risk_aversion_weight_lambda = $(lambda) ,
-            risk_aversion_confidence_level_alpha = $(alpha);
-        ",
-    )
-    # transform the profiles data from wide to long
-    TC.transform_wide_to_long!(
-        connection_baseline,
-        "profiles_wide",
-        "profiles";
-        exclude_columns=["scenario", "milestone_year", "timestep"],
-    )
+    # layout = TC.ProfilesTableLayout(;
+    #     year=:milestone_year,
+    #     cols_to_groupby=[:milestone_year, :scenario],
+    # )
+    # time_to_cluster = @elapsed TC.dummy_cluster!(connection_baseline; layout=layout)
+    # TEM.populate_with_defaults!(connection_baseline)
+    # DuckDB.query(connection_baseline, "UPDATE asset SET is_seasonal = false")
 
-    layout = TC.ProfilesTableLayout(;
-        year=:milestone_year,
-        cols_to_groupby=[:milestone_year, :scenario],
-    )
-    time_to_cluster = @elapsed TC.dummy_cluster!(connection_baseline; layout=layout)
-    TEM.populate_with_defaults!(connection_baseline)
-    DuckDB.query(connection_baseline, "UPDATE asset SET is_seasonal = false")
+    # time_to_read = @elapsed energy_problem_baseline = TEM.EnergyProblem(connection_baseline)
 
-    time_to_read = @elapsed energy_problem_baseline = TEM.EnergyProblem(connection_baseline)
+    # baseline_investment_by_solver = Dict{Symbol,DataFrame}()
+    # baseline_n_lol_ens_by_solver = Dict{Symbol,Int}()
+    # baseline_n_lol_smr_ccs_by_solver = Dict{Symbol,Int}()
+    # baseline_objective_by_solver = Dict{Symbol,Float64}()
 
-    baseline_investment_by_solver = Dict{Symbol,DataFrame}()
-    baseline_n_lol_ens_by_solver = Dict{Symbol,Int}()
-    baseline_n_lol_smr_ccs_by_solver = Dict{Symbol,Int}()
-    baseline_objective_by_solver = Dict{Symbol,Float64}()
+    # for solver in solvers
+    #     optimizer, parameters = get_solver_parameters(solver)
 
-    for solver in solvers
-        optimizer, parameters = get_solver_parameters(solver)
+    #     @info "Creating the model for the base case study $base_name with $solver"
+    #     time_to_create = @elapsed TEM.create_model!(
+    #         energy_problem_baseline;
+    #         optimizer=optimizer,
+    #         optimizer_parameters=parameters,
+    #         model_file_name="",
+    #         enable_names=enable_names,
+    #         direct_model=direct_model,
+    #     )
 
-        @info "Creating the model for the base case study $base_name with $solver"
-        time_to_create = @elapsed TEM.create_model!(
-            energy_problem_baseline;
-            optimizer=optimizer,
-            optimizer_parameters=parameters,
-            model_file_name="",
-            enable_names=enable_names,
-            direct_model=direct_model,
-        )
+    #     baseline_output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "EU-output-data", base_name, "N$(number_of_scenarios)_draw$(draw)", string(solver))
+    #     mkpath(baseline_output_folder)
 
-        baseline_output_folder = joinpath(homedir(), "Nextcloud", "ExperimentData", "EU-output-data", base_name, "N$(number_of_scenarios)_draw$(draw)", string(solver))
-        mkpath(baseline_output_folder)
+    #     if !(isfile(joinpath(baseline_output_folder, "var_assets_investment.csv")) &&
+    #          isfile(joinpath(baseline_output_folder, "var_flow.csv")) &&
+    #          isfile(joinpath(baseline_output_folder, "baseline_breakdown.csv")) &&
+    #          isfile(joinpath(baseline_output_folder, "var_value_at_risk_threshold_mu.csv",)) &&
+    #          isfile(joinpath(baseline_output_folder, "total_operational_cost_per_scenario.csv",)))
 
-        if !(isfile(joinpath(baseline_output_folder, "var_assets_investment.csv")) &&
-             isfile(joinpath(baseline_output_folder, "var_flow.csv")) &&
-             isfile(joinpath(baseline_output_folder, "baseline_breakdown.csv")) &&
-             isfile(joinpath(baseline_output_folder, "var_value_at_risk_threshold_mu.csv",)) &&
-             isfile(joinpath(baseline_output_folder, "total_operational_cost_per_scenario.csv",)))
+    #         @info "Solving the model and saving the solution for the base case study $base_name with $solver"
+    #         time_to_solve = @elapsed TEM.solve_model!(energy_problem_baseline)
+    #         #        mu_value =
+    #         #            JuMP.value(energy_problem_baseline.variables[:value_at_risk_threshold_mu].container)
+    #         time_to_save = @elapsed TEM.save_solution!(energy_problem_baseline)
+    #         TEM.export_solution_to_csv_files(baseline_output_folder, energy_problem_baseline)
 
-            @info "Solving the model and saving the solution for the base case study $base_name with $solver"
-            time_to_solve = @elapsed TEM.solve_model!(energy_problem_baseline)
-            #        mu_value =
-            #            JuMP.value(energy_problem_baseline.variables[:value_at_risk_threshold_mu].container)
-            time_to_save = @elapsed TEM.save_solution!(energy_problem_baseline)
-            TEM.export_solution_to_csv_files(baseline_output_folder, energy_problem_baseline)
+    #         baseline_investment_df = TIO.get_table(connection_baseline, "var_assets_investment")
+    #         baseline_objective = energy_problem_baseline.objective_value
+    #         termination_status = string(energy_problem_baseline.termination_status)
+    #         baseline_df = DataFrame(time_to_solve=[time_to_solve], time_to_save=[time_to_save], objective_value=[baseline_objective], termination_status=[termination_status])
+    #         CSV.write(joinpath(baseline_output_folder, "baseline_breakdown.csv"), baseline_df; writeheader=true)
 
-            baseline_investment_df = TIO.get_table(connection_baseline, "var_assets_investment")
-            baseline_objective = energy_problem_baseline.objective_value
-            termination_status = string(energy_problem_baseline.termination_status)
-            baseline_df = DataFrame(time_to_solve=[time_to_solve], time_to_save=[time_to_save], objective_value=[baseline_objective], termination_status=[termination_status])
-            CSV.write(joinpath(baseline_output_folder, "baseline_breakdown.csv"), baseline_df; writeheader=true)
+    #         mu_value_df = TIO.get_table(connection_baseline, "var_value_at_risk_threshold_mu")
+    #         var_flow_df = TIO.get_table(connection_baseline, "var_flow")
 
-            mu_value_df = TIO.get_table(connection_baseline, "var_value_at_risk_threshold_mu")
-            var_flow_df = TIO.get_table(connection_baseline, "var_flow")
+    #         df_cost_per_scenario = export_total_operational_cost_per_scenario(energy_problem_baseline, baseline_output_folder)
+    #         plot_cost_per_scenario(df_cost_per_scenario, baseline_output_folder, mu_value_df)
 
-            df_cost_per_scenario = export_total_operational_cost_per_scenario(energy_problem_baseline, baseline_output_folder)
-            plot_cost_per_scenario(df_cost_per_scenario, baseline_output_folder, mu_value_df)
+    #     else
+    #         baseline_df = CSV.read(joinpath(baseline_output_folder, "baseline_breakdown.csv"), DataFrame)
+    #         time_to_solve = only(baseline_df.time_to_solve)
+    #         time_to_save = only(baseline_df.time_to_save)
+    #         baseline_investment_df = CSV.read(joinpath(baseline_output_folder, "var_assets_investment.csv"), DataFrame)
+    #         baseline_objective = only(baseline_df.objective_value)
+    #         termination_status = only(baseline_df.termination_status)
 
-        else
-            baseline_df = CSV.read(joinpath(baseline_output_folder, "baseline_breakdown.csv"), DataFrame)
-            time_to_solve = only(baseline_df.time_to_solve)
-            time_to_save = only(baseline_df.time_to_save)
-            baseline_investment_df = CSV.read(joinpath(baseline_output_folder, "var_assets_investment.csv"), DataFrame)
-            baseline_objective = only(baseline_df.objective_value)
-            termination_status = only(baseline_df.termination_status)
+    #         mu_value_df = CSV.read(joinpath(baseline_output_folder, "var_value_at_risk_threshold_mu.csv"), DataFrame)
+    #         var_flow_df = CSV.read(joinpath(baseline_output_folder, "var_flow.csv"), DataFrame)
 
-            mu_value_df = CSV.read(joinpath(baseline_output_folder, "var_value_at_risk_threshold_mu.csv"), DataFrame)
-            var_flow_df = CSV.read(joinpath(baseline_output_folder, "var_flow.csv"), DataFrame)
+    #         df_cost_per_scenario = CSV.read(joinpath(baseline_output_folder, "total_operational_cost_per_scenario.csv"), DataFrame)
+    #         plot_cost_per_scenario(df_cost_per_scenario, baseline_output_folder, mu_value_df)
+    #     end
 
-            df_cost_per_scenario = CSV.read(joinpath(baseline_output_folder, "total_operational_cost_per_scenario.csv"), DataFrame)
-            plot_cost_per_scenario(df_cost_per_scenario, baseline_output_folder, mu_value_df)
-        end
+    #     mu_value = if nrow(mu_value_df) == 0
+    #         NaN
+    #     else
+    #         only(mu_value_df.solution)
+    #     end
 
-        mu_value = if nrow(mu_value_df) == 0
-            NaN
-        else
-            only(mu_value_df.solution)
-        end
+    #     flow_ens = filter(row ->
+    #             occursin("ens", lowercase(row.from_asset)) && occursin("e_demand", lowercase(row.to_asset)),
+    #         var_flow_df
+    #     )
+    #     flow_smr_ccs = filter(row ->
+    #             occursin("ens", lowercase(row.from_asset)) && occursin("h_demand", lowercase(row.to_asset)),
+    #         var_flow_df
+    #     )
+    #     # water_borrowed = filter(
+    #     #     row -> row.from_asset == "water_borrower" && row.to_asset == "hydro_reservoir",
+    #     #     var_flow_df,
+    #     # )
 
-        flow_ens = filter(row ->
-                occursin("ens", lowercase(row.from_asset)) && occursin("e_demand", lowercase(row.to_asset)),
-            var_flow_df
-        )
-        flow_smr_ccs = filter(row ->
-                occursin("ens", lowercase(row.from_asset)) && occursin("h2_demand", lowercase(row.to_asset)),
-            var_flow_df
-        )
-        # water_borrowed = filter(
-        #     row -> row.from_asset == "water_borrower" && row.to_asset == "hydro_reservoir",
-        #     var_flow_df,
-        # )
+    #     # count steps with loss of load
+    #     baseline_n_lol_ens = count(row -> row.solution > 1e-8, eachrow(flow_ens))
+    #     baseline_lole_e_demand = baseline_n_lol_ens / number_of_scenarios
+    #     baseline_n_lol_smr_ccs = count(row -> row.solution > 1e-8, eachrow(flow_smr_ccs))
+    #     baseline_lole_h2_demand = baseline_n_lol_smr_ccs / number_of_scenarios
+    #     baseline_lol_ens = sum(flow_ens.solution)
+    #     baseline_lol_smr = sum(flow_smr_ccs.solution)
 
-        # count steps with loss of load
-        baseline_n_lol_ens = count(row -> row.solution > 1e-8, eachrow(flow_ens))
-        baseline_lole_e_demand = baseline_n_lol_ens / number_of_scenarios
-        baseline_n_lol_smr_ccs = count(row -> row.solution > 1e-8, eachrow(flow_smr_ccs))
-        baseline_lole_h2_demand = baseline_n_lol_smr_ccs / number_of_scenarios
-        baseline_lol_ens = sum(flow_ens.solution)
-        baseline_lol_smr = sum(flow_smr_ccs.solution)
+    #     # amount_water_borrowed_b = sum(water_borrowed.solution)
+    #     amount_water_borrowed_b = 0.0
 
-        # amount_water_borrowed_b = sum(water_borrowed.solution)
-        amount_water_borrowed_b = 0.0
+    #     baseline_investment_by_solver[solver] = copy(baseline_investment_df)
+    #     baseline_n_lol_ens_by_solver[solver] = baseline_n_lol_ens
+    #     baseline_n_lol_smr_ccs_by_solver[solver] = baseline_n_lol_smr_ccs
+    #     baseline_objective_by_solver[solver] = baseline_objective
 
-        baseline_investment_by_solver[solver] = copy(baseline_investment_df)
-        baseline_n_lol_ens_by_solver[solver] = baseline_n_lol_ens
-        baseline_n_lol_smr_ccs_by_solver[solver] = baseline_n_lol_smr_ccs
-        baseline_objective_by_solver[solver] = baseline_objective
-
-        new_results_row = (
-            case_name=base_name,
-            rp=1,
-            solver=solver,
-            time_to_cluster=0.0,
-            time_to_read=time_to_read,
-            time_to_create=time_to_create,
-            time_to_solve=time_to_solve,
-            time_to_save=time_to_save,
-            objective_value=baseline_objective,
-            termination_status=termination_status,
-            value_at_risk_threshold_mu_red=0.0,
-            num_constraints=JuMP.num_constraints(
-                energy_problem_baseline.model;
-                count_variable_in_set_constraints=false,
-            ),
-            num_variables=JuMP.num_variables(energy_problem_baseline.model),
-            time_to_resolve_benchmark=0.0,
-            objective_value_resolve_benchmark=0.0,
-            termination_status_resolve_benchmark="",
-            num_loss_of_load_e_demand_benchmark=0,
-            lole_e_demand_benchmark=0.0,
-            num_loss_of_load_h2_demand_benchmark=0,
-            lole_h2_demand_benchmark=0.0,
-            water_borrowed_benchmark=0.0,
-            value_at_risk_threshold_mu_benchmark=0.0,
-            time_to_resolve_baseline=0.0,
-            objective_value_resolve_baseline=0.0,
-            termination_status_resolve_baseline="",
-            num_loss_of_load_e_demand_baseline=baseline_n_lol_ens,
-            lole_e_demand_baseline=baseline_lole_e_demand,
-            num_loss_of_load_h2_demand_baseline=baseline_n_lol_smr_ccs,
-            lole_h2_demand_baseline=baseline_lole_h2_demand,
-            water_borrowed_baseline=amount_water_borrowed_b,
-            value_at_risk_threshold_mu_baseline=mu_value,
-            scenario_set="full",
-            draw=draw,
-            number_of_scenarios=number_of_scenarios,
-        )
-        push!(results_df, new_results_row)
-    end
+    #     new_results_row = (
+    #         case_name=base_name,
+    #         rp=1,
+    #         solver=solver,
+    #         time_to_cluster=0.0,
+    #         time_to_read=time_to_read,
+    #         time_to_create=time_to_create,
+    #         time_to_solve=time_to_solve,
+    #         time_to_save=time_to_save,
+    #         objective_value=baseline_objective,
+    #         termination_status=termination_status,
+    #         value_at_risk_threshold_mu_red=0.0,
+    #         num_constraints=JuMP.num_constraints(
+    #             energy_problem_baseline.model;
+    #             count_variable_in_set_constraints=false,
+    #         ),
+    #         num_variables=JuMP.num_variables(energy_problem_baseline.model),
+    #         time_to_resolve_benchmark=0.0,
+    #         objective_value_resolve_benchmark=0.0,
+    #         termination_status_resolve_benchmark="",
+    #         num_loss_of_load_e_demand_benchmark=0,
+    #         lole_e_demand_benchmark=0.0,
+    #         num_loss_of_load_h2_demand_benchmark=0,
+    #         lole_h2_demand_benchmark=0.0,
+    #         water_borrowed_benchmark=0.0,
+    #         value_at_risk_threshold_mu_benchmark=0.0,
+    #         time_to_resolve_baseline=0.0,
+    #         objective_value_resolve_baseline=0.0,
+    #         termination_status_resolve_baseline="",
+    #         num_loss_of_load_e_demand_baseline=baseline_n_lol_ens,
+    #         lole_e_demand_baseline=baseline_lole_e_demand,
+    #         num_loss_of_load_h2_demand_baseline=baseline_n_lol_smr_ccs,
+    #         lole_h2_demand_baseline=baseline_lole_h2_demand,
+    #         water_borrowed_baseline=amount_water_borrowed_b,
+    #         value_at_risk_threshold_mu_baseline=mu_value,
+    #         scenario_set="full",
+    #         draw=draw,
+    #         number_of_scenarios=number_of_scenarios,
+    #     )
+    #     push!(results_df, new_results_row)
+    # end
 
 
     # optimize the energy system for each case study
@@ -354,8 +349,21 @@ function main()
         run_case = row[:run_case]
 
         weight_fitting_kwargs = Dict(:learning_rate => learning_rate, :niters => niters)
-        clustering_kwargs = Dict(:learning_rate => learning_rate, :niters => niters)
-
+        # clustering_kwargs = Dict(:learning_rate => learning_rate, :niters => niters)
+        if method ∉ [:k_means, :k_medoids]
+            clustering_kwargs = Dict(
+                :learning_rate => learning_rate,
+                :niters => niters,
+                :heuristic_distance => heuristic_distance,
+                :use_apgs => use_apgs,
+                :perc_initial_clustering => perc_initial_clustering
+            )
+        else
+            clustering_kwargs = (
+                :use_apgs => use_apgs,
+                :perc_initial_clustering => perc_initial_clustering
+            )
+        end
         if !run_case
             continue
         end
@@ -509,7 +517,7 @@ function main()
                     var_flow_df
                 )
                 flow_smr_ccs = filter(row ->
-                        occursin("ens", lowercase(row.from_asset)) && occursin("h2_demand", lowercase(row.to_asset)),
+                        occursin("ens", lowercase(row.from_asset)) && occursin("h_demand", lowercase(row.to_asset)),
                     var_flow_df
                 )
                 # water_borrowed = filter(
@@ -533,11 +541,6 @@ function main()
                 # if amount_water_borrowed_err > 0.0
                 #     error("Borrowed water has been used: $amount_water_borrowed_err")
                 # end
-
-                baseline_investment_df = baseline_investment_by_solver[solver]
-                baseline_n_lol_ens = baseline_n_lol_ens_by_solver[solver]
-                baseline_n_lol_smr_ccs = baseline_n_lol_smr_ccs_by_solver[solver]
-                baseline_objective = baseline_objective_by_solver[solver]
 
                 new_results_row = (
                     case_name=case_name,
