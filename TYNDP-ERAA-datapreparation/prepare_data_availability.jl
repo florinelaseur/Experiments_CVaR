@@ -147,25 +147,27 @@ function prepare_availability_data()
     """
     Aggregate ERAA solar capacity-factor profiles within one market node.
 
-    No installed-capacity data are used.
-
-    The TYNDP assets-profiles.csv determines which model availability
-    profiles are required. ERAA determines the corresponding
-    weather-dependent capacity-factor time series.
+    Installed-capacity shares (from capacities-2030.csv) determine
+    which market nodes are dominated by one subtype. For those nodes
+    the minority subtype is dropped instead of being averaged in.
 
     :photovoltaic combines the available ERAA profiles:
         - PV utility fixed
         - PV utility tracking
+    Exceptions (single-subtype capacity share > ~80%):
+        - CY00, HU00, ITN1, DKW1, DKE1 follow PV utility fixed only
+        - ITSA, ITSI, AL00 follow PV utility tracking only
 
     :rooftop combines the available ERAA profiles:
         - PV industrial rooftop
         - PV residential rooftop
+    Exceptions (small industrial share):
+        - CY00, GR00, GR03 follow PV residential rooftop only
 
-    If only one underlying ERAA profile exists, that profile is used
-    directly.
-
-    If both underlying ERAA profiles exist, their capacity factors
-    are averaged equally for every timestep and weather scenario.
+    Everywhere else, if only one underlying ERAA profile exists, that
+    profile is used directly. If both underlying ERAA profiles exist,
+    their capacity factors are averaged equally for every timestep
+    and weather scenario.
     """
     function aggregate_solar_profiles(
         zone::String,
@@ -174,17 +176,37 @@ function prepare_availability_data()
 
         if solar_type == :photovoltaic
 
-            file_suffixes = [
-                "PV_utility_fixed",
-                "PV_utility_tracking",
-            ]
+            if zone in ("CY00", "HU00", "ITN1", "DKW1", "DKE1")
+
+                file_suffixes = ["PV_utility_fixed"]
+
+            elseif zone in ("ITSA", "ITSI", "AL00")
+
+                file_suffixes = ["PV_utility_tracking"]
+
+            else
+
+                file_suffixes = [
+                    "PV_utility_fixed",
+                    "PV_utility_tracking",
+                ]
+
+            end
 
         elseif solar_type == :rooftop
 
-            file_suffixes = [
-                "PV_industrial_rooftop",
-                "PV_residential_rooftop",
-            ]
+            if zone in ("CY00", "GR00", "GR03")
+
+                file_suffixes = ["PV_residential_rooftop"]
+
+            else
+
+                file_suffixes = [
+                    "PV_industrial_rooftop",
+                    "PV_residential_rooftop",
+                ]
+
+            end
 
         else
             error(
