@@ -6,11 +6,16 @@ cd(@__DIR__)
 
 function combine_profiles()
 
+    # input_data_folder = joinpath(
+    #     homedir(),
+    #     "Nextcloud",
+    #     "ExperimentData",
+    #     "EU-input-data",
+    # )
+
     input_data_folder = joinpath(
         homedir(),
-        "Nextcloud",
-        "ExperimentData",
-        "EU-input-data",
+        "Server",
     )
 
     demand_file = joinpath(

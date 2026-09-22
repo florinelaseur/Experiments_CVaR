@@ -22,14 +22,20 @@ function prepare_demand_data()
     )
 
     # TYNDP model input data
+    # input_data_folder_TYNDP = joinpath(
+    #     homedir(),
+    #     "Nextcloud",
+    #     "ExperimentData",
+    #     "EU-input-data",
+    #     "TYNDP",
+    #     "Outputs",
+    #     "tulipa_input_north_sea_2026_2035_de",
+    # )
+
     input_data_folder_TYNDP = joinpath(
         homedir(),
-        "Nextcloud",
-        "ExperimentData",
-        "EU-input-data",
-        "TYNDP",
-        "Outputs",
-        "tulipa_input_north_sea_2026_2035_de",
+        "Server",
+        "tulipa_input_north_sea_2026_2035_de_bnl"
     )
 
     profiles_file = joinpath(
@@ -278,11 +284,17 @@ function prepare_demand_data()
     # WRITE OUTPUT
     # ============================================================
 
+    # output_file = joinpath(
+    #     homedir(),
+    #     "Nextcloud",
+    #     "ExperimentData",
+    #     "EU-input-data",
+    #     "profiles-demand.csv",
+    # )
+
     output_file = joinpath(
         homedir(),
-        "Nextcloud",
-        "ExperimentData",
-        "EU-input-data",
+        "Server",
         "profiles-demand.csv",
     )
 

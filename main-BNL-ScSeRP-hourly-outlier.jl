@@ -10,6 +10,7 @@ ENV["GKSwstype"] = "100"
 # Pkg.activate(".")
 # Pkg.instantiate()
 
+
 # Load the required packages
 import TulipaEnergyModel as TEM
 import TulipaIO as TIO
