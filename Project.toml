@@ -18,3 +18,4 @@ juliaup_jll = "038fdbe3-3777-5af9-9568-3738956aeb97"
 [compat]
 TulipaClustering = "0.5.1"
 TulipaIO = "0.5.0"
+TulipaEnergyModel = "0.22.2"

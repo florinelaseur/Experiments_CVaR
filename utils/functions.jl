@@ -1,5 +1,7 @@
 
 function get_solver_parameters(optimizer::Symbol)
+    n_threads = parse(Int, get(ENV, "SLURM_CPUS_PER_TASK", "4"))
+
     if optimizer == :HiGHS
         return HiGHS.Optimizer,
         Dict(
@@ -7,11 +9,16 @@ function get_solver_parameters(optimizer::Symbol)
             "solver" => "hipo",
             "parallel" => "on",
             "run_crossover" => "off",
+            "threads" => n_threads,          # HiGHS: kleine letters
         )
     elseif optimizer == :Gurobi
-        return Gurobi.Optimizer, Dict("OutputFlag" => 1)
+        return Gurobi.Optimizer,
+        Dict(
+            "OutputFlag" => 1,
+            "Threads" => n_threads,          # Gurobi: hoofdletter
+        )
     else
-        return HiGHS.Optimizer, Dict()
+        return HiGHS.Optimizer, Dict("threads" => n_threads)
     end
 end
 
@@ -574,8 +581,8 @@ function export_operational_cost_per_scenario(energy_problem, output_folder)
 
     operational_costs = JuMP.value.(
         flows_cost .+
-        vintage_flows_cost .+
-        units_on_cost
+            vintage_flows_cost .+
+            units_on_cost
     )
 
     df[!, :operational_cost] = operational_costs
@@ -872,7 +879,7 @@ function plot_normalized_asset_investment_differences(
         if benchmark_solution[i] > 0
             inv_diff[i] =
                 (approximation_solution[i] - benchmark_solution[i]) /
-                benchmark_solution[i]
+                    benchmark_solution[i]
         else
             inv_diff[i] = approximation_solution[i] - benchmark_solution[i]
         end
@@ -984,9 +991,9 @@ function plot_comparison(output_folder, number_of_scenarios)
     # Runtime
     df_plot[!, :runtime_own] =
         df_plot.time_to_read .+
-        df_plot.time_to_create .+
-        df_plot.time_to_solve .+
-        df_plot.time_to_save
+            df_plot.time_to_create .+
+            df_plot.time_to_solve .+
+            df_plot.time_to_save
 
     rp_rows = df_plot.rp .> 1
 
@@ -994,7 +1001,7 @@ function plot_comparison(output_folder, number_of_scenarios)
 
     df_plot[rp_rows, :runtime_total] =
         df_plot[rp_rows, :runtime_own] .+
-        df_plot[rp_rows, :time_to_resolve_hourly]
+            df_plot[rp_rows, :time_to_resolve_hourly]
 
     runtime_comparison = copy(df_plot.runtime_total)
 
@@ -1124,10 +1131,10 @@ function plot_comparison_copy(output_folder, number_of_scenarios)
     # RP model runtime, excluding clustering
     df_plot[!, :runtime_rp] =
         df_plot.time_to_cluster .+
-        df_plot.time_to_read .+
-        df_plot.time_to_create .+
-        df_plot.time_to_solve .+
-        df_plot.time_to_save
+            df_plot.time_to_read .+
+            df_plot.time_to_create .+
+            df_plot.time_to_solve .+
+            df_plot.time_to_save
 
     comparison = DataFrame(
         case_label=String[],
@@ -1389,10 +1396,10 @@ function plot_comparison_runtime(results_path)
     # Runtime of the model itself, including clustering
     df_plot[!, :runtime_model] =
         df_plot.time_to_cluster .+
-        df_plot.time_to_read .+
-        df_plot.time_to_create .+
-        df_plot.time_to_solve .+
-        df_plot.time_to_save
+            df_plot.time_to_read .+
+            df_plot.time_to_create .+
+            df_plot.time_to_solve .+
+            df_plot.time_to_save
 
     comparison = DataFrame(
         case_label=String[],
@@ -1405,7 +1412,7 @@ function plot_comparison_runtime(results_path)
 
         # Free hourly baseline solve
         if row.base_name == "0_HourlyBaseline" &&
-           row.scenario_set == "full"
+            row.scenario_set == "full"
 
             push!(comparison, (
                 case_label="Hourly baseline",
@@ -1416,11 +1423,11 @@ function plot_comparison_runtime(results_path)
 
             # CC solve plus hourly OOS resolve with CC investments fixed
         elseif row.scenario_set == "reduced" &&
-               string(row.termination_status_resolve_baseline) == "OPTIMAL"
+            string(row.termination_status_resolve_baseline) == "OPTIMAL"
 
             runtime_cc_and_resolve =
                 row.runtime_model +
-                row.time_to_resolve_baseline
+                    row.time_to_resolve_baseline
 
             push!(comparison, (
                 case_label="$(row.rp) RPs: CC + hourly resolve",
